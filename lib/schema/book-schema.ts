@@ -12,8 +12,17 @@ export const BookSentenceSchema = z.object({
   textTarget: z.string(),
   textNative: z.string(),
   audioS3Key: z.string().min(1),
-  audioUrl: z.string().optional().nullable(), // Populated when presigned for frontend reader
+  audioUrl: z.string().optional().nullable(),
   wordTimestamps: z.array(BookWordTimestampSchema).default([]),
+});
+
+// 🟢 Pre-baked Reading Buddy Teaching Schema
+export const CheckpointSpriteTeachingSchema = z.object({
+  successComment: z.string(),
+  successMood: z.string().default("excited"),
+  hintComment: z.string(),
+  hintMood: z.string().default("thinking"),
+  trapExplo: z.string().nullable().optional(),
 });
 
 export const BookPageCheckpointSchema = z.object({
@@ -23,6 +32,7 @@ export const BookPageCheckpointSchema = z.object({
   options: z.array(z.string()).nullable().optional(),
   correctAnswer: z.string(),
   explanationNative: z.string(),
+  spriteTeaching: CheckpointSpriteTeachingSchema, // 🟢 Integrated Sprite Teaching
 });
 
 export const LocalizedBookPageSchema = z.object({
@@ -51,6 +61,9 @@ export const SpoonBookWebhookSchema = z.object({
 
 export type BookWordTimestamp = z.infer<typeof BookWordTimestampSchema>;
 export type BookSentence = z.infer<typeof BookSentenceSchema>;
+export type CheckpointSpriteTeaching = z.infer<
+  typeof CheckpointSpriteTeachingSchema
+>;
 export type BookPageCheckpoint = z.infer<typeof BookPageCheckpointSchema>;
 export type LocalizedBookPage = z.infer<typeof LocalizedBookPageSchema>;
 export type LocalizedBookTranslation = z.infer<
