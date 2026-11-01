@@ -9,6 +9,7 @@ import {
   History,
   Plus,
   Moon,
+  Zap,
   MessageSquare,
   MessagesSquare,
   RectangleHorizontal,
@@ -26,8 +27,9 @@ interface SpriteChatHeaderProps {
   activeTab: ActiveTab;
   viewMode: ChatViewMode;
   sessionsCount: number;
+  energyCount?: number;
+  maxEnergy?: number;
   isSnoozing?: boolean;
-  /** Automatically collapses the bulky top row when a chat/board session is active */
   isSessionActive?: boolean;
   onSelectTab: (tab: ActiveTab) => void;
   onChangeViewMode: (mode: ChatViewMode) => void;
@@ -42,6 +44,8 @@ export function SpriteChatHeader({
   activeTab,
   viewMode,
   sessionsCount,
+  energyCount = 1,
+  maxEnergy = 3,
   isSnoozing = false,
   isSessionActive = false,
   onSelectTab,
@@ -51,13 +55,12 @@ export function SpriteChatHeader({
 }: SpriteChatHeaderProps) {
   const [manualExpand, setManualExpand] = useState(false);
 
-  // Auto-collapse Row 1 when inside an active Session tab, unless manually expanded
   const isCollapsed =
     activeTab === "session" && isSessionActive && !manualExpand;
 
   return (
     <div className="relative z-20 overflow-hidden border-b border-white/10 bg-gradient-to-r from-teal-950/90 via-indigo-950/90 to-slate-950/95 px-4 py-2.5 shrink-0 transition-all">
-      {/* EXPANDED ROW 1: Only shown on Briefing/History, Empty Session, or when toggled open */}
+      {/* EXPANDED ROW 1 */}
       <AnimatePresence initial={false}>
         {!isCollapsed && (
           <motion.div
@@ -109,10 +112,12 @@ export function SpriteChatHeader({
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <h3 className="text-base font-extrabold text-white tracking-tight">
                       {spriteName}
                     </h3>
+
+                    {/* Status Badge */}
                     {isSnoozing ? (
                       <span className="rounded-full bg-indigo-500/20 border border-indigo-400/40 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-indigo-200">
                         💤 Snoozing
@@ -122,7 +127,32 @@ export function SpriteChatHeader({
                         AI Tutor
                       </span>
                     )}
+
+                    {/* ⚡ 3-Slot Energy Meter (e.g. ⚡ ⚡ ⚪) */}
+                    <div
+                      className="flex items-center gap-1 rounded-full bg-slate-950/80 border border-amber-300/30 px-2.5 py-0.5"
+                      title={`${energyCount} of ${maxEnergy} Energy Charges available`}
+                    >
+                      <span className="text-[10px] font-black text-amber-300 mr-0.5">
+                        {energyCount}/{maxEnergy}
+                      </span>
+                      {Array.from({ length: maxEnergy }).map((_, idx) => {
+                        const slot = idx + 1;
+                        const isCharged = slot <= energyCount;
+                        return (
+                          <Zap
+                            key={slot}
+                            className={`h-3 w-3 transition-all ${
+                              isCharged
+                                ? "text-amber-300 fill-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
+                                : "text-slate-600 fill-slate-800/80"
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
+
                   <p className="text-xs font-semibold text-indigo-200/90 mt-0.5">
                     <span className="text-teal-400 font-extrabold">
                       Current:
@@ -136,9 +166,8 @@ export function SpriteChatHeader({
         )}
       </AnimatePresence>
 
-      {/* SLEEK SINGLE-LINE COMMAND BAR (Always Visible — Only 44px Tall!) */}
+      {/* SLEEK SINGLE-LINE COMMAND BAR */}
       <div className="flex flex-nowrap items-center justify-between gap-2">
-        {/* LEFT: Compact New-Session Button (when collapsed) + Navigation Tabs */}
         <div className="flex items-center gap-2 min-w-0">
           {isCollapsed && (
             <button
@@ -190,9 +219,27 @@ export function SpriteChatHeader({
               </button>
             ))}
           </div>
+
+          {/* Compact Energy Pill in 44px Mode */}
+          {isCollapsed && (
+            <div
+              className="hidden sm:flex items-center gap-1 rounded-xl bg-slate-950/80 border border-amber-300/30 px-2 py-1"
+              title={`${energyCount} of ${maxEnergy} Energy Charges`}
+            >
+              <Zap
+                className={`h-3 w-3 ${
+                  energyCount > 0
+                    ? "text-amber-300 fill-amber-300"
+                    : "text-slate-600 fill-slate-800"
+                }`}
+              />
+              <span className="text-[10px] font-black text-amber-300">
+                {energyCount}/{maxEnergy}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* RIGHT: Single/Multi Toggle + Expand/Collapse Header Toggle + Close Button */}
         <div className="flex shrink-0 items-center gap-1.5">
           <div className="flex items-center gap-1 rounded-xl bg-slate-950/70 p-1 border border-white/10">
             <button
@@ -224,7 +271,6 @@ export function SpriteChatHeader({
             </button>
           </div>
 
-          {/* Toggle Full Header Info when in an active session */}
           {activeTab === "session" && isSessionActive && (
             <button
               type="button"
@@ -240,7 +286,6 @@ export function SpriteChatHeader({
             </button>
           )}
 
-          {/* Close Drawer */}
           <button
             onClick={onClose}
             title="Close Assistant"

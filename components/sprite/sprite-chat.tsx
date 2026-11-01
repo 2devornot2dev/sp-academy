@@ -50,13 +50,13 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     deleteSession,
     isShowing,
     playAudioUrl, // <--- Used to play the TTS audio blob
-    stopAudio,    // <--- Used to stop audio when user replies or closes chat
+    stopAudio, // <--- Used to stop audio when user replies or closes chat
   } = useSprite();
 
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
   const [sessionsList, setSessionsList] = useState<SpriteSessionData[]>([]);
   const [selectedTurnIndex, setSelectedTurnIndex] = useState<number | null>(
-    null
+    null,
   );
   const [input, setInput] = useState("");
 
@@ -135,7 +135,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       spokenText: string,
       isTranslationRequired: boolean,
       boardStatus?: "IN_PROGRESS" | "COMPLETED" | null,
-      isNewBoard?: boolean
+      isNewBoard?: boolean,
     ) => {
       const cleanText = cleanDisplayString(spokenText);
       if (!cleanText || cleanText.length < 4) return;
@@ -143,8 +143,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       // Smart Weight:
       // - 85% chance when a new Chalkboard opens or when a Chalkboard completes
       // - 35% chance on middle step updates
-      const weight =
-        isNewBoard || boardStatus === "COMPLETED" ? 0.85 : 0.35;
+      const weight = isNewBoard || boardStatus === "COMPLETED" ? 0.85 : 0.35;
 
       if (Math.random() > weight) return;
 
@@ -182,7 +181,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
         }
       }
     },
-    [userId, profile?.nativeVoiceId, profile?.targetVoiceId, playAudioUrl]
+    [userId, profile?.nativeVoiceId, profile?.targetVoiceId, playAudioUrl],
   );
 
   const transport = useMemo(
@@ -190,7 +189,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       new DefaultChatTransport({
         api: `/api/users/${userId}/sprite/chat`,
       }),
-    [userId]
+    [userId],
   );
 
   const { messages, setMessages, sendMessage, status, error } = useChat({
@@ -201,13 +200,13 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
 
       // 1. Trigger non-sequential weighted voice in the background (do NOT await so UI never blocks!)
       const isNewBoard = Boolean(
-        parsed.chalkboard && parsed.chalkboard.title !== "__STEP_UPDATE__"
+        parsed.chalkboard && parsed.chalkboard.title !== "__STEP_UPDATE__",
       );
       void maybeSpeakTurn(
         parsed.spokenText,
         parsed.isTranslationRequired,
         parsed.chalkboard?.status,
-        isNewBoard
+        isNewBoard,
       );
 
       // 2. Persist turn to session history
@@ -260,11 +259,14 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
 
   const activeAssistantPayload = useMemo(
     () => parseMessagePayload(activeTurn?.assistantMessage),
-    [activeTurn?.assistantMessage]
+    [activeTurn?.assistantMessage],
   );
 
- const isSnoozing = useMemo(() => {
-    if (aiBrain.currentFocusType === "SPOON" || aiBrain.currentFocusType === "BOSS") {
+  const isSnoozing = useMemo(() => {
+    if (
+      aiBrain.currentFocusType === "SPOON" ||
+      aiBrain.currentFocusType === "BOSS"
+    ) {
       return false;
     }
     if (aiBrain.currentFocusType === "BRIDGE") {
@@ -289,10 +291,10 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
             spriteName: sessionRef.current.spriteName,
             dossier: sessionRef.current.dossier,
           },
-        }
+        },
       );
     },
-    [sendMessage, isSnoozing, stopAudio]
+    [sendMessage, isSnoozing, stopAudio],
   );
 
   const handleQuickPrompt = useCallback(
@@ -302,7 +304,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       setActiveTab("session");
       sendWithSessionBody(promptText);
     },
-    [isLoading, isSnoozing, setActiveTab, sendWithSessionBody]
+    [isLoading, isSnoozing, setActiveTab, sendWithSessionBody],
   );
 
   useEffect(() => {
@@ -345,7 +347,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
   };
 
   const handleDeleteSession = async (
-    session: SpriteSessionData
+    session: SpriteSessionData,
   ): Promise<boolean> => {
     const ok = await deleteSession(session.id);
     if (!ok) return false;
@@ -377,6 +379,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     setActiveTab("session");
     sendWithSessionBody(`Help me practice how to use "${word}"`);
   };
+
+  const energyCount = (profile as any)?.energy ?? 1;
 
   return (
     <>
@@ -558,6 +562,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
                 currentLessonTitle={aiBrain.currentLessonTitle}
                 activeTab={activeTab}
                 sessionsCount={sessionsList.length}
+                energyCount={energyCount}
+                maxEnergy={3}
                 isSnoozing={isSnoozing}
                 isSessionActive={turns.length > 0}
                 onSelectTab={setActiveTab}
@@ -569,7 +575,6 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
                   if (activeTab !== "session") setActiveTab("session");
                 }}
               />
-
               {/* PART 2: MESSAGES / STAGE / BRIEFING / HISTORY */}
               <SpriteChatMessages
                 activeTab={activeTab}

@@ -125,15 +125,31 @@ export function SpriteChatBriefingTab({
   return (
     <div className="flex-1 flex flex-col gap-4">
       {/* 1. Active Lesson Objective Card */}
+     // Inside components/sprite/sprite-chat-briefing-tab.tsx:
+
+      {/* 1. Active Lesson Objective Card */}
       <div className="relative overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg shrink-0">
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">
             Active Lesson Objective
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 border border-amber-300/35 px-2.5 py-0.5 text-[10px] font-black text-amber-300">
-            <Zap className="h-3 w-3 fill-current" />
-            {energyCount} {energyCount === 1 ? "Charge" : "Charges"}
-          </span>
+
+          {/* ⚡ 3-Slot Energy Meter in Briefing Tab */}
+          <div className="inline-flex items-center gap-1 rounded-full bg-slate-950/80 border border-amber-300/40 px-2.5 py-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 mr-0.5">
+              Energy
+            </span>
+            {[1, 2, 3].map((slot) => (
+              <Zap
+                key={slot}
+                className={`h-3.5 w-3.5 transition-all ${
+                  slot <= energyCount
+                    ? "text-amber-300 fill-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
+                    : "text-slate-600 fill-slate-800/80"
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
         <h2 className="text-lg font-extrabold text-white">
