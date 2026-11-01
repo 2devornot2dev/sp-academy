@@ -16,23 +16,29 @@ export const BookSentenceSchema = z.object({
   wordTimestamps: z.array(BookWordTimestampSchema).default([]),
 });
 
-// 🟢 Pre-baked Reading Buddy Teaching Schema
-export const CheckpointSpriteTeachingSchema = z.object({
-  successComment: z.string(),
+// 🟢 Universal Option Schema with Dedicated Sprite Feedback
+export const CheckpointOptionSchema = z.object({
+  text: z.string(), // Option text in target language
+  isCorrect: z.boolean(),
+  spriteMood: z.string().default("excited"), // "excited" | "thinking" | "curious" | "encouraging"
+  spriteReaction: z.string(), // Dedicated feedback in learner's native language
+});
+
+export const SpeakChallengeSchema = z.object({
+  targetPhrase: z.string(),
+  phoneticGuide: z.string().nullable().optional(),
+  successReaction: z.string(),
   successMood: z.string().default("excited"),
-  hintComment: z.string(),
-  hintMood: z.string().default("thinking"),
-  trapExplo: z.string().nullable().optional(),
+  retryHint: z.string(),
+  retryMood: z.string().default("thinking"),
 });
 
 export const BookPageCheckpointSchema = z.object({
   type: z.enum(["multiple_choice", "speak_phrase"]),
   questionNative: z.string(),
-  targetPhrase: z.string().nullable().optional(),
-  options: z.array(z.string()).nullable().optional(),
-  correctAnswer: z.string(),
+  options: z.array(CheckpointOptionSchema).length(3).nullable().optional(),
+  speakChallenge: SpeakChallengeSchema.nullable().optional(),
   explanationNative: z.string(),
-  spriteTeaching: CheckpointSpriteTeachingSchema, // 🟢 Integrated Sprite Teaching
 });
 
 export const LocalizedBookPageSchema = z.object({
@@ -61,9 +67,8 @@ export const SpoonBookWebhookSchema = z.object({
 
 export type BookWordTimestamp = z.infer<typeof BookWordTimestampSchema>;
 export type BookSentence = z.infer<typeof BookSentenceSchema>;
-export type CheckpointSpriteTeaching = z.infer<
-  typeof CheckpointSpriteTeachingSchema
->;
+export type CheckpointOption = z.infer<typeof CheckpointOptionSchema>;
+export type SpeakChallenge = z.infer<typeof SpeakChallengeSchema>;
 export type BookPageCheckpoint = z.infer<typeof BookPageCheckpointSchema>;
 export type LocalizedBookPage = z.infer<typeof LocalizedBookPageSchema>;
 export type LocalizedBookTranslation = z.infer<
