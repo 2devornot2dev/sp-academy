@@ -58,7 +58,15 @@ export default function OnboardingShell({
   const urlErrorCode = searchParams.get("error");
 
   const { data: session, isPending } = authClient.useSession();
-  const hasAccount = !!session?.user;
+  const isOAuth = searchParams.get("oauth") === "1";
+  const hasAccount = isOAuth && !!session?.user;
+
+  // Wipe any existing session when arriving on onboarding unless returning from Google click
+  useEffect(() => {
+    if (!isOAuth) {
+      authClient.signOut();
+    }
+  }, [isOAuth]);
 
   const [step, setStep] = useState(1);
   const totalSteps = 6;
@@ -117,16 +125,15 @@ export default function OnboardingShell({
     }
   }, [urlErrorCode, searchParams, router]);
 
-  // Prefill Google details when session loads
   useEffect(() => {
-    if (!session?.user) return;
+    if (!isOAuth || !session?.user) return;
 
     const [first, ...rest] = (session.user.name ?? "").split(" ");
 
     setFirstName((prev) => prev || first || "");
     setLastName((prev) => prev || rest.join(" "));
     setEmailValue((prev) => prev || session.user.email || "");
-  }, [session?.user]);
+  }, [isOAuth, session?.user]);
 
   const usernameError = username ? validateUsername(username) : null;
 
@@ -155,7 +162,10 @@ export default function OnboardingShell({
     e?.preventDefault();
     setError(null);
 
-    const currentUrl = `/onboarding${sessionId ? `?session_id=${sessionId}` : ""}`;
+    const params = new URLSearchParams();
+    params.set("oauth", "1");
+    if (sessionId) params.set("session_id", sessionId);
+    const currentUrl = `/onboarding?${params.toString()}`;
 
     try {
       const { error: signInError } = await authClient.signIn.social({
@@ -174,7 +184,7 @@ export default function OnboardingShell({
   };
 
   // 2. Replace handleCompleteOnboarding (lines 166-206) with this:
-const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async () => {
     const userId = session?.user?.id;
 
     if (!userId) {
@@ -192,7 +202,8 @@ const handleCompleteOnboarding = async () => {
         (sprite === "vivi" ? "girl-01" : "boy-01");
 
       const resolvedNativeVoiceId = `${nativeLanguage}-${voiceSuffix}`;
-      const resolvedTargetVoiceId = voiceId || `${targetLanguage}-${voiceSuffix}`;
+      const resolvedTargetVoiceId =
+        voiceId || `${targetLanguage}-${voiceSuffix}`;
 
       const commonPayload = {
         userId,

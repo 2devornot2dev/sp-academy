@@ -17,6 +17,7 @@ export type Plan = {
   annualSavingsLabel?: string;
   description: string;
   features: string[];
+  seatNote?: string;
   cta: { label: string; href: string };
 };
 
@@ -58,7 +59,7 @@ export const PLAN_FREE_MILESTONE: Plan = {
 
 export const PLAN_CORE_FOUNDER: Plan = {
   id: "founder",
-  name: "Spoon Core • Founder",
+  name: "Founder",
   label: "Beta Founder Offer",
   accent: "primary",
   featured: true,
@@ -68,6 +69,7 @@ export const PLAN_CORE_FOUNDER: Plan = {
   annualPrice: "$29",
   annualTotal: "$348 CAD billed annually",
   annualSavingsLabel: "2 months free (Save $72)",
+  seatNote: "First 100 founders only · $35 locked for life",
   description: "15 full learning cycles per month with 1-on-1 AI coaching.",
   features: [
     "45 Spoons + 45 Video Vocab Bridges /mo",
@@ -86,7 +88,7 @@ export const PLAN_CORE_FOUNDER: Plan = {
 
 export const PLAN_UNLIMITED_PLUS: Plan = {
   id: "unlimited",
-  name: "Spoon Unlimited+",
+  name: "Unlimited+",
   label: "For Intensive Learners",
   accent: "secondary",
   featured: false,

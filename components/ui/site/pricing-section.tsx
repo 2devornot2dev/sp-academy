@@ -190,9 +190,10 @@ export default function PricingSection() {
             const accent = ACCENTS[plan.accent];
             const isLoading = loadingId === plan.id;
             const isSolid = SOLID_PLANS.includes(plan.id);
-            
+
             // Only founder and unlimited launch Stripe checkout
-            const usesCheckout = plan.id === "founder" || plan.id === "unlimited";
+            const usesCheckout =
+              plan.id === "founder" || plan.id === "unlimited";
 
             const displayPrice =
               isAnnual && plan.annualPrice ? plan.annualPrice : plan.price;
@@ -236,17 +237,19 @@ export default function PricingSection() {
                         {plan.label}
                       </span>
 
-                      {isAnnual && plan.annualSavingsLabel && plan.id !== "free" && (
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide uppercase ${
-                            isSolid
-                              ? "bg-white/20 text-white"
-                              : "bg-emerald-500/15 text-emerald-600"
-                          }`}
-                        >
-                          {plan.annualSavingsLabel}
-                        </span>
-                      )}
+                      {isAnnual &&
+                        plan.annualSavingsLabel &&
+                        plan.id !== "free" && (
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide uppercase ${
+                              isSolid
+                                ? "bg-white/20 text-white"
+                                : "bg-emerald-500/15 text-emerald-600"
+                            }`}
+                          >
+                            {plan.annualSavingsLabel}
+                          </span>
+                        )}
                     </div>
 
                     <h3
@@ -258,7 +261,23 @@ export default function PricingSection() {
                       {plan.name}
                     </h3>
 
-                    <div className="mt-5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    {/* Crossed-out original price, on its own line above the real price */}
+                    {displayOriginalPrice && (
+                      <p
+                        className={`mt-5 text-lg font-semibold line-through decoration-2 ${
+                          isSolid ? "text-white/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        <span className="sr-only">Regular price </span>
+                        {displayOriginalPrice}
+                      </p>
+                    )}
+
+                    <div
+                      className={`${
+                        displayOriginalPrice ? "mt-1" : "mt-5"
+                      } flex flex-wrap items-baseline gap-x-2 gap-y-1`}
+                    >
                       <span
                         className={`text-[clamp(2.5rem,4.5vw,3.5rem)] font-bold leading-none tracking-[-0.05em] ${
                           isSolid ? "text-white" : "text-foreground"
@@ -278,20 +297,18 @@ export default function PricingSection() {
                           {plan.period}
                         </span>
                       )}
-
-                      {displayOriginalPrice && (
-                        <span
-                          className={`text-base font-medium line-through ${
-                            isSolid
-                              ? "text-white/60"
-                              : "text-muted-foreground/80"
-                          }`}
-                        >
-                          <span className="sr-only">Regular price </span>
-                          {displayOriginalPrice}
-                        </span>
-                      )}
                     </div>
+
+                    {/* Optional seat-limit pill, e.g. "First 100 founders only" */}
+                    {plan.seatNote && (
+                      <p
+                        className={`mt-3 w-fit rounded-full px-3 py-1 text-xs font-bold ${
+                          isSolid ? "bg-white/20 text-white" : accent.chip
+                        }`}
+                      >
+                        {plan.seatNote}
+                      </p>
+                    )}
 
                     {isAnnual && plan.annualTotal && plan.id !== "free" && (
                       <p
