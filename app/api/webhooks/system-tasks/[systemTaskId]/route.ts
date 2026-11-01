@@ -11,6 +11,7 @@ import { handleSpriteNotificationGeneration } from "@/lib/system-tasks/handlers/
 import { handleVocabBridgeGeneration } from "@/lib/system-tasks/handlers/handle-vocab-bridge";
 import { handleFreestyleReview } from "@/lib/system-tasks/handlers/handler-freestyle-review";
 import { handleSpriteExerciseGeneration } from "@/lib/system-tasks/handlers/handle-sprite-exercise";
+import { handleBookGeneration } from "@/lib/system-tasks/handlers/handle-book-generation";
 import { SystemTaskType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
@@ -91,8 +92,12 @@ export async function POST(req: Request, { params }: Params) {
         return await handleSpriteNotificationGeneration(task, body);
       }
 
-       case SystemTaskType.SPRITE_EXERCISE_GENERATION: {
+      case SystemTaskType.SPRITE_EXERCISE_GENERATION: {
         return await handleSpriteExerciseGeneration(task, body);
+      }
+
+      case SystemTaskType.BOOK_GENERATION: {
+        return await handleBookGeneration(task, body);
       }
 
       default:

@@ -120,6 +120,50 @@ model SpriteExercise {
   @@index([spriteProfileId, createdAt(sort: Desc)])
 }
 
+model SpoonBook {
+  id                 String   @id @default(cuid())
+  slug               String   @unique // e.g. "the-midnight-ticket"
+  characterName      String
+  characterAvatarUrl String   // Cloudinary reference avatar URL
+  levelBand          String   @default("beginner")
+  genre              String   @default("story")
+
+  coverImageS3Key    String
+  introVideoS3Key    String?
+
+  // S3 keys for the 5 shared page illustrations: ["books/.../page_1.png", ...]
+  pageImageS3Keys    String[]
+
+  // Keyed by locale ("fr-FR", "es-ES", "en-US") -> { title, synopsis, pages: [...] }
+  translations       Json
+
+  isPublished        Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  progress           UserBookProgress[]
+}
+
+model UserBookProgress {
+  id                   String    @id @default(cuid())
+  userId               String
+  spoonBookId          String
+  targetLanguage       String    // "fr-FR" | "es-ES" | "en-US"
+
+  currentPage          Int       @default(1) // 1..5
+  completedCheckpoints Json      @default("[]") // e.g. [1, 2, 3]
+  quizScore            Int?      // 0..100
+  completedAt          DateTime?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spoonBook            SpoonBook @relation(fields: [spoonBookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, spoonBookId, targetLanguage])
+}
+
 model User {
   id    String @id @default(cuid())
   email String @unique
@@ -187,6 +231,7 @@ model User {
   languageProfiles       LanguageProfile[]
   foundationCourses      FoundationCourse[]
   foundationBossStages   FoundationBossStage[]
+  bookProgress           UserBookProgress[]
 }
 
 model BillingInformation {
