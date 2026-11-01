@@ -8,18 +8,16 @@ import { getCachedDossier } from "@/lib/sprites/get-cached-dossier";
 import { resolveFishVoiceId } from "@/lib/sprites/voices";
 import { setLiveTaskState } from "@/app/actions/system-task-actions";
 import type { ChalkboardData } from "@/lib/schema/sprite-schema";
+import { EXERCISE_BUILDING_ORDER_INDEX, EXERCISE_READY_ORDER_INDEX } from "@/lib/sprites/sprites-contants";
 
 const SPRITE_EXERCISE_LAMBDA =
   process.env.SPRITE_EXERCISE_LAMBDA_NAME ?? "spoon-sprite-exercise-builder";
 
 const BASE_WEBHOOK = `${
-  process.env.NEXT_PUBLIC_APP_URL2 ??
   process.env.NEXT_PUBLIC_APP_URL ??
   "https://spoonacademy.com"
 }/api/webhooks/system-tasks`;
 
-export const EXERCISE_BUILDING_ORDER_INDEX = 9001;
-export const EXERCISE_READY_ORDER_INDEX = 9002;
 
 export interface StruggledBoardMistake {
   sessionId: string;

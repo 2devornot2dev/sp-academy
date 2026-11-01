@@ -5,8 +5,9 @@ import { NextResponse } from "next/server";
 import { pusherServer } from "@/lib/pusher-server";
 import { lambda, createCommand } from "@/lib/aws/lambda";
 import { clearLiveTaskState } from "@/app/actions/system-task-actions";
-import { EXERCISE_READY_ORDER_INDEX } from "@/app/actions/invoke-sprite-exercise";
+
 import { SpriteExerciseWebhookSchema } from "@/lib/schema/sprite-exercise-schema";
+import { EXERCISE_READY_ORDER_INDEX } from "@/lib/sprites/sprites-contants";
 
 const BASE_WEBHOOK = `${
   process.env.NEXT_PUBLIC_APP_URL ??
