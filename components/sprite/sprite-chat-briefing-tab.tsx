@@ -9,6 +9,9 @@ import {
   Dumbbell,
   Loader2,
   Sparkles,
+  CheckCircle2,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import { useSprite } from "@/context/sprite-context";
 import { invokeSpriteExercise } from "@/app/actions/invoke-sprite-exercise";
@@ -39,9 +42,10 @@ export function SpriteChatBriefingTab({
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [isPlayingArcade, setIsPlayingArcade] = useState(false);
-  const [energyCount, setEnergyCount] = useState<number>(
-    (profile as any)?.energy ?? 1
-  );
+
+  // Dismiss states for Briefing cards
+  const [hideObjectiveCard, setHideObjectiveCard] = useState(false);
+  const [hideArcadeCard, setHideArcadeCard] = useState(false);
 
   const refreshExercise = useCallback(async () => {
     if (!userId) return;
@@ -49,7 +53,7 @@ export function SpriteChatBriefingTab({
     try {
       const ex = await getActiveSpriteExercise(userId);
       setActiveExercise(ex);
-      if (ex?.status === "READY") {
+      if (ex?.status === "READY" || ex?.status === "COMPLETED") {
         setIsGenerating(false);
       } else if (ex?.status === "BUILDING") {
         setIsGenerating(true);
@@ -61,22 +65,15 @@ export function SpriteChatBriefingTab({
     }
   }, [userId]);
 
-  // Fetch on mount & whenever liveTask transitions (e.g. when Pusher signals completion)
   useEffect(() => {
     void refreshExercise();
   }, [refreshExercise, liveTask?.status]);
 
-  const handleGenerateOrLaunch = async () => {
+  const handleBuildNewWorkout = async () => {
     if (!userId) return;
     setGenError(null);
-
-    // If a READY exercise is already waiting, launch the 3-Round Arcade immediately!
-    if (activeExercise?.status === "READY" && activeExercise.content) {
-      setIsPlayingArcade(true);
-      return;
-    }
-
     setIsGenerating(true);
+
     const res = await invokeSpriteExercise({ userId });
     if (!res.ok) {
       setIsGenerating(false);
@@ -87,11 +84,13 @@ export function SpriteChatBriefingTab({
     await refreshExercise();
   };
 
-  // If the user clicked "Play Workout", render the 3-Round Arcade full-stage!
+  // Render the 3-Round Sprite Exercise Arcade full-stage when active
   if (
     isPlayingArcade &&
     userId &&
-    activeExercise?.status === "READY" &&
+    activeExercise &&
+    (activeExercise.status === "READY" ||
+      activeExercise.status === "COMPLETED") &&
     activeExercise.content
   ) {
     return (
@@ -102,10 +101,9 @@ export function SpriteChatBriefingTab({
           title={activeExercise.title}
           spriteName={spriteName}
           content={activeExercise.content}
-          onFinishExercise={(newEnergy) => {
-            setEnergyCount(newEnergy);
+          onFinishExercise={() => {
             setIsPlayingArcade(false);
-            setActiveExercise(null);
+            void refreshExercise();
           }}
           onClose={() => setIsPlayingArcade(false)}
         />
@@ -122,104 +120,156 @@ export function SpriteChatBriefingTab({
   const isReadyToPlay =
     activeExercise?.status === "READY" && Boolean(activeExercise.content);
 
+  const isCompletedWorkout =
+    activeExercise?.status === "COMPLETED" && Boolean(activeExercise.content);
+
   return (
     <div className="flex-1 flex flex-col gap-4">
-  
-      {/* 1. Active Lesson Objective Card */}
-      <div className="relative overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg shrink-0">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">
-            Active Lesson Objective
-          </span>
-
-          {/* ⚡ 3-Slot Energy Meter in Briefing Tab */}
-          <div className="inline-flex items-center gap-1 rounded-full bg-slate-950/80 border border-amber-300/40 px-2.5 py-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 mr-0.5">
-              Energy
+      {/* 1. Active Lesson Objective Card (Dismissible) */}
+      {!hideObjectiveCard && (
+        <div className="relative overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg shrink-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">
+              Active Lesson Objective
             </span>
-            {[1, 2, 3].map((slot) => (
-              <Zap
-                key={slot}
-                className={`h-3.5 w-3.5 transition-all ${
-                  slot <= energyCount
-                    ? "text-amber-300 fill-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
-                    : "text-slate-600 fill-slate-800/80"
-                }`}
-              />
-            ))}
+            <button
+              type="button"
+              onClick={() => setHideObjectiveCard(true)}
+              className="rounded-lg p-1 -mr-1 -mt-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
+              title="Hide objective card"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
+
+          <h2 className="text-lg font-extrabold text-white">
+            {aiBrain.currentLessonTitle}
+          </h2>
+          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+            Click any priority target below to immediately launch a 1-on-1
+            practice session with {spriteName}.
+          </p>
         </div>
+      )}
 
-        <h2 className="text-lg font-extrabold text-white">
-          {aiBrain.currentLessonTitle}
-        </h2>
-        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-          Click any priority target below to launch a 1-on-1 practice session,
-          or run a 3-round repair workout to earn{" "}
-          <span className="text-amber-300 font-bold">+1 ⚡ Energy</span>.
-        </p>
-      </div>
-
-      {/* 2. SPRITE REPAIR ARCADE LAUNCHER CARD (+1 ⚡ ENERGY) */}
-      <div className="relative overflow-hidden rounded-3xl border border-amber-400/35 bg-gradient-to-r from-amber-950/40 via-indigo-950/60 to-slate-900/90 p-5 shadow-lg shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-          <div className="flex items-start gap-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/40 bg-amber-400/15 text-amber-300 shadow-md">
-              <Dumbbell className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-white">
-                  3-Round Mistake Repair Arcade
-                </h3>
-                <span className="rounded-md bg-amber-300 px-2 py-0.5 text-[9px] font-black uppercase text-slate-950">
-                  +1 ⚡ Reward
-                </span>
-              </div>
-              <p className="text-xs font-medium text-slate-300 mt-0.5 leading-relaxed">
-                {isReadyToPlay
-                  ? `Your custom 3-round workout (${activeExercise?.title}) is ready!`
-                  : `Visual Match · Binary Sentence Dash · 3x Voice Burst built from your recent Chalkboard mistakes.`}
-              </p>
-            </div>
-          </div>
-
+      {/* 2. 3-ROUND SPRITE EXERCISE CARD (1 Per Milestone Lock + Dismissible) */}
+      {!hideArcadeCard && (
+        <div
+          className={`relative overflow-hidden rounded-3xl border p-5 shadow-lg shrink-0 transition ${
+            isCompletedWorkout
+              ? "border-teal-500/35 bg-gradient-to-r from-teal-950/50 via-slate-900/90 to-slate-950/90"
+              : "border-amber-400/35 bg-gradient-to-r from-amber-950/40 via-indigo-950/60 to-slate-900/90"
+          }`}
+        >
+          {/* Top-Right Close / Hide Button */}
           <button
             type="button"
-            disabled={isBuildingNow || isLoadingExercise}
-            onClick={handleGenerateOrLaunch}
-            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition shrink-0 shadow-lg ${
-              isReadyToPlay
-                ? "bg-gradient-to-r from-amber-300 to-teal-300 text-slate-950 hover:brightness-110"
-                : "bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-60"
-            }`}
+            onClick={() => setHideArcadeCard(true)}
+            className="absolute top-3.5 right-3.5 rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
+            title="Hide exercise card"
           >
-            {isBuildingNow ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Baking Workout...</span>
-              </>
-            ) : isReadyToPlay ? (
-              <>
-                <Zap className="h-3.5 w-3.5 fill-current" />
-                <span>Play 3-Round Workout</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Build Repair Workout</span>
-              </>
-            )}
+            <X className="h-3.5 w-3.5" />
           </button>
-        </div>
 
-        {genError && (
-          <p className="mt-2.5 rounded-xl border border-rose-500/30 bg-rose-950/50 px-3 py-1.5 text-xs font-semibold text-rose-200">
-            {genError}
-          </p>
-        )}
-      </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pr-5">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-md ${
+                  isCompletedWorkout
+                    ? "border-teal-400/40 bg-teal-400/15 text-teal-300"
+                    : "border-amber-300/40 bg-amber-400/15 text-amber-300"
+                }`}
+              >
+                {isCompletedWorkout ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : (
+                  <Dumbbell className="h-5 w-5" />
+                )}
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-black text-white">
+                    {isCompletedWorkout
+                      ? "Sprite Exercise Completed!"
+                      : "3-Round Mistake Repair Arcade"}
+                  </h3>
+                  {isCompletedWorkout ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-400/20 border border-teal-400/40 px-2 py-0.5 text-[9px] font-black uppercase text-teal-300">
+                      ✓ +1 ⚡ Claimed
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-300 px-2 py-0.5 text-[9px] font-black uppercase text-slate-950">
+                      +1 <Zap className="h-2.5 w-2.5 fill-current" /> Reward
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs font-medium text-slate-300 mt-1 leading-relaxed">
+                  {isCompletedWorkout
+                    ? `Milestone ${
+                        activeExercise?.currentMilestone ?? ""
+                      } Sprite Exercise complete! Beat Boss Stage ${
+                        activeExercise?.currentMilestone ?? ""
+                      } to unlock your next +1 ⚡ exercise.`
+                    : isReadyToPlay
+                      ? `Your custom 3-round Sprite Exercise (${activeExercise?.title}) is ready!`
+                      : `Visual Match · Binary Sentence Dash · 3x Voice Burst built from your recent Chalkboard mistakes.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Button by State (Locked to 1 Build per Milestone!) */}
+            <div className="flex items-center gap-2 shrink-0">
+              {isCompletedWorkout ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPlayingArcade(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-teal-400/40 bg-teal-500/15 px-3.5 py-2 text-xs font-extrabold text-teal-200 hover:bg-teal-500/25 transition"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Replay Practice</span>
+                </button>
+              ) : isReadyToPlay ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPlayingArcade(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-teal-300 px-4 py-2.5 text-xs font-black text-slate-950 hover:brightness-110 transition shadow-lg"
+                >
+                  <Zap className="h-3.5 w-3.5 fill-current" />
+                  <span>Play 3-Round Workout</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isBuildingNow || isLoadingExercise}
+                  onClick={handleBuildNewWorkout}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-black text-white hover:bg-indigo-400 disabled:opacity-60 transition shadow-lg"
+                >
+                  {isBuildingNow ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Baking Workout...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Build Repair Workout</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {genError && (
+            <p className="mt-2.5 rounded-xl border border-rose-500/30 bg-rose-950/50 px-3 py-1.5 text-xs font-semibold text-rose-200">
+              {genError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 3. Priority Targets Row */}
       {(aiBrain.topWord || aiBrain.topPhrase) && (

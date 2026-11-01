@@ -4,27 +4,34 @@
 import { prisma } from "@/lib/prisma";
 import { getPresignedUrls } from "@/app/actions/s3";
 import { awardSpriteEnergy } from "@/app/actions/sprite-energy";
+import { getUserMilestoneTag } from "@/app/actions/invoke-sprite-exercise";
 import type { SpriteExerciseContent } from "@/lib/schema/sprite-exercise-schema";
 
 export interface HydratedSpriteExercise {
   id: string;
   title: string;
   status: string;
+  currentMilestone: number;
   energyReward: number;
   rewardClaimed: boolean;
   content: SpriteExerciseContent | null;
 }
 
 /**
- * Fetches the user's latest READY or BUILDING SpriteExercise and signs all S3 image/audio keys
+ * Fetches the user's SpriteExercise for the CURRENT Milestone (or any active READY/BUILDING one)
  */
 export async function getActiveSpriteExercise(
   userId: string
 ): Promise<HydratedSpriteExercise | null> {
+  const { currentMilestone, milestoneTag } = await getUserMilestoneTag(userId);
+
   const ex = await prisma.spriteExercise.findFirst({
     where: {
       userId,
-      status: { in: ["BUILDING", "READY"] },
+      OR: [
+        { courseId: milestoneTag },
+        { status: { in: ["BUILDING", "READY"] } },
+      ],
     },
     orderBy: { createdAt: "desc" },
   });
@@ -32,18 +39,18 @@ export async function getActiveSpriteExercise(
   if (!ex) return null;
 
   const rawContent = ex.content as SpriteExerciseContent | null;
-  if (!rawContent || ex.status !== "READY") {
+  if (!rawContent || (ex.status !== "READY" && ex.status !== "COMPLETED")) {
     return {
       id: ex.id,
       title: ex.title,
       status: ex.status,
+      currentMilestone,
       energyReward: ex.energyReward,
       rewardClaimed: ex.rewardClaimed,
       content: null,
     };
   }
 
-  // Collect all S3 keys across all 3 rounds to sign in 1 batch call
   const s3Keys: string[] = [];
   rawContent.visualMatch?.cards?.forEach((c) => {
     if (c.imageS3Key) s3Keys.push(c.imageS3Key);
@@ -89,6 +96,7 @@ export async function getActiveSpriteExercise(
     id: ex.id,
     title: ex.title,
     status: ex.status,
+    currentMilestone,
     energyReward: ex.energyReward,
     rewardClaimed: ex.rewardClaimed,
     content: hydrated,

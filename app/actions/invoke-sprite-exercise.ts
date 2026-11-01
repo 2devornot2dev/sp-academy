@@ -45,6 +45,43 @@ export type InvokeSpriteExerciseResult =
       error: string;
     };
 
+/**
+ * Computes the user's active Milestone number (1, 2, 3...) based on completed Boss Stages
+ */
+export async function getUserMilestoneTag(
+  userId: string,
+  explicitCourseId?: string | null
+): Promise<{
+  courseId: string;
+  currentMilestone: number;
+  milestoneTag: string;
+}> {
+  const course = explicitCourseId
+    ? { id: explicitCourseId }
+    : await prisma.foundationCourse.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+  const resolvedCourseId = course?.id ?? "default";
+
+  const completedBossCount = await prisma.foundationBossStage.count({
+    where: {
+      userId,
+      ...(course?.id ? { foundationCourseId: course.id } : {}),
+      status: "COMPLETED",
+    },
+  });
+
+  const currentMilestone = completedBossCount + 1;
+  return {
+    courseId: resolvedCourseId,
+    currentMilestone,
+    milestoneTag: `${resolvedCourseId}:M${currentMilestone}`,
+  };
+}
+
 export async function invokeSpriteExercise({
   userId,
   courseId,
@@ -53,8 +90,15 @@ export async function invokeSpriteExercise({
   courseId?: string | null;
 }): Promise<InvokeSpriteExerciseResult> {
   try {
-    // 1. Fetch User + SpriteProfile + Recent Sessions with Boards
-    const [spriteProfile, existingBuildingExercise, dossier] =
+    // 1. Resolve current Milestone Tag (e.g. "course123:M6")
+    const {
+      courseId: resolvedCourseId,
+      currentMilestone,
+      milestoneTag,
+    } = await getUserMilestoneTag(userId, courseId);
+
+    // 2. Check if an exercise already exists for this Milestone
+    const [spriteProfile, existingMilestoneExercise, dossier] =
       await Promise.all([
         prisma.spriteProfile.findUnique({
           where: { userId },
@@ -75,8 +119,13 @@ export async function invokeSpriteExercise({
           },
         }),
         prisma.spriteExercise.findFirst({
-          where: { userId, status: "BUILDING" },
-          select: { id: true },
+          where: {
+            userId,
+            courseId: milestoneTag,
+            status: { in: ["BUILDING", "READY", "COMPLETED"] },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, status: true },
         }),
         getCachedDossier(userId).catch(() => null),
       ]);
@@ -85,16 +134,23 @@ export async function invokeSpriteExercise({
       return { ok: false, error: "Sprite profile not found for user." };
     }
 
-    if (existingBuildingExercise) {
+    // 🛑 HARD GATE: 1 Sprite Exercise per Milestone (Boss-to-Boss)!
+    if (existingMilestoneExercise) {
+      if (existingMilestoneExercise.status === "COMPLETED") {
+        return {
+          ok: false,
+          error: `You already completed your Sprite Exercise for Milestone ${currentMilestone}! Beat Boss Stage ${currentMilestone} to unlock the next one.`,
+        };
+      }
       return {
         ok: true,
-        exerciseId: existingBuildingExercise.id,
+        exerciseId: existingMilestoneExercise.id,
         taskId: "existing",
         mistakeCount: 0,
       };
     }
 
-    // 2. Extract struggled steps across recent Chalkboards
+    // 3. Extract struggled steps across recent Chalkboards
     const mistakes: StruggledBoardMistake[] = [];
     const seenTargets = new Set<string>();
 
@@ -147,26 +203,25 @@ export async function invokeSpriteExercise({
       return {
         ok: false,
         error:
-          "Complete at least one Chalkboard or Spoon lesson first so your Sprite has material to build your repair drill!",
+          "Complete at least one Chalkboard or Spoon lesson first so your Sprite has material to build your exercise!",
       };
     }
 
-    const resolvedCourseId = courseId ?? dossier?.courseId ?? null;
     const drillTitle =
       mistakes.length > 0 && mistakes[0].lessonTitle
-        ? `${spriteProfile.sprite.name} Repair: ${mistakes[0].lessonTitle}`
-        : `${spriteProfile.sprite.name} Targeted Repair Drill`;
+        ? `Milestone ${currentMilestone}: ${mistakes[0].lessonTitle}`
+        : `Milestone ${currentMilestone} Sprite Exercise`;
 
     const buildNodeId = `${spriteProfile.sprite.slug}:${spriteProfile.nativeVoiceId}:${spriteProfile.targetVoiceId}:${EXERCISE_BUILDING_ORDER_INDEX}`;
 
-    // 3. Create SpriteExercise + Exercise SystemTask + Sprite Notification SystemTask
+    // 4. Create SpriteExercise (tagged with milestoneTag!) + SystemTasks
     const { exercise, systemTask, spriteBuildTask } =
       await prisma.$transaction(async (tx) => {
         const ex = await tx.spriteExercise.create({
           data: {
             spriteProfileId: spriteProfile.id,
             userId,
-            courseId: resolvedCourseId,
+            courseId: milestoneTag, // <--- Locks to this Milestone!
             title: drillTitle,
             status: "BUILDING",
             sourceMistakes: mistakes as unknown as Prisma.InputJsonValue,
@@ -180,10 +235,11 @@ export async function invokeSpriteExercise({
             status: "IN_PROGRESS",
             metadata: {
               userId,
-              courseId: resolvedCourseId,
+              courseId: milestoneTag,
               foundationCourseId: resolvedCourseId,
               spriteProfileId: spriteProfile.id,
               spriteExerciseId: ex.id,
+              milestoneIndex: currentMilestone,
             },
           },
         });
@@ -210,12 +266,11 @@ export async function invokeSpriteExercise({
     const webhookUrl = `${BASE_WEBHOOK}/${systemTask.id}`;
     const spriteWebhookUrl = `${BASE_WEBHOOK}/${spriteBuildTask.id}`;
 
-    // 4. Build Payloads for Both Lambdas
     const lambdaPayload = {
       taskId: systemTask.id,
       exerciseId: exercise.id,
       userId,
-      courseId: resolvedCourseId,
+      courseId: milestoneTag,
       userName: dossier?.userName ?? "Learner",
       spriteSlug: spriteProfile.sprite.slug,
       spriteName: spriteProfile.sprite.name,
@@ -264,13 +319,12 @@ export async function invokeSpriteExercise({
         taskId: systemTask.id,
         taskType: "SPRITE_EXERCISE_GENERATION",
         status: "BUILDING",
-        label: "Sprite Repair Drill",
+        label: "Sprite Exercise",
         courseId: resolvedCourseId,
         updatedAt: new Date().toISOString(),
       }),
     ]);
 
-    // 5. Invoke BOTH `spoon-sprite-exercise-builder` AND `spoon-sprite-builder` (Fire #1: On Build!)
     const [exerciseRes] = await Promise.all([
       lambda.send(
         createCommand({
