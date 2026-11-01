@@ -28,7 +28,7 @@ import {
   retrySystemTask,
   type LiveTaskStatus,
 } from "@/app/actions/system-task-actions";
-import { pusherClient } from "@/lib/pusher-client"
+import { pusherClient } from "@/lib/pusher-client";
 
 export type SpriteType = "vox" | "vivi";
 export type ChatViewMode = "single" | "multi";
@@ -63,6 +63,8 @@ export type SpriteProfileData = {
   targetLanguage: string;
   nativeVoiceId: string;
   targetVoiceId: string;
+  energy?: number;
+  maxEnergy?: number;
   context: SpriteAIContext | null;
   sprite: {
     slug: string;
@@ -104,7 +106,7 @@ interface SpriteContextValue {
   summonSprite: (payload: SpritePayload) => void;
   summonSpriteNode: (options: {
     orderIndex: number;
-    stepType?: "SPOON" | "BRIDGE" | "BOSS"
+    stepType?: "SPOON" | "BRIDGE" | "BOSS";
     dedupeKey?: string;
     actionLabel?: string;
     onAction?: () => void;
@@ -120,12 +122,11 @@ interface SpriteContextValue {
   // Session Management
   deleteSession: (sessionId: string) => Promise<boolean>;
 
-  // sprite phasess messages
+  // Live Builder Task State
   liveTask: LiveTaskStatus | null;
   setLiveTask: (task: LiveTaskStatus | null) => void;
   isRetryingTask: boolean;
   retryLiveTask: (taskId?: string) => Promise<boolean>;
-
 }
 
 const SpriteContext = createContext<SpriteContextValue | null>(null);
@@ -162,8 +163,6 @@ export function SpriteProvider({
   const [liveTask, setLiveTask] = useState<LiveTaskStatus | null>(null);
   const [isRetryingTask, setIsRetryingTask] = useState(false);
 
-  
-
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -183,7 +182,8 @@ export function SpriteProvider({
     if (
       urlOrKey.startsWith("http://") ||
       urlOrKey.startsWith("https://") ||
-      urlOrKey.startsWith("/")
+      urlOrKey.startsWith("/") ||
+      urlOrKey.startsWith("blob:")
     ) {
       return urlOrKey;
     }
@@ -262,7 +262,8 @@ export function SpriteProvider({
     },
     [isChatOpen, playAudioUrl, stopAudio]
   );
-const summonSpriteNode = useCallback(
+
+  const summonSpriteNode = useCallback(
     async ({
       orderIndex,
       stepType,
@@ -301,8 +302,6 @@ const summonSpriteNode = useCallback(
 
       if (!node) return;
 
-      // Guard: If the DB node at a Spoon/Bridge index accidentally has a Boss header
-      // (from the Lambda prompt confusing subStep===3 with Boss), don't show a Boss alert on a Spoon!
       const isAccidentalBossNode =
         stepType !== "BOSS" &&
         /boss/i.test(`${node.header ?? ""} ${node.action ?? ""}`);
@@ -327,11 +326,10 @@ const summonSpriteNode = useCallback(
         audioUrl: node.nativeAudioUrl ?? node.targetAudioUrl,
         targetAudioUrl: node.targetAudioUrl,
         autoPlayAudio: true,
-        duration: 9000, // Auto-hide after 9 seconds instead of lingering for 20s
+        duration: 9000,
         position: "bottom-right",
         action: onAction
           ? {
-              // Always trust the page's exact step label ("Start Spoon 15") over stale DB action text
               label: actionLabel || node.action || "Continue",
               onClick: onAction,
               variant: "primary",
@@ -352,7 +350,6 @@ const summonSpriteNode = useCallback(
 
   const openChat = useCallback(
     (options?: { tab?: ActiveTab; prompt?: string }) => {
-      // Hide floating toast when opening the full chat drawer
       if (timerRef.current) clearTimeout(timerRef.current);
       setCurrent(null);
 
@@ -412,12 +409,12 @@ const summonSpriteNode = useCallback(
 
   const positionClasses =
     current?.position === "bottom-right"
-      ? "bottom-24 right-6" // Raised slightly so it sits cleanly above the Chat Launcher button!
+      ? "bottom-24 right-6"
       : current?.position === "top-right"
         ? "top-6 right-6"
         : "bottom-6 left-6";
 
-        const retryLiveTask = useCallback(
+  const retryLiveTask = useCallback(
     async (explicitTaskId?: string): Promise<boolean> => {
       const targetId = explicitTaskId || liveTask?.taskId;
       if (!targetId) return false;
@@ -447,13 +444,12 @@ const summonSpriteNode = useCallback(
   );
 
   // 1. Hydrate initial task state from Upstash Redis on mount
-  // 2. Subscribe to `user-${userId}` on Pusher for instant Lambda error/completion events
+  // 2. Subscribe to `user-${userId}` on Pusher for instant Lambda error/completion & SpriteNode events
   useEffect(() => {
     if (!userId) return;
 
     let mounted = true;
 
-    // Initial check in case a task failed before page load/refresh
     getLiveTaskState(userId).then((cached) => {
       if (!mounted || !cached) return;
       setLiveTask(cached);
@@ -477,7 +473,6 @@ const summonSpriteNode = useCallback(
       }
     });
 
-    // Live Pusher subscription
     const channelName = `user-${userId}`;
     const channel = pusherClient.subscribe(channelName);
 
@@ -518,18 +513,54 @@ const summonSpriteNode = useCallback(
       setLiveTask(null);
     };
 
+    // 🟢 NEW: Receives freshly baked (or cached) SpriteNode notifications from spoon-sprite-builder!
+    const handleSpriteNodeReady = (node: {
+      nodeId: string;
+      orderIndex: number;
+      stepType?: string | null;
+      header?: string | null;
+      nativeBody: string;
+      targetBody?: string | null;
+      nativeAudioUrl?: string | null;
+      targetAudioUrl?: string | null;
+      action?: string | null;
+    }) => {
+      summonSprite({
+        id: `${node.nodeId}_${Date.now()}`,
+        badge: node.header ?? undefined,
+        text: node.nativeBody,
+        targetText: node.targetBody ?? undefined,
+        audioUrl: node.nativeAudioUrl ?? node.targetAudioUrl,
+        targetAudioUrl: node.targetAudioUrl,
+        autoPlayAudio: true,
+        duration: 10000,
+        position: "bottom-right",
+        action:
+          node.stepType === "EXERCISE_READY" ||
+          node.stepType === "EXERCISE_BUILDING"
+            ? {
+                label: node.action || "Open Briefing",
+                variant: "primary",
+                onClick: () => openChat({ tab: "briefing" }),
+              }
+            : undefined,
+      });
+    };
+
     channel.bind("system-task-failed", handleFailed);
     channel.bind("system-task-building", handleBuilding);
     channel.bind("system-task-completed", handleCompleted);
+    channel.bind("sprite-node-ready", handleSpriteNodeReady);
 
     return () => {
       mounted = false;
       channel.unbind("system-task-failed", handleFailed);
       channel.unbind("system-task-building", handleBuilding);
       channel.unbind("system-task-completed", handleCompleted);
+      channel.unbind("sprite-node-ready", handleSpriteNodeReady);
       pusherClient.unsubscribe(channelName);
     };
-  }, [userId, summonSprite, retryLiveTask]);
+  }, [userId, summonSprite, retryLiveTask, openChat]);
 
   return (
     <SpriteContext.Provider
@@ -562,11 +593,10 @@ const summonSpriteNode = useCallback(
         playAudioUrl,
         stopAudio,
         deleteSession,
-
         isRetryingTask,
         liveTask,
         retryLiveTask,
-        setLiveTask
+        setLiveTask,
       }}
     >
       {children}

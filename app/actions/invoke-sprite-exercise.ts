@@ -18,6 +18,9 @@ const BASE_WEBHOOK = `${
   "https://spoonacademy.com"
 }/api/webhooks/system-tasks`;
 
+export const EXERCISE_BUILDING_ORDER_INDEX = 9001;
+export const EXERCISE_READY_ORDER_INDEX = 9002;
+
 export interface StruggledBoardMistake {
   sessionId: string;
   lessonTitle: string | null;
@@ -42,10 +45,6 @@ export type InvokeSpriteExerciseResult =
       error: string;
     };
 
-/**
- * Harvests struggled Chalkboard steps + weak Word Matrix items and invokes
- * the Sprite Exercise Builder Lambda to create a targeted 2-minute Repair Drill.
- */
 export async function invokeSpriteExercise({
   userId,
   courseId,
@@ -62,7 +61,9 @@ export async function invokeSpriteExercise({
           include: {
             sprite: true,
             sessions: {
-              where: { board: { not: Prisma.AnyNull } },
+              where: {
+                board: { not: Prisma.AnyNull },
+              },
               orderBy: { updatedAt: "desc" },
               take: 12,
               select: {
@@ -84,7 +85,6 @@ export async function invokeSpriteExercise({
       return { ok: false, error: "Sprite profile not found for user." };
     }
 
-    // Prevent duplicate concurrent generations
     if (existingBuildingExercise) {
       return {
         ok: true,
@@ -94,7 +94,7 @@ export async function invokeSpriteExercise({
       };
     }
 
-    // 2. Extract every struggled step or correction across the user's recent Chalkboards
+    // 2. Extract struggled steps across recent Chalkboards
     const mistakes: StruggledBoardMistake[] = [];
     const seenTargets = new Set<string>();
 
@@ -141,7 +141,6 @@ export async function invokeSpriteExercise({
       if (mistakes.length >= 6) break;
     }
 
-    // 3. Gather weak / focus words from the Dossier as supplemental drill material
     const focusWords = dossier?.focusWords ?? [];
 
     if (mistakes.length === 0 && focusWords.length === 0) {
@@ -158,40 +157,60 @@ export async function invokeSpriteExercise({
         ? `${spriteProfile.sprite.name} Repair: ${mistakes[0].lessonTitle}`
         : `${spriteProfile.sprite.name} Targeted Repair Drill`;
 
-    // 4. Create the SpriteExercise row + SystemTask row in a transaction
-    const { exercise, systemTask } = await prisma.$transaction(async (tx) => {
-      const ex = await tx.spriteExercise.create({
-        data: {
-          spriteProfileId: spriteProfile.id,
-          userId,
-          courseId: resolvedCourseId,
-          title: drillTitle,
-          status: "BUILDING",
-          sourceMistakes: mistakes as unknown as Prisma.InputJsonValue,
-          energyReward: 1,
-        },
-      });
+    const buildNodeId = `${spriteProfile.sprite.slug}:${spriteProfile.nativeVoiceId}:${spriteProfile.targetVoiceId}:${EXERCISE_BUILDING_ORDER_INDEX}`;
 
-      const task = await tx.systemTask.create({
-        data: {
-          type: SystemTaskType.SPRITE_EXERCISE_GENERATION,
-          status: "IN_PROGRESS",
-          metadata: {
+    // 3. Create SpriteExercise + Exercise SystemTask + Sprite Notification SystemTask
+    const { exercise, systemTask, spriteBuildTask } =
+      await prisma.$transaction(async (tx) => {
+        const ex = await tx.spriteExercise.create({
+          data: {
+            spriteProfileId: spriteProfile.id,
             userId,
             courseId: resolvedCourseId,
-            foundationCourseId: resolvedCourseId,
-            spriteProfileId: spriteProfile.id,
-            spriteExerciseId: ex.id,
+            title: drillTitle,
+            status: "BUILDING",
+            sourceMistakes: mistakes as unknown as Prisma.InputJsonValue,
+            energyReward: 1,
           },
-        },
+        });
+
+        const task = await tx.systemTask.create({
+          data: {
+            type: SystemTaskType.SPRITE_EXERCISE_GENERATION,
+            status: "IN_PROGRESS",
+            metadata: {
+              userId,
+              courseId: resolvedCourseId,
+              foundationCourseId: resolvedCourseId,
+              spriteProfileId: spriteProfile.id,
+              spriteExerciseId: ex.id,
+            },
+          },
+        });
+
+        const sTask = await tx.systemTask.create({
+          data: {
+            type: SystemTaskType.SPRITE_NOTIFICATION_GENERATION,
+            status: "IN_PROGRESS",
+            metadata: {
+              userId,
+              courseId: resolvedCourseId,
+              foundationCourseId: resolvedCourseId,
+              spriteProfileId: spriteProfile.id,
+              orderIndex: EXERCISE_BUILDING_ORDER_INDEX,
+              nodeId: buildNodeId,
+              stepType: "EXERCISE_BUILDING",
+            },
+          },
+        });
+
+        return { exercise: ex, systemTask: task, spriteBuildTask: sTask };
       });
 
-      return { exercise: ex, systemTask: task };
-    });
-
     const webhookUrl = `${BASE_WEBHOOK}/${systemTask.id}`;
+    const spriteWebhookUrl = `${BASE_WEBHOOK}/${spriteBuildTask.id}`;
 
-    // 5. Build the Lambda payload (includes both Chalkboard mistakes & Dossier focusWords)
+    // 4. Build Payloads for Both Lambdas
     const lambdaPayload = {
       taskId: systemTask.id,
       exerciseId: exercise.id,
@@ -214,33 +233,63 @@ export async function invokeSpriteExercise({
       webhookUrl,
     };
 
-    // Save payload onto SystemTask so 1-click Retry works automatically if Lambda fails!
-    await prisma.systemTask.update({
-      where: { id: systemTask.id },
-      data: { payload: lambdaPayload as unknown as Prisma.InputJsonValue },
-    });
+    const spriteBuildPayload = {
+      spriteProfileId: spriteProfile.id,
+      spriteSlug: spriteProfile.sprite.slug,
+      spriteName: spriteProfile.sprite.name,
+      persona: spriteProfile.sprite.persona ?? "",
+      nativeLanguage: spriteProfile.nativeLanguage,
+      targetLanguage: spriteProfile.targetLanguage,
+      nativeVoiceId: spriteProfile.nativeVoiceId,
+      targetVoiceId: spriteProfile.targetVoiceId,
+      orderIndex: EXERCISE_BUILDING_ORDER_INDEX,
+      spriteOrderIndex: EXERCISE_BUILDING_ORDER_INDEX,
+      stepType: "EXERCISE_BUILDING",
+      nodeId: buildNodeId,
+      webhookUrl: spriteWebhookUrl,
+    };
 
-    // 6. Push live "BUILDING" state to Upstash Redis so SpriteChat shows the baking banner
-    await setLiveTaskState(userId, {
-      taskId: systemTask.id,
-      taskType: "SPRITE_EXERCISE_GENERATION",
-      status: "BUILDING",
-      label: "Sprite Repair Drill",
-      courseId: resolvedCourseId,
-      updatedAt: new Date().toISOString(),
-    });
+    await Promise.all([
+      prisma.systemTask.update({
+        where: { id: systemTask.id },
+        data: { payload: lambdaPayload as unknown as Prisma.InputJsonValue },
+      }),
+      prisma.systemTask.update({
+        where: { id: spriteBuildTask.id },
+        data: {
+          payload: spriteBuildPayload as unknown as Prisma.InputJsonValue,
+        },
+      }),
+      setLiveTaskState(userId, {
+        taskId: systemTask.id,
+        taskType: "SPRITE_EXERCISE_GENERATION",
+        status: "BUILDING",
+        label: "Sprite Repair Drill",
+        courseId: resolvedCourseId,
+        updatedAt: new Date().toISOString(),
+      }),
+    ]);
 
-    // 7. Invoke the Sprite Exercise Builder Lambda
-    const response = await lambda.send(
-      createCommand({
-        functionName: SPRITE_EXERCISE_LAMBDA,
-        invocationType: "Event",
-        payload: { body: JSON.stringify(lambdaPayload) },
-      })
-    );
+    // 5. Invoke BOTH `spoon-sprite-exercise-builder` AND `spoon-sprite-builder` (Fire #1: On Build!)
+    const [exerciseRes] = await Promise.all([
+      lambda.send(
+        createCommand({
+          functionName: SPRITE_EXERCISE_LAMBDA,
+          invocationType: "Event",
+          payload: { body: JSON.stringify(lambdaPayload) },
+        })
+      ),
+      lambda.send(
+        createCommand({
+          functionName: "spoon-sprite-builder",
+          invocationType: "Event",
+          payload: { body: JSON.stringify(spriteBuildPayload) },
+        })
+      ),
+    ]);
 
-    if (response.StatusCode !== 202) {
-      throw new Error(`Unexpected Lambda status: ${response.StatusCode}`);
+    if (exerciseRes.StatusCode !== 202) {
+      throw new Error(`Unexpected Lambda status: ${exerciseRes.StatusCode}`);
     }
 
     return {

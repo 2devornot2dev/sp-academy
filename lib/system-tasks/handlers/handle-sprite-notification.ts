@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { SystemTask } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { pusherServer } from "@/lib/pusher-server";
 
 export async function handleSpriteNotificationGeneration(
   task: SystemTask,
@@ -46,7 +47,6 @@ export async function handleSpriteNotificationGeneration(
         },
       ];
 
-  // Filter out any malformed items missing a nodeId
   const validPosts = incomingPosts.filter((p: any) =>
     Boolean(p.nodeId || fallbackNodeId),
   );
@@ -100,6 +100,27 @@ export async function handleSpriteNotificationGeneration(
       },
     }),
   ]);
+
+  // 4. 🟢 Broadcast to the user via Pusher so the Sprite notification pops immediately!
+  const userId = meta.userId;
+  const firstPost = validPosts[0];
+  if (userId && firstPost) {
+    try {
+      await pusherServer.trigger(`user-${userId}`, "sprite-node-ready", {
+        nodeId: String(firstPost.nodeId || fallbackNodeId),
+        orderIndex: Number(firstPost.orderIndex ?? defaultOrderIndex),
+        stepType: meta.stepType ?? null,
+        header: firstPost.header || "Mission Update",
+        nativeBody: firstPost.nativeBody || "",
+        targetBody: firstPost.targetBody || "",
+        nativeAudioUrl: firstPost.nativeAudioUrl ?? null,
+        targetAudioUrl: firstPost.targetAudioUrl ?? null,
+        action: firstPost.action ?? null,
+      });
+    } catch (err) {
+      console.error("[handleSpriteNotification] Pusher trigger failed:", err);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
