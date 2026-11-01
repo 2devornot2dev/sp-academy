@@ -124,9 +124,7 @@ export function SpriteChatBriefingTab({
 
   return (
     <div className="flex-1 flex flex-col gap-4">
-      {/* 1. Active Lesson Objective Card */}
-     // Inside components/sprite/sprite-chat-briefing-tab.tsx:
-
+  
       {/* 1. Active Lesson Objective Card */}
       <div className="relative overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg shrink-0">
         <div className="flex items-center justify-between gap-2 mb-1">
