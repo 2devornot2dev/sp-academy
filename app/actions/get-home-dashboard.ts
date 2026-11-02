@@ -144,16 +144,25 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
         )
       : 0;
 
-  const pickTop = (
+ // Guarantee 4 DISTINCT words across Most Seen, Most Tapped, Most Spoken, Most Heard
+  const usedWords = new Set<string>();
+
+  const pickTopUnique = (
     list: any[],
     scoreFn: (w: any) => number,
     subFn: (w: any, val: number) => string
   ): WordSuperlative | null => {
     if (list.length === 0) return null;
-    const sorted = [...list].sort((a, b) => scoreFn(b) - scoreFn(a));
+    const candidates = list.filter(
+      (w) => w?.word && !usedWords.has(String(w.word).toLowerCase())
+    );
+    const pool = candidates.length > 0 ? candidates : list;
+    const sorted = [...pool].sort((a, b) => scoreFn(b) - scoreFn(a));
     const best = sorted[0];
-    const val = scoreFn(best);
+    const val = best ? scoreFn(best) : 0;
     if (!best || val <= 0) return null;
+
+    usedWords.add(String(best.word).toLowerCase());
     return {
       word: best.word,
       translation: best.translation || "Vocabulary item",
@@ -162,31 +171,31 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
     };
   };
 
-  const mostSeen = pickTop(
-    allWords,
-    (w) => Number(w.seenCount ?? 0),
-    (_, v) => `Seen ${v}x in lessons`
-  );
-
-  const mostTapped = pickTop(
-    allWords,
-    (w) => Number(w.tappedCorrect ?? 0) + Number(w.tappedWrong ?? 0),
-    (w, v) => `${v} taps (${w.tappedCorrect ?? v} correct)`
-  );
-
-  const mostSpoken = pickTop(
+  const mostSpoken = pickTopUnique(
     allWords,
     (w) => Number(w.spokenAttempts ?? 0),
     (w, v) =>
-      `Spoken ${v}x${
-        w.avgSpokenScore != null ? ` · ${Math.round(w.avgSpokenScore)}% avg` : ""
+      `${v}x${
+        w.avgSpokenScore != null ? ` · ${Math.round(w.avgSpokenScore)}%` : ""
       }`
   );
 
-  const mostHeard = pickTop(
+  const mostTapped = pickTopUnique(
+    allWords,
+    (w) => Number(w.tappedCorrect ?? 0) + Number(w.tappedWrong ?? 0),
+    (w, v) => `${v} taps (${w.tappedCorrect ?? v} hit)`
+  );
+
+  const mostHeard = pickTopUnique(
     allWords,
     (w) => Number(w.heardCount ?? w.seenCount ?? 0),
-    (_, v) => `Heard ${v}x in audio`
+    (_, v) => `Heard ${v}x`
+  );
+
+  const mostSeen = pickTopUnique(
+    allWords,
+    (w) => Number(w.seenCount ?? 0),
+    (_, v) => `Seen ${v}x`
   );
 
   // Determine Slim Upcoming Focus

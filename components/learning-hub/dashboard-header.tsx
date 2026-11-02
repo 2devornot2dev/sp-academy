@@ -1,3 +1,5 @@
+// componenents/learning-hub/dashboard-header.tsx
+"use client";
 import { Flame, Globe2, Trophy } from "lucide-react";
 
 type DashboardHeaderProps = {
