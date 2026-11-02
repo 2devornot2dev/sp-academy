@@ -14,7 +14,7 @@ import {
   Headphones,
   ChevronRight,
 } from "lucide-react";
-import ActivityFeed from "@/components/home/ActivityFeed";
+import ActivityFeed from "@/components/home/activity-feed";
 import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
 import {
   getBadges,
