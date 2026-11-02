@@ -7,7 +7,8 @@ import {
   Settings,
   Gamepad,
   BookAudio,
-  LayoutGrid
+  LayoutGrid,
+  Trophy,
 } from "lucide-react";
 
 
@@ -41,6 +42,11 @@ export const navItems = [
     label: "Games",
     href: "/games",
     icon: <Gamepad strokeWidth={1.5} />,
+  },
+  {
+    label: "Achievements",
+    href: "/achievements",
+    icon: <Trophy strokeWidth={1.5} />,
   }
   // {
   //   label: "Daily Journal",
