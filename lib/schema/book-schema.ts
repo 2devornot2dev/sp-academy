@@ -41,11 +41,24 @@ export const BookPageCheckpointSchema = z.object({
   explanationNative: z.string(),
 });
 
+export const BookPageDefinitionSchema = z.object({
+  word: z.string(),
+  lemma: z.string().nullable().optional(),
+  partOfSpeech: z.string().default("NOUN"),
+  translation: z.string(),
+  phonetic: z.string(),
+  audioS3Key: z.string().default(""),
+  audioUrl: z.string().optional().nullable(), // Populated when presigned for reader
+});
+
 export const LocalizedBookPageSchema = z.object({
   pageNumber: z.number().int().min(1).max(5),
   sentences: z.array(BookSentenceSchema).min(1),
+  definitions: z.array(BookPageDefinitionSchema).min(1).max(2).default([]), // 🟢 NEW: 1-2 words per page
   checkpoint: BookPageCheckpointSchema,
 });
+
+export type BookPageDefinition = z.infer<typeof BookPageDefinitionSchema>;
 
 export const LocalizedBookTranslationSchema = z.object({
   title: z.string(),
