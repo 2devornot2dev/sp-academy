@@ -14,7 +14,7 @@ export default async function Page({
   const callbackURL =
     redirect && redirect.startsWith("/") && !redirect.startsWith("//")
       ? redirect
-      : "/learning-hub";
+      : "/dashboard";
 
   return (
     <div className="flex min-h-screen bg-white">

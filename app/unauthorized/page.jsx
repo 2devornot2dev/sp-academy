@@ -8,7 +8,7 @@ export default function page() {
         You do not have permission to view this page.
       </p>
       <Link
-        href="/learning-hub"
+        href="/dashboard"
         className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
       >
         Return to Home!

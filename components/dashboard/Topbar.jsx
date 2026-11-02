@@ -51,7 +51,7 @@ export const Topbar = ({
         {/* Logo for small screens */}
         <div className="-ml-3 flex items-center gap-2 text-white">
           {!desktopSidebarOpen && (
-            <Link href="/learning-hub">
+            <Link href="/dashboard">
               <Image
                 src="/logo1.png"
                 height={100}
