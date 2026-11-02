@@ -68,7 +68,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
           </div>
 
           <div className="max-w-3xl">
-            <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl lg:text-4xl">
+            <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl md:text-4xl">
               {greeting}, {user.firstName}!
             </h1>
             <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">
