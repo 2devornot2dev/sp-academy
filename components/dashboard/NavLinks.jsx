@@ -8,13 +8,14 @@ import {
   Gamepad,
   BookAudio,
 } from "lucide-react";
+import { MdDashboard } from "react-icons/md";
 
 export const navItems = [
-  // {
-  //   label: "Home",
-  //   href: "/home",
-  //   icon: <Home strokeWidth={1.5} />,
-  // },
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: <MdDashboard strokeWidth={1.5} />,
+  },
   {
     label: "Conversation",
     href: "/conversation",
