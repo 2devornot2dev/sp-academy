@@ -257,17 +257,37 @@ export const Sidebar = ({
           </div>
         )}
 
-        <div className="flex items-center justify-center py-1">
+        {/* Smooth Disappear -> Wait for Sidebar Slide -> Reappear Logo */}
+        <div className="relative flex h-10 w-full items-center justify-center overflow-hidden py-1">
+          {/* Expanded Full Logo */}
           <Image
-            src={sidebarOpen ? "/logo1-up.png" : "/logo1-min.png"}
+            src="/logo1-up.png"
             width={1000}
             height={1000}
             alt="SPOON Logo"
             priority
             quality={100}
             className={cn(
-              "h-auto object-contain transition-all duration-200",
-              sidebarOpen ? "w-[160px]" : "w-8",
+              "h-auto w-[160px] object-contain transition-[opacity,transform]",
+              sidebarOpen
+                ? "opacity-100 scale-100 duration-200 delay-200 ease-out"
+                : "pointer-events-none absolute opacity-0 scale-90 duration-75 delay-0 ease-in"
+            )}
+          />
+
+          {/* Collapsed Mini Icon Logo */}
+          <Image
+            src="/logo1-min.png"
+            width={1000}
+            height={1000}
+            alt="SPOON Mini Logo"
+            priority
+            quality={100}
+            className={cn(
+              "h-auto w-8 object-contain transition-[opacity,transform]",
+              !sidebarOpen
+                ? "opacity-100 scale-100 duration-200 delay-200 ease-out"
+                : "pointer-events-none absolute opacity-0 scale-75 duration-75 delay-0 ease-in"
             )}
           />
         </div>
