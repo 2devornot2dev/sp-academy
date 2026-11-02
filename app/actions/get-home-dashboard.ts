@@ -4,12 +4,11 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-guard";
 
-export interface BossVaultSlot {
-  milestoneIndex: number;
-  passed: boolean;
-  score: number | null;
-  unlockTitle: string;
-  unlockType: string;
+export interface WordSuperlative {
+  word: string;
+  translation: string;
+  count: number;
+  subLabel: string;
 }
 
 export interface HomeDashboardData {
@@ -33,8 +32,13 @@ export interface HomeDashboardData {
     totalWordsBanked: number;
     spokenResonanceAvg: number;
     currentMilestone: number;
-    subStepInMilestone: number;
-    bossVault: BossVaultSlot[];
+    spoonsInCurrentCycle: number; // 0, 1, 2, or 3
+  };
+  wordSuperlatives: {
+    mostSeen: WordSuperlative | null;
+    mostTapped: WordSuperlative | null;
+    mostSpoken: WordSuperlative | null;
+    mostHeard: WordSuperlative | null;
   };
   sprite: {
     name: string;
@@ -47,41 +51,32 @@ export interface HomeDashboardData {
   upcoming: {
     focusType: "SPOON" | "BRIDGE" | "BOSS";
     title: string;
-    subtitle: string;
     href: string;
     ctaLabel: string;
     stepsUntilNextBoss: number;
     nextBossReward: string;
   };
-  achievements: Array<{
-    id: string;
-    name: string;
-    description: string;
-    imageUrl: string | null;
-    unlockedAt: string | null;
-    isUnlocked: boolean;
-  }>;
 }
 
-const BOSS_UNLOCK_CATALOG: Array<{ title: string; type: string }> = [
-  { title: "Storybook #1: The Midnight Ticket", type: "📕 SpoonBook" },
-  { title: "3-Round Mistake Repair Arcade", type: "⚡ Arcade Mode" },
-  { title: "Storybook #2: The Missing Croissant", type: "📕 SpoonBook" },
-  { title: "Bistro Regular Rank Emblem", type: "🛡️ Rank Tier" },
-  { title: "Storybook #3: Table for Two", type: "📕 SpoonBook" },
-  { title: "Street Conversationalist Frame", type: "👑 Prestige" },
-  { title: "VIP Immersion Vault", type: "🔥 Mastery" },
-  { title: "Native Flow Certification", type: "🏆 Milestone" },
+const BOSS_UNLOCK_CATALOG = [
+  "Storybook #1: The Midnight Ticket",
+  "3-Round Mistake Repair Arcade",
+  "Storybook #2: The Missing Croissant",
+  "Bistro Regular Rank Emblem",
+  "Storybook #3: Table for Two",
+  "Street Conversationalist Frame",
+  "VIP Immersion Vault",
+  "Native Flow Certification",
 ];
 
 const RANK_TITLES = [
-  "Tier 1 · Day-One Explorer",
-  "Tier 2 · Café Regular",
-  "Tier 3 · Street Survivor",
-  "Tier 4 · Bistro Conversationalist",
-  "Tier 5 · Fluent Navigator",
-  "Tier 6 · Local Insider",
-  "Tier 7 · Master Speaker",
+  "Day-One Explorer",
+  "Café Regular",
+  "Street Survivor",
+  "Bistro Conversationalist",
+  "Fluent Navigator",
+  "Local Insider",
+  "Master Speaker",
 ];
 
 function getLanguageMeta(code?: string | null) {
@@ -95,14 +90,7 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   const user = await requireUser();
   if (!user) return null;
 
-  const [
-    course,
-    bossStages,
-    spriteProfile,
-    langProfiles,
-    allAchievements,
-    userProgress,
-  ] = await Promise.all([
+  const [course, bossStages, spriteProfile, langProfiles] = await Promise.all([
     prisma.foundationCourse.findFirst({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -126,42 +114,26 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
       include: {
         wordStats: {
           where: { seenCount: { gt: 0 } },
-          select: { avgSpokenScore: true, spokenAttempts: true },
         },
       },
     }),
-    prisma.achievement
-      .findMany({
-        orderBy: { createdAt: "asc" },
-        take: 12,
-      })
-      .catch(() => []),
-    prisma.userProgress
-      .findMany({
-        where: { userId: user.id },
-        include: { achievement: true },
-      })
-      .catch(() => []),
   ]);
 
   const lessons = course?.lessons ?? [];
-
   const completedLessons = lessons.filter(
     (l) => l.status === "COMPLETED" || Boolean(l.completedAt)
   );
   const spoonsCompleted = completedLessons.length;
-
   const bridgesCompleted = lessons.filter(
     (l) => l.foundationBridge && Boolean((l.foundationBridge as any).completedAt)
   ).length;
+  const bossesDefeated = bossStages.filter((b) => Boolean(b.passed)).length;
 
-  const defeatedBossStages = bossStages.filter((b) => Boolean(b.passed));
-  const bossesDefeated = defeatedBossStages.length;
+  // Compute the 4 WordStat Superlatives: Most Seen, Most Tapped, Most Spoken, Most Heard
+  const allWords = langProfiles.flatMap((lp) => lp.wordStats as any[]);
+  const totalWordsBanked = allWords.length;
 
-  // Word Matrix stats
-  const allSeenWords = langProfiles.flatMap((lp) => lp.wordStats);
-  const totalWordsBanked = allSeenWords.length;
-  const spokenWords = allSeenWords.filter(
+  const spokenWords = allWords.filter(
     (w) => (w.spokenAttempts ?? 0) > 0 && w.avgSpokenScore != null
   );
   const spokenResonanceAvg =
@@ -172,55 +144,62 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
         )
       : 0;
 
-  // Auto-Unlock Achievements in UserProgress if criteria thresholds are met
-  const unlockedMap = new Map<string, any>();
-  for (const up of userProgress) {
-    if (up?.achievementId) {
-      unlockedMap.set(String(up.achievementId), up);
-    }
-  }
+  const pickTop = (
+    list: any[],
+    scoreFn: (w: any) => number,
+    subFn: (w: any, val: number) => string
+  ): WordSuperlative | null => {
+    if (list.length === 0) return null;
+    const sorted = [...list].sort((a, b) => scoreFn(b) - scoreFn(a));
+    const best = sorted[0];
+    const val = scoreFn(best);
+    if (!best || val <= 0) return null;
+    return {
+      word: best.word,
+      translation: best.translation || "Vocabulary item",
+      count: val,
+      subLabel: subFn(best, val),
+    };
+  };
 
-  for (const ach of allAchievements) {
-    const existingUp = unlockedMap.get(ach.id);
-    if (existingUp?.isUnlocked) continue;
+  const mostSeen = pickTop(
+    allWords,
+    (w) => Number(w.seenCount ?? 0),
+    (_, v) => `Seen ${v}x in lessons`
+  );
 
-    const crit = (ach.criteria as Record<string, any>) || {};
-    const shouldUnlock =
-      (crit.spoons && spoonsCompleted >= Number(crit.spoons)) ||
-      (crit.bosses && bossesDefeated >= Number(crit.bosses)) ||
-      (crit.words && totalWordsBanked >= Number(crit.words));
+  const mostTapped = pickTop(
+    allWords,
+    (w) => Number(w.tappedCorrect ?? 0) + Number(w.tappedWrong ?? 0),
+    (w, v) => `${v} taps (${w.tappedCorrect ?? v} correct)`
+  );
 
-    if (shouldUnlock) {
-      try {
-        const created = await prisma.userProgress.create({
-          data: {
-            userId: user.id,
-            achievementId: ach.id,
-            isUnlocked: true,
-            unlockedAt: new Date(),
-          },
-          include: { achievement: true },
-        });
-        unlockedMap.set(ach.id, created);
-      } catch {
-        // Ignore race condition
-      }
-    }
-  }
+  const mostSpoken = pickTop(
+    allWords,
+    (w) => Number(w.spokenAttempts ?? 0),
+    (w, v) =>
+      `Spoken ${v}x${
+        w.avgSpokenScore != null ? ` · ${Math.round(w.avgSpokenScore)}% avg` : ""
+      }`
+  );
 
-  // Determine Upcoming Focus (Next Spoon vs Vocab Bridge vs Boss Stage)
+  const mostHeard = pickTop(
+    allWords,
+    (w) => Number(w.heardCount ?? w.seenCount ?? 0),
+    (_, v) => `Heard ${v}x in audio`
+  );
+
+  // Determine Slim Upcoming Focus
   const courseId = course?.id ?? "default";
   const currentMilestone = bossesDefeated + 1;
-  const subStepInMilestone = (spoonsCompleted % 3) + 1;
+  const spoonsInCurrentCycle = spoonsCompleted % 3;
 
   const lessonWithBridgeDue = completedLessons.find(
     (l) => l.foundationBridge && !(l.foundationBridge as any).completedAt
   );
-
   const activeBossDue = bossStages.find(
     (b) => b.milestoneIndex === currentMilestone && !b.passed
   );
-
   const nextSpoonLesson =
     lessons.find((l) => l.status !== "COMPLETED" && !l.completedAt) ??
     lessons[lessons.length - 1];
@@ -228,9 +207,6 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   let focusType: "SPOON" | "BRIDGE" | "BOSS" = "SPOON";
   let upcomingTitle =
     nextSpoonLesson?.title || `Spoon ${spoonsCompleted + 1}`;
-  let upcomingSubtitle = `Spoon ${
-    nextSpoonLesson?.orderIndex ?? spoonsCompleted + 1
-  } · Audio & Speech Mission`;
   let upcomingHref = nextSpoonLesson
     ? `/foundation/${nextSpoonLesson.id}/${courseId}`
     : "/learning-hub";
@@ -241,92 +217,34 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   if (activeBossDue && spoonsCompleted >= currentMilestone * 3) {
     focusType = "BOSS";
     upcomingTitle = `Boss Stage ${currentMilestone}`;
-    upcomingSubtitle = "3 Hearts · Timed Survival Assessment";
     upcomingHref = `/foundation/boss/${activeBossDue.id}`;
     ctaLabel = `Challenge Boss ${currentMilestone}`;
   } else if (lessonWithBridgeDue?.foundationBridge) {
     focusType = "BRIDGE";
-    upcomingTitle =
-      lessonWithBridgeDue.title ||
-      `Vocab Bridge ${lessonWithBridgeDue.orderIndex}`;
-    upcomingSubtitle = `Vocab Bridge ${lessonWithBridgeDue.orderIndex} · Lock words into Matrix`;
+    upcomingTitle = `Vocab Bridge ${lessonWithBridgeDue.orderIndex}`;
     upcomingHref = `/foundation/vocab/${lessonWithBridgeDue.foundationBridge.id}`;
-    ctaLabel = `Complete Bridge ${lessonWithBridgeDue.orderIndex}`;
+    ctaLabel = `Unlock Bridge ${lessonWithBridgeDue.orderIndex}`;
   }
-
-  // Build 8-slot Boss Crown Vault
-  const bossVault: BossVaultSlot[] = Array.from({ length: 8 }).map((_, i) => {
-    const mIdx = i + 1;
-    const dbBoss = bossStages.find((b) => b.milestoneIndex === mIdx);
-    const reward =
-      BOSS_UNLOCK_CATALOG[i] || {
-        title: `Milestone ${mIdx} Prestige Crown`,
-        type: "👑 Crown",
-      };
-
-    return {
-      milestoneIndex: mIdx,
-      passed: Boolean(dbBoss?.passed),
-      score: dbBoss?.score ?? null,
-      unlockTitle: reward.title,
-      unlockType: reward.type,
-    };
-  });
-
-  const nextBossReward =
-    BOSS_UNLOCK_CATALOG[currentMilestone - 1]?.title ||
-    `Milestone ${currentMilestone} Crown`;
 
   const stepsUntilNextBoss =
     focusType === "BOSS"
       ? 0
       : Math.max(1, currentMilestone * 3 - spoonsCompleted);
 
+  const nextBossReward =
+    BOSS_UNLOCK_CATALOG[currentMilestone - 1] ||
+    `Milestone ${currentMilestone} Crown`;
+
   const langMeta = getLanguageMeta(course?.targetLanguage);
   const rankTitle =
     RANK_TITLES[Math.min(RANK_TITLES.length - 1, bossesDefeated)];
-
-  const builtInAchievements = [
-    {
-      id: "builtin-first-spoon",
-      name: "First Words Spoken",
-      description: "Complete your very first Spoon audio lesson.",
-      imageUrl: null,
-      unlockedAt: spoonsCompleted >= 1 ? new Date().toISOString() : null,
-      isUnlocked: spoonsCompleted >= 1,
-    },
-    {
-      id: "builtin-first-boss",
-      name: "First Boss Crown",
-      description: "Survive Boss Stage 1 with at least 1 heart remaining.",
-      imageUrl: null,
-      unlockedAt: bossesDefeated >= 1 ? new Date().toISOString() : null,
-      isUnlocked: bossesDefeated >= 1,
-    },
-    {
-      id: "builtin-ten-spoons",
-      name: "Double-Digit Momentum",
-      description: "Complete 10 custom-baked Spoons.",
-      imageUrl: null,
-      unlockedAt: spoonsCompleted >= 10 ? new Date().toISOString() : null,
-      isUnlocked: spoonsCompleted >= 10,
-    },
-    {
-      id: "builtin-word-centurion",
-      name: "Lexicon Centurion",
-      description: "Bank 100+ active words in your Word Matrix.",
-      imageUrl: null,
-      unlockedAt: totalWordsBanked >= 100 ? new Date().toISOString() : null,
-      isUnlocked: totalWordsBanked >= 100,
-    },
-  ];
 
   return {
     user: {
       id: user.id,
       firstName:
         (user as any).firstName || user.name?.split(" ")[0] || "Learner",
-      name: user.name || "Learner",
+      name: user.name || (user as any).firstName || "Learner",
       avatarUrl: user.image ?? null,
     },
     languageCard: {
@@ -343,8 +261,13 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
       totalWordsBanked,
       spokenResonanceAvg,
       currentMilestone,
-      subStepInMilestone,
-      bossVault,
+      spoonsInCurrentCycle,
+    },
+    wordSuperlatives: {
+      mostSeen,
+      mostTapped,
+      mostSpoken,
+      mostHeard,
     },
     sprite: {
       name: spriteProfile?.sprite?.name || "Vox",
@@ -357,12 +280,10 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
     upcoming: {
       focusType,
       title: upcomingTitle,
-      subtitle: upcomingSubtitle,
       href: upcomingHref,
       ctaLabel,
       stepsUntilNextBoss,
       nextBossReward,
     },
-    achievements: builtInAchievements,
   };
 }
