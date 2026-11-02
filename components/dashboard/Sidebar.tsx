@@ -190,7 +190,7 @@ export const Sidebar = ({
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="overflow-x-hidden">
         {/* Menu Group */}
         <SidebarGroup>
           <SidebarGroupLabel className="py-4 text-lg font-bold tracking-widest text-emerald-500">
