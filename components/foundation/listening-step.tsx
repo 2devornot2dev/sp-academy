@@ -9,15 +9,14 @@ import {
   Loader2,
   Volume2,
   Headphones,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
+  Turtle,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
 import { useWordAudio } from "@/context/word-audio-context";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMatrix } from "@/context/matrix-context";
-import type { WordTimestamp } from "@/lib/schema/foundation/lesson-schema";
 
 type WordTile = {
   id: string;
@@ -27,91 +26,6 @@ type WordTile = {
 function isSameWord(a?: string, b?: string) {
   if (!a || !b) return false;
   return a.trim() === b.trim();
-}
-
-/**
- * 1. If `data.wordTimestamps` from Whisper is present, uses those exact millisecond marks!
- *    (Extends very brief word windows to at least 360ms or until the next word starts
- *    so ultra-short words like "Je" or "à" are still comfortable for the human eye to read).
- * 2. Fallback for older lessons: computes a punctuation-aware timeline from `referenceText`.
- */
-function buildWordTimeline(
-  words: string[],
-  durationMs: number,
-  explicitTimestamps?: WordTimestamp[],
-  referenceText?: string
-): WordTimestamp[] {
-  if (
-    Array.isArray(explicitTimestamps) &&
-    explicitTimestamps.length === words.length
-  ) {
-    return explicitTimestamps.map((ts, idx) => {
-      const nextStart =
-        idx + 1 < explicitTimestamps.length
-          ? explicitTimestamps[idx + 1].startMs
-          : ts.endMs + 220;
-      // Ensure even a 90ms word ("je") stays visible for ~340ms (or right up until the next word starts)
-      const readableEnd = Math.min(
-        nextStart - 20,
-        Math.max(ts.endMs, ts.startMs + 340)
-      );
-      return {
-        word: ts.word || words[idx],
-        startMs: ts.startMs,
-        endMs: Math.max(ts.startMs + 120, readableEnd),
-      };
-    });
-  }
-
-  if (words.length === 0) return [];
-
-  const rawRefTokens = (referenceText || "").trim().split(/\s+/).filter(Boolean);
-  const leadPad = Math.min(90, durationMs * 0.05);
-  const tailPad = Math.min(180, durationMs * 0.08);
-  const usableMs = Math.max(400, durationMs - leadPad - tailPad);
-
-  const itemMetrics = words.map((w, i) => {
-    const refTok = rawRefTokens[i] || w;
-    const clean = w.replace(/[.,!?;:]/g, "");
-    const vowelGroups = (
-      clean.match(/[aeiouyàâéèêëîïôùûüœ]+/gi) || []
-    ).length;
-
-    const speakWeight = Math.max(
-      1.0,
-      vowelGroups * 1.1 + clean.length * 0.16
-    );
-
-    const isLast = i === words.length - 1;
-    let pauseWeight = 0;
-    if (!isLast) {
-      if (/[.!?]$/.test(refTok)) {
-        pauseWeight = 2.1; // Full-stop pause
-      } else if (/[,;:]$/.test(refTok)) {
-        pauseWeight = 1.15; // Comma pause
-      }
-    }
-
-    return { speakWeight, pauseWeight };
-  });
-
-  const totalUnits = itemMetrics.reduce(
-    (acc, m) => acc + m.speakWeight + m.pauseWeight,
-    0
-  );
-
-  let cursor = leadPad;
-  return words.map((word, idx) => {
-    const { speakWeight, pauseWeight } = itemMetrics[idx];
-    const speakMs = (speakWeight / totalUnits) * usableMs;
-    const pauseMs = (pauseWeight / totalUnits) * usableMs;
-
-    const startMs = Math.round(cursor);
-    const endMs = Math.round(cursor + speakMs + pauseMs * 0.35);
-
-    cursor += speakMs + pauseMs;
-    return { word, startMs, endMs };
-  });
 }
 
 export function ListeningStep({
@@ -134,14 +48,13 @@ export function ListeningStep({
   const resolvedAudioUrl = urls[0];
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const rafRef = useRef<number | null>(null);
-
-  // Active word index driven at 60fps by audio.currentTime
+  const [playMode, setPlayMode] = useState<"words" | "sentence">("words");
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
-  const [wordProgress, setWordProgress] = useState<number>(0);
-  const [hasUsedFirstListenAssist, setHasUsedFirstListenAssist] =
-    useState(false);
+  const [hasCompletedFirstListen, setHasCompletedFirstListen] = useState(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Token to cancel an in-flight word-by-word sequence immediately if stopped
+  const sequenceTokenRef = useRef<number>(0);
 
   const initialTiles: WordTile[] = useMemo(
     () =>
@@ -160,25 +73,29 @@ export function ListeningStep({
   );
   const [feedbackMsg, setFeedbackMsg] = useState<string>("");
 
-  const stopRaf = () => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+  const stopAllAudio = () => {
+    sequenceTokenRef.current += 1;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
     }
+    stopWordAudio();
+    setIsPlaying(false);
     setActiveWordIdx(null);
-    setWordProgress(0);
   };
 
   useEffect(() => {
+    stopAllAudio();
     setAvailableWords(initialTiles);
     setSelectedWords([]);
     setStatus("idle");
     setFeedbackMsg("");
-    setHasUsedFirstListenAssist(false);
-    stopRaf();
+    setHasCompletedFirstListen(false);
     hasTrackedSeen.current = false;
     hasHeardMainAudio.current = false;
     heardTileIds.current.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTiles]);
 
   // 1. TRACK "SEEN" ONCE PER UNIQUE WORD ON MOUNT
@@ -194,37 +111,12 @@ export function ListeningStep({
 
   useEffect(() => {
     return () => {
-      stopAudio();
-      stopRaf();
+      stopAllAudio();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-    }
-    setIsPlaying(false);
-    stopRaf();
-    stopWordAudio();
-  };
-
-  const toggleAudio = () => {
-    if (isPlaying) {
-      stopAudio();
-      setHasUsedFirstListenAssist(true);
-      return;
-    }
-
-    if (!resolvedAudioUrl) return;
-
-    stopWordAudio();
-
-    const isFirstListen =
-      !hasHeardMainAudio.current &&
-      !hasUsedFirstListenAssist &&
-      status === "idle";
-
+  const trackHeardOnce = () => {
     if (!hasHeardMainAudio.current && data.expectedOrder) {
       const uniqueExpected = Array.from(new Set<string>(data.expectedOrder));
       uniqueExpected.forEach((word) => {
@@ -232,77 +124,106 @@ export function ListeningStep({
       });
       hasHeardMainAudio.current = true;
     }
+  };
+
+  /**
+   * MODE 1 (First Listen / Slow Breakdown):
+   * Speaks each word one at a time while displaying it calmly in the center for at least ~950ms.
+   */
+  const playSlowWordByWord = async () => {
+    const words: string[] = data.expectedOrder || [];
+    if (words.length === 0) return;
+
+    stopAllAudio();
+    const myToken = ++sequenceTokenRef.current;
+
+    trackHeardOnce();
+    setPlayMode("words");
+    setIsPlaying(true);
+
+    for (let i = 0; i < words.length; i++) {
+      if (sequenceTokenRef.current !== myToken) return;
+
+      setActiveWordIdx(i);
+      const startedAt = Date.now();
+
+      try {
+        await playWord(words[i], "m");
+      } catch {
+        // Ignore single word playback hiccup
+      }
+
+      if (sequenceTokenRef.current !== myToken) return;
+
+      // Ensure each word stays on screen long enough (~950ms minimum) to read comfortably
+      const elapsed = Date.now() - startedAt;
+      const holdMs = Math.max(320, 950 - elapsed);
+      await new Promise((r) => setTimeout(r, holdMs));
+    }
+
+    if (sequenceTokenRef.current === myToken) {
+      setActiveWordIdx(null);
+      setIsPlaying(false);
+      setHasCompletedFirstListen(true);
+    }
+  };
+
+  /**
+   * MODE 2 (Second+ Listen):
+   * Plays the full fluid sentence MP3 (`listening.mp3`) at natural speed (or 0.85x if slow).
+   */
+  const playFullSentence = (playbackRate = 1.0) => {
+    if (!resolvedAudioUrl) return;
+
+    stopAllAudio();
+    const myToken = ++sequenceTokenRef.current;
+
+    trackHeardOnce();
+    setPlayMode("sentence");
+    setIsPlaying(true);
 
     const audio = new Audio(resolvedAudioUrl);
+    audio.playbackRate = playbackRate;
     audioRef.current = audio;
 
-    // 60fps playhead sync locked to `audio.currentTime`
-    const syncToAudioClock = () => {
-      if (!audioRef.current || audioRef.current.paused) return;
-
-      const currentMs = audioRef.current.currentTime * 1000;
-      const totalMs =
-        Number.isFinite(audioRef.current.duration) &&
-        audioRef.current.duration > 0
-          ? audioRef.current.duration * 1000
-          : (data.expectedOrder?.length || 3) * 600;
-
-      const timeline = buildWordTimeline(
-        data.expectedOrder || [],
-        totalMs,
-        data.wordTimestamps,
-        data.referenceText
-      );
-
-      const idx = timeline.findIndex(
-        (t) => currentMs >= t.startMs && currentMs <= t.endMs
-      );
-
-      if (idx !== -1) {
-        setActiveWordIdx(idx);
-        const span = Math.max(1, timeline[idx].endMs - timeline[idx].startMs);
-        setWordProgress(
-          Math.min(1, Math.max(0, (currentMs - timeline[idx].startMs) / span))
-        );
-      } else {
-        // Between words (e.g., during a period silence pause) -> word disappears cleanly!
-        setActiveWordIdx(null);
-        setWordProgress(0);
-      }
-
-      rafRef.current = requestAnimationFrame(syncToAudioClock);
-    };
-
     audio.onended = () => {
-      setIsPlaying(false);
-      stopRaf();
-      if (isFirstListen) {
-        setHasUsedFirstListenAssist(true);
+      if (sequenceTokenRef.current === myToken) {
+        setIsPlaying(false);
       }
     };
 
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-        if (isFirstListen) {
-          rafRef.current = requestAnimationFrame(syncToAudioClock);
-        }
-      })
-      .catch((err) => {
-        console.warn("Audio playback skipped:", err);
+    audio.play().catch((err) => {
+      console.warn("Sentence audio playback skipped:", err);
+      if (sequenceTokenRef.current === myToken) {
         setIsPlaying(false);
-        stopRaf();
-      });
+      }
+    });
+  };
+
+  // Main Play / Stop handler:
+  // 1st click -> Slow Word-by-Word with centered word reveal
+  // 2nd+ click -> Fluid full sentence
+  const handlePrimaryPlay = () => {
+    if (isPlaying) {
+      stopAllAudio();
+      setHasCompletedFirstListen(true);
+      return;
+    }
+
+    if (!hasCompletedFirstListen && status === "idle") {
+      void playSlowWordByWord();
+    } else {
+      playFullSentence(1.0);
+    }
   };
 
   const handleAddWord = (tile: WordTile) => {
-    stopAudio();
+    stopAllAudio();
 
     const now = Date.now();
     if (now - lastAudioTriggerRef.current > 80) {
       lastAudioTriggerRef.current = now;
-      playWord(tile.text, "m");
+      void playWord(tile.text, "m");
     }
 
     if (!heardTileIds.current.has(tile.id)) {
@@ -322,14 +243,14 @@ export function ListeningStep({
   };
 
   const handleReset = () => {
-    stopAudio();
+    stopAllAudio();
     setStatus("idle");
     setSelectedWords([]);
     setAvailableWords(initialTiles);
   };
 
   const handleCheck = () => {
-    setHasUsedFirstListenAssist(true);
+    setHasCompletedFirstListen(true);
 
     const expected: string[] = data.expectedOrder || [];
 
@@ -358,7 +279,7 @@ export function ListeningStep({
   };
 
   const handleNext = () => {
-    stopAudio();
+    stopAllAudio();
     onNext();
   };
 
@@ -368,7 +289,7 @@ export function ListeningStep({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-8 animate-in fade-in duration-500">
-      {/* Header & Progress (Matches PronunciationStep) */}
+      {/* Header & Progress */}
       <div className="mb-8 shrink-0 text-center">
         <h2 className="mb-3 text-xl font-extrabold text-gray-900 md:text-2xl">
           Listen &amp; Build
@@ -382,7 +303,7 @@ export function ListeningStep({
               return (
                 <div
                   key={idx}
-                  className={`h-2.5 rounded-full transition-all duration-200 ${
+                  className={`h-2.5 rounded-full transition-all duration-300 ${
                     isCurrentlySpoken
                       ? "w-8 bg-indigo-600"
                       : status === "correct"
@@ -398,15 +319,15 @@ export function ListeningStep({
         )}
 
         <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
-          {!hasUsedFirstListenAssist && status === "idle"
-            ? "First Listen: Synced Word Spotlight"
+          {!hasCompletedFirstListen && status === "idle"
+            ? "First Listen: Slow Word-by-Word Breakdown"
             : `${selectedWords.length} of ${expectedWords.length} Words Placed`}
         </p>
       </div>
 
-      {/* Centerpiece Acoustic Stage Card (Matches PronunciationStep Card) */}
+      {/* Centerpiece Acoustic Stage Card */}
       <div
-        className={`relative mb-6 flex min-h-[185px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-3xl border bg-white p-8 text-center shadow-xs transition-all duration-300 ${
+        className={`relative mb-6 flex min-h-[190px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-3xl border bg-white p-8 text-center shadow-xs transition-all duration-300 ${
           isPlaying
             ? "border-indigo-300 ring-4 ring-indigo-500/10"
             : status === "correct"
@@ -418,40 +339,28 @@ export function ListeningStep({
           <Headphones size={150} />
         </div>
 
-        {/* Centered Single-Word Appear & Disappear Stage */}
-        <div className="relative z-10 flex min-h-[88px] w-full items-center justify-center">
+        {/* Center Display: Paced Word Card (1st Listen) OR Waveform (Full Sentence) OR Clean Play Controls */}
+        <div className="relative z-10 flex min-h-[96px] w-full flex-col items-center justify-center">
           <AnimatePresence mode="wait">
-            {isPlaying && activeWord ? (
+            {isPlaying && playMode === "words" && activeWord ? (
               <motion.div
                 key={`word-${activeWordIdx}-${activeWord}`}
-                initial={{ opacity: 0, y: 12, scale: 0.88, filter: "blur(6px)" }}
-                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -10, scale: 0.92, filter: "blur(6px)" }}
-                transition={{
-                  type: "spring",
-                  stiffness: 460,
-                  damping: 30,
-                  mass: 0.65,
-                }}
+                initial={{ opacity: 0, y: 8, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.94 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 className="flex flex-col items-center gap-2"
               >
-                <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/95 px-8 py-3.5 shadow-sm">
-                  <span className="text-3xl font-extrabold tracking-tight text-indigo-950 md:text-4xl">
-                    {activeWord}
-                  </span>
-                  <div
-                    className="absolute bottom-0 left-0 h-1 bg-indigo-500 transition-[width] duration-75 ease-linear"
-                    style={{ width: `${Math.round(wordProgress * 100)}%` }}
-                  />
-                </div>
-
+                <span className="rounded-2xl border border-indigo-200 bg-indigo-50/90 px-8 py-3.5 text-3xl font-extrabold tracking-tight text-indigo-950 shadow-xs md:text-4xl">
+                  {activeWord}
+                </span>
                 <span className="text-[11px] font-bold uppercase tracking-widest text-indigo-500">
                   Word {(activeWordIdx ?? 0) + 1} of {expectedWords.length}
                 </span>
               </motion.div>
             ) : isPlaying ? (
               <motion.div
-                key="playing-waveform"
+                key="sentence-waveform"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -480,56 +389,66 @@ export function ListeningStep({
                   )}
                 </div>
                 <span className="text-xs font-bold text-indigo-600">
-                  Listening closely...
+                  Playing full sentence...
                 </span>
               </motion.div>
             ) : (
               <motion.div
-                key="idle-prompt"
+                key="idle-controls"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-3"
+                className="flex flex-col items-center gap-3 w-full max-w-md"
               >
-                <button
-                  type="button"
-                  onClick={toggleAudio}
-                  disabled={isAudioLoading}
-                  className="inline-flex items-center gap-3 rounded-2xl bg-gray-900 px-7 py-4 text-base font-bold text-white shadow-md transition-all hover:bg-black active:scale-[0.98] disabled:opacity-50"
-                >
-                  {isAudioLoading ? (
-                    <Loader2 size={22} className="animate-spin" />
-                  ) : (
-                    <Volume2 size={22} />
-                  )}
-                  <span>
-                    {!hasUsedFirstListenAssist && status === "idle"
-                      ? "Play Audio (With Word Assist)"
-                      : "Listen to Sentence"}
-                  </span>
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3 w-full">
+                  {/* Primary Listen Button */}
+                  <button
+                    type="button"
+                    onClick={handlePrimaryPlay}
+                    disabled={isAudioLoading}
+                    className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 px-7 py-4 text-base font-bold text-white shadow-md transition-all hover:bg-black active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isAudioLoading ? (
+                      <Loader2 size={20} className="animate-spin" />
+                    ) : (
+                      <Volume2 size={20} />
+                    )}
+                    <span>
+                      {!hasCompletedFirstListen && status === "idle"
+                        ? "Listen (Word by Word)"
+                        : "Listen to Sentence"}
+                    </span>
+                  </button>
 
-                {!hasUsedFirstListenAssist && status === "idle" && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600">
-                    <Sparkles size={13} />
-                    Each word appears &amp; disappears in sync on your first listen
-                  </span>
-                )}
+                  {/* Secondary Slow Button (Available after 1st listen so they can hear the slow breakdown or slow sentence anytime) */}
+                  {hasCompletedFirstListen && (
+                    <button
+                      type="button"
+                      onClick={() => void playSlowWordByWord()}
+                      disabled={isAudioLoading}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm font-bold text-gray-700 shadow-2xs transition-all hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]"
+                      title="Play slow word-by-word breakdown"
+                    >
+                      <Turtle size={18} className="text-indigo-600" />
+                      <span>Slow Words</span>
+                    </button>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
 
-        {isPlaying && (
-          <button
-            type="button"
-            onClick={toggleAudio}
-            className="relative z-10 mt-4 inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
-          >
-            <Square size={12} className="fill-current" />
-            <span>Stop Audio</span>
-          </button>
-        )}
+          {isPlaying && (
+            <button
+              type="button"
+              onClick={handlePrimaryPlay}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-1.5 text-xs font-bold text-gray-600 shadow-2xs transition hover:bg-gray-50"
+            >
+              <Square size={11} className="fill-current" />
+              <span>Stop</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Sentence Builder Drop Zone */}
