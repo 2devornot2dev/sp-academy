@@ -16,19 +16,23 @@ import {
 } from "lucide-react";
 import ActivityFeed from "@/components/home/ActivityFeed";
 import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
-import { badges, getGreeting, HeroTrophyIllustration, signatures } from "./utils";
-
+import {
+  getBadges,
+  getGreeting,
+  getSignatures,
+  HeroTrophyIllustration,
+} from "./utils";
 
 export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
   const { user, languageCard, wordSuperlatives, sprite, upcoming } = data;
   const greeting = getGreeting();
+  const signatures = getSignatures(wordSuperlatives);
+  const badges = getBadges(languageCard);
 
   const cyclePct =
     upcoming.focusType === "BOSS"
       ? 100
       : Math.max(18, Math.round((languageCard.spoonsInCurrentCycle / 3) * 100));
-
-
 
   return (
     <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100">
@@ -132,7 +136,9 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       href={upcoming.href}
                       className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-indigo-600/30 transition active:scale-95"
                     >
-                      <span className="text-indigo-200 font-bold">Up Next:</span>
+                      <span className="text-indigo-200 font-bold">
+                        Up Next:
+                      </span>
                       <span>{upcoming.title}</span>
                       <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
@@ -153,8 +159,8 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       Word Matrix Signatures
                     </h3>
                     <p className="text-[11px] font-semibold text-slate-400">
-                      {languageCard.totalWordsBanked} active words tracked across
-                      your lessons
+                      {languageCard.totalWordsBanked} active words tracked
+                      across your lessons
                     </p>
                   </div>
                   <Link
@@ -204,7 +210,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                             : "Practice to unlock"}
                         </p>
                       </div>
-                    )
+                    ),
                   )}
                 </div>
               </div>
