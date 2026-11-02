@@ -68,7 +68,7 @@ export async function getUserMilestoneTag(
     where: {
       userId,
       ...(course?.id ? { foundationCourseId: course.id } : {}),
-      status: "COMPLETED",
+      passed: true, // <--- Matches all previously defeated Boss Stages!
     },
   });
 

@@ -1,6 +1,9 @@
+// app/api/boss/review/route.ts (or your boss review route path)
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
+import { awardSpriteEnergy } from "@/app/actions/sprite-energy";
+import { invalidateDossierCache } from "@/lib/sprites/get-cached-dossier";
 
 export async function POST(request: Request) {
   try {
@@ -21,13 +24,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
     }
 
+    // 0. Check if this Boss Stage was already passed previously (prevents farming +1 ⚡ on replays)
+    const existingStage = await prisma.foundationBossStage.findUnique({
+      where: { id: sessionId },
+      select: { passed: true },
+    });
+
+    const isFirstTimePassing = Boolean(passed && !existingStage?.passed);
+
     // 1. Update Boss Stage and grab all the related data we need
     const updatedStage = await prisma.foundationBossStage.update({
       where: { id: sessionId },
       data: {
         passed: passed,
+        ...(passed ? { status: "COMPLETED", completedAt: new Date() } : {}),
         score: score,
-        completedAt: passed ? new Date() : undefined,
         attempts: { increment: 1 },
         results: { xpAwarded: xp, chancesRemaining, durationSeconds: duration },
       },
@@ -36,13 +47,25 @@ export async function POST(request: Request) {
       },
     });
 
-    // 2. IF PASSED: Ensure the next Spoon is either already pre-baked OR queue it now as a fallback!
+    let newEnergy: number | undefined = undefined;
+
+    // 2. IF PASSED: Award +1 ⚡ Sprite Energy (on first pass) & ensure next Spoon is pre-baked/queued!
     if (passed) {
       const course = updatedStage.course;
       const user = course.user;
       const nextLessonDay = updatedStage.milestoneIndex * 3 + 1; // e.g., Milestone 1 -> Day 4
 
-      // Check if triggerMilestoneBossAndNextSpoon already pre-baked (or is baking) this Spoon
+      // 2A. 🟢 Award +1 ⚡ Energy Charge on first-time Boss defeat & refresh Dossier cache
+      if (isFirstTimePassing) {
+        const energyRes = await awardSpriteEnergy(user.id, 1);
+        newEnergy = energyRes.energy;
+        console.log(
+          `⚡ Awarded +1 Sprite Energy to user ${user.id} for defeating Boss ${updatedStage.milestoneIndex} (Total: ${newEnergy} ⚡)`
+        );
+      }
+      await invalidateDossierCache(user.id);
+
+      // 2B. Check if triggerMilestoneBossAndNextSpoon already pre-baked (or is baking) this Spoon
       const existingNextSpoon = await prisma.foundationLesson.findUnique({
         where: {
           foundationCourseId_orderIndex: {
@@ -111,6 +134,8 @@ export async function POST(request: Request) {
       success: true,
       message: passed ? "Boss Defeated! Next milestone ready." : "Try Again.",
       stage: updatedStage,
+      energyAwarded: isFirstTimePassing ? 1 : 0,
+      newEnergy,
     });
   } catch (error) {
     console.error("Boss Review Route Error:", error);
