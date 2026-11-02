@@ -41,12 +41,12 @@ export const navItems = [
     label: "Games",
     href: "/games",
     icon: <Gamepad strokeWidth={1.5} />,
-  },
-  {
-    label: "Daily Journal",
-    href: "/daily-journal",
-    icon: <BookAudio strokeWidth={1.5} />
   }
+  // {
+  //   label: "Daily Journal",
+  //   href: "/daily-journal",
+  //   icon: <BookAudio strokeWidth={1.5} />
+  // }
 ];
 
 export const settingItems = [
