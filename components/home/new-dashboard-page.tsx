@@ -10,7 +10,7 @@ import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
 
 export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E6F4FE] via-[#F2F8FF] to-[#E8F2FF] p-4 sm:p-6 lg:p-8 font-sans text-slate-900">
+    <div className="min-h-screen animate-bg p-4 sm:p-6 lg:p-8 font-sans text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* 1. TOP HERO TROPHY BANNER (With User Name, Milestone Progress & Slim Up Next) */}
         <DashboardHeroBanner data={data} />
