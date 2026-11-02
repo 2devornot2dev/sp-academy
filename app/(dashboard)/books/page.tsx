@@ -1,14 +1,11 @@
-import BookCard from "@/components/books/BookCard";
-import CreateBookReportCard from "@/components/books/CreateBookReportCard";
-import { getBooksByUserId } from "@/lib/actions";
 import { requireUser } from "@/lib/auth-guard";
-import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
 import { BookOpen, LibraryBig } from "lucide-react";
 
 export default async function BookReportsPage() {
   const user = await requireUser();
 
-  const books = await getBooksByUserId(user.id);
+  const books = await prisma.spoonBook.findMany();
 
   // console.log("Books data:", books);
 
@@ -43,10 +40,12 @@ export default async function BookReportsPage() {
       </header>
 
       <div className="mt-6 grid max-w-7xl grid-cols-1 gap-6 px-6 sm:grid-cols-2 lg:grid-cols-3">
-        <CreateBookReportCard />
-        {books.map((book) => (
-          <BookCard key={book.id} book={book} />
-        ))}
+        {!books || books.length === 0 ? (
+          <div className="col-span-full flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200/20 bg-slate-950/30 p-6 text-center text-sm text-white/80">
+            <LibraryBig className="size-9 text-white/90" />
+            <p>No books available at the moment.</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
