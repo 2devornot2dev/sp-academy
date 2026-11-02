@@ -8,10 +8,6 @@ import {
   Trophy,
   Zap,
   ArrowRight,
-  Eye,
-  MousePointerClick,
-  Mic2,
-  Headphones,
   ChevronRight,
 } from "lucide-react";
 import ActivityFeed from "@/components/home/activity-feed";
@@ -36,15 +32,12 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
 
   return (
     <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100">
-      {/* =====================================================================
-          1. SPOON HEADER BANNER (Matches Conversation & Learning Hub 1:1)
-          ===================================================================== */}
+      {/* 1. HEADER BANNER */}
       <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
         <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
-          {/* Top Frosted Glass Pills */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-slate-950/35 px-4 py-1 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-md">
               <Globe2 className="h-3.5 w-3.5 text-cyan-300" />
@@ -86,14 +79,12 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
         </div>
       </header>
 
-      {/* =====================================================================
-          2. OVERLAPPING -MT-10 12-COLUMN GRID (Fits 100% in Remaining Viewport)
-          ===================================================================== */}
+      {/* 2. MAIN GRID */}
       <main className="relative z-20 mx-auto -mt-10 flex-1 min-h-0 w-full max-w-7xl px-6 pb-5 lg:px-8">
         <div className="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* LEFT COLUMN (8 Cols): Dark Milestone Hero Card + White Signatures & Badges Card */}
+          {/* LEFT COLUMN */}
           <div className="flex flex-col gap-5 min-h-0 lg:col-span-8">
-            {/* CARD 1: DARK HERO MILESTONE & TROPHY CARD (Matches Conversation Dark Hero Card) */}
+            {/* CARD 1: DARK HERO */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0F172A] via-[#131D36] to-[#1E1B4B] p-6 text-white shadow-xl shrink-0">
               <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex-1 space-y-3 text-center sm:text-left">
@@ -115,7 +106,6 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                     </p>
                   </div>
 
-                  {/* 3-Spoon Cycle Progress Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
                     <div className="h-3.5 w-full sm:w-60 rounded-full bg-slate-800 p-0.5">
                       <div
@@ -130,7 +120,6 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                     </span>
                   </div>
 
-                  {/* Slim Up Next Action Button */}
                   <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                     <Link
                       href={upcoming.href}
@@ -149,11 +138,11 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
               </div>
             </div>
 
-            {/* CARD 2: WHITE SIGNATURES (4 Cols) + 3D HEX BADGES (6 Cols) */}
-            <div className="flex-1 min-h-0 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between gap-4 overflow-y-auto">
-              {/* Top Section: 4 Distinct Word Matrix Signatures */}
-              <div>
-                <div className="flex items-center justify-between mb-2.5">
+            {/* CARD 2: SIGNATURES (2x2 stat cards) + HEX BADGES */}
+            <div className="flex-1 min-h-0 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col gap-4 overflow-y-auto">
+              {/* Signatures: header + 2x2 grid (grows to fill space) */}
+              <div className="flex flex-1 min-h-0 flex-col">
+                <div className="flex items-center justify-between mb-3 shrink-0">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">
                       Word Matrix Signatures
@@ -172,7 +161,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                   </Link>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid flex-1 grid-cols-2 auto-rows-fr gap-3">
                   {signatures.map(
                     ({
                       id,
@@ -180,43 +169,50 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       Icon,
                       item,
                       fallback,
-                      iconBg,
-                      pillClass,
                       cardClass,
+                      statClass,
                     }) => (
                       <div
                         key={id}
-                        className={`rounded-2xl border p-3 transition hover:shadow-xs ${cardClass}`}
+                        className={`group relative flex min-h-[120px] items-center justify-between overflow-hidden rounded-2xl p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl ${cardClass}`}
                       >
-                        <div className="flex items-center justify-between gap-1 mb-1.5">
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${pillClass}`}
-                          >
+                        <Icon className="pointer-events-none absolute -bottom-4 -right-3 h-28 w-28 text-white/10 transition-transform duration-300 group-hover:scale-110" />
+
+                        <div className="relative z-10 min-w-0 pr-3">
+                          <span className="inline-block rounded-full border border-white/20 bg-white/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider">
                             {label}
                           </span>
-                          <div
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-2xs ${iconBg}`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
+
+                          <div className="mt-2 truncate text-3xl font-black leading-none tracking-tight">
+                            {item?.word || fallback}
                           </div>
+
+                          <div className="mt-1 truncate text-sm font-semibold text-white/90">
+                            {item
+                              ? `“${item.translation}”`
+                              : "Practice to unlock"}
+                          </div>
+
+                          {item?.subLabel && (
+                            <span
+                              className={`mt-2.5 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-black ${statClass}`}
+                            >
+                              {item.subLabel}
+                            </span>
+                          )}
                         </div>
 
-                        <p className="text-base font-black text-slate-900 truncate">
-                          {item?.word || fallback}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-500 truncate">
-                          {item
-                            ? `"${item.translation}" · ${item.subLabel}`
-                            : "Practice to unlock"}
-                        </p>
+                        <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-inner transition-transform duration-300 group-hover:rotate-6 lg:h-20 lg:w-20">
+                          <Icon className="h-8 w-8 drop-shadow lg:h-10 lg:w-10" />
+                        </div>
                       </div>
                     ),
                   )}
                 </div>
               </div>
 
-              {/* Bottom Section: 6 Isometric 3D Hexagon Badges in 1 Compact Row */}
-              <div className="border-t border-slate-100 pt-3.5">
+              {/* Badges */}
+              <div className="shrink-0 border-t border-slate-100 pt-3.5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-black uppercase tracking-wider text-slate-400">
                     Recent Badges ({badges.filter((b) => b.unlocked).length}/
@@ -284,7 +280,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
             </div>
           </div>
 
-          {/* RIGHT COLUMN (4 Cols): SPOON FEED CARD (Internal Scroll, Fits Viewport) */}
+          {/* RIGHT COLUMN: SPOON FEED */}
           <div className="flex flex-col min-h-0 lg:col-span-4">
             <div className="flex h-full min-h-[380px] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="mb-3 flex items-center justify-between shrink-0 border-b border-slate-100 pb-3">

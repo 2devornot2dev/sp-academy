@@ -102,52 +102,7 @@ export const getGreeting = () => {
   return "Hi";
 };
 
-export function getSignatures(
-  wordSuperlatives: HomeDashboardData["wordSuperlatives"]
-) {
-  return [
-    {
-      id: "seen",
-      label: "Most Seen",
-      Icon: Eye,
-      item: wordSuperlatives.mostSeen,
-      fallback: "bonjour",
-      iconBg: "bg-sky-500 text-white",
-      pillClass: "bg-sky-100 text-sky-700",
-      cardClass: "border-sky-100 bg-sky-50/50",
-    },
-    {
-      id: "tapped",
-      label: "Most Tapped",
-      Icon: MousePointerClick,
-      item: wordSuperlatives.mostTapped,
-      fallback: "voudrais",
-      iconBg: "bg-amber-500 text-white",
-      pillClass: "bg-amber-100 text-amber-800",
-      cardClass: "border-amber-100 bg-amber-50/50",
-    },
-    {
-      id: "spoken",
-      label: "Most Spoken",
-      Icon: Mic2,
-      item: wordSuperlatives.mostSpoken,
-      fallback: "fatigué",
-      iconBg: "bg-emerald-500 text-white",
-      pillClass: "bg-emerald-100 text-emerald-800",
-      cardClass: "border-emerald-100 bg-emerald-50/50",
-    },
-    {
-      id: "heard",
-      label: "Most Heard",
-      Icon: Headphones,
-      item: wordSuperlatives.mostHeard,
-      fallback: "l'addition",
-      iconBg: "bg-purple-500 text-white",
-      pillClass: "bg-purple-100 text-purple-800",
-      cardClass: "border-purple-100 bg-purple-50/50",
-    },
-  ];
-}
+
 
 export function getBadges(
   languageCard: HomeDashboardData["languageCard"]
@@ -200,6 +155,49 @@ export function getBadges(
       unlocked: languageCard.bossesDefeated >= 3,
       grad: ["#F9A8D4", "#DB2777"],
       emoji: "🌍",
+    },
+  ];
+}
+
+export function getSignatures(
+  wordSuperlatives: HomeDashboardData["wordSuperlatives"]
+) {
+  return [
+    {
+      id: "seen",
+      label: "Most Seen",
+      Icon: Eye,
+      item: wordSuperlatives.mostSeen,
+      fallback: "bonjour",
+      cardClass: "bg-blue-600 shadow-blue-600/25",
+      statClass: "bg-blue-950/40 text-blue-100",
+    },
+    {
+      id: "tapped",
+      label: "Most Tapped",
+      Icon: MousePointerClick,
+      item: wordSuperlatives.mostTapped,
+      fallback: "voudrais",
+      cardClass: "bg-amber-500 shadow-amber-500/25",
+      statClass: "bg-amber-950/40 text-amber-100",
+    },
+    {
+      id: "spoken",
+      label: "Most Spoken",
+      Icon: Mic2,
+      item: wordSuperlatives.mostSpoken,
+      fallback: "fatigué",
+      cardClass: "bg-emerald-600 shadow-emerald-600/25",
+      statClass: "bg-emerald-950/40 text-emerald-100",
+    },
+    {
+      id: "heard",
+      label: "Most Heard",
+      Icon: Headphones,
+      item: wordSuperlatives.mostHeard,
+      fallback: "l'addition",
+      cardClass: "bg-purple-600 shadow-purple-600/25",
+      statClass: "bg-purple-950/40 text-purple-100",
     },
   ];
 }

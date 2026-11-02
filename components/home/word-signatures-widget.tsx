@@ -59,19 +59,7 @@ export function WordSignaturesWidget({
       numberBadge: "bg-emerald-950/40 text-emerald-100 border-white/10",
       iconBg: "bg-white/15 text-white border-white/20",
     },
-    {
-      id: "heard",
-      label: "Most Heard",
-      Icon: Headphones,
-      data: superlatives.mostHeard,
-      fallbackWord: "j'ai",
-      fallbackTrans: "I have",
-      fallbackSub: "Heard 61x in audio",
-      cardBg: "bg-purple-600 text-white shadow-purple-600/20",
-      badgeStyle: "bg-white/20 text-white border-white/20",
-      numberBadge: "bg-purple-950/40 text-purple-100 border-white/10",
-      iconBg: "bg-white/15 text-white border-white/20",
-    },
+   
   ];
 
   return (
