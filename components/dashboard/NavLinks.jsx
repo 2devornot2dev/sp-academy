@@ -7,14 +7,15 @@ import {
   Settings,
   Gamepad,
   BookAudio,
+  LayoutGrid
 } from "lucide-react";
-import { MdDashboard } from "react-icons/md";
+
 
 export const navItems = [
   {
     label: "Dashboard",
     href: "/dashboard",
-    icon: <MdDashboard strokeWidth={1.5} />,
+    icon: <LayoutGrid strokeWidth={1.5} />,
   },
   {
     label: "Conversation",
