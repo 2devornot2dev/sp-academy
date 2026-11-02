@@ -240,8 +240,8 @@ export const Sidebar = ({
         </SidebarGroup>
       </SidebarContent>
 
-      {/* BOTTOM: Admin Button (if admin) + Dynamic Logo */}
-      <SidebarFooter className="flex flex-col gap-4 p-3">
+   {/* BOTTOM: Admin Button (if admin) + Dynamic Logo */}
+      <SidebarFooter className="flex flex-col gap-4 overflow-hidden p-3">
         {isAdmin && sidebarOpen && (
           <div className="animate-gradient overflow-hidden rounded-lg bg-linear-to-r from-sky-400 via-emerald-400 to-violet-400 bg-[length:300%_300%] p-1 shadow-lg">
             <Button
@@ -257,8 +257,8 @@ export const Sidebar = ({
           </div>
         )}
 
-        {/* Smooth Disappear -> Wait for Sidebar Slide -> Reappear Logo */}
-        <div className="relative flex h-10 w-full items-center justify-center overflow-hidden py-1">
+        {/* Both images stay `absolute` inside `overflow-hidden` so they never trigger a horizontal scrollbar! */}
+        <div className="relative flex h-10 w-full items-center justify-center overflow-hidden">
           {/* Expanded Full Logo */}
           <Image
             src="/logo1-up.png"
@@ -268,10 +268,10 @@ export const Sidebar = ({
             priority
             quality={100}
             className={cn(
-              "h-auto w-[160px] object-contain transition-[opacity,transform]",
+              "absolute h-auto w-[160px] max-w-none object-contain transition-[opacity,transform]",
               sidebarOpen
                 ? "opacity-100 scale-100 duration-200 delay-200 ease-out"
-                : "pointer-events-none absolute opacity-0 scale-90 duration-75 delay-0 ease-in"
+                : "pointer-events-none opacity-0 scale-90 duration-75 delay-0 ease-in"
             )}
           />
 
@@ -284,10 +284,10 @@ export const Sidebar = ({
             priority
             quality={100}
             className={cn(
-              "h-auto w-8 object-contain transition-[opacity,transform]",
+              "absolute h-auto w-8 object-contain transition-[opacity,transform]",
               !sidebarOpen
                 ? "opacity-100 scale-100 duration-200 delay-200 ease-out"
-                : "pointer-events-none absolute opacity-0 scale-75 duration-75 delay-0 ease-in"
+                : "pointer-events-none opacity-0 scale-75 duration-75 delay-0 ease-in"
             )}
           />
         </div>
