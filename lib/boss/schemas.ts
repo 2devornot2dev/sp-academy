@@ -40,7 +40,13 @@ export const BossPersonaSchema = z.object({
   avatarKey: z.string().nullable().optional(),
   coverUrl: z.string().nullable().optional(),
   avatar: BossAvatarSchema.nullable().optional(),
+
+  // 🟢 NEW: Add video and audio keys
+  introAudioKey: z.string().nullable().optional(),
+  introVideoKey: z.string().nullable().optional(),
+  introVideoS3Key: z.string().nullable().optional(), // In case Lambda or DB uses this naming
 });
+
 
 export type BossPersona = z.infer<typeof BossPersonaSchema>;
 
