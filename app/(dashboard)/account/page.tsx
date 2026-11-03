@@ -1,22 +1,23 @@
 // app/account/page.tsx
 import React from "react";
-import { getAccountSettingsByUserId } from "@/lib/actions";
-import { auth } from "@clerk/nextjs/server";
+import { getUserDetailsById, type UserDetails } from "@/lib/actions";
+
+import { requireUser } from "@/lib/auth-guard";
 import { Cog } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { AccountSettingsForm } from "@/components/account/AccountSettingsForm";
-import { BillingForm } from "@/components/account/BillingForm";
-import { SharingSettingsForm } from "@/components/account/SharingSettingsForm";
-import { NotificationSettingsForm } from "@/components/account/NotificationSettingsForm";
+import { BillingForm } from "@/components/account/billing-form";
+import { SharingSettingsForm } from "@/components/account/sharing-settings-form";
+import { NotificationSettingsForm } from "@/components/account/notifications-settings-form";
 import { ProfilePictureUploader } from "@/components/account/ProfilePictureUploader";
 import { DangerZone } from "@/components/account/DangerZone";
 import { ProfileCompletion } from "@/components/account/ProfileCompletion";
-import { GeneralSettings } from "@/components/account/GeneralSettings";
+import { GeneralSettings } from "@/components/account/general-settings";
 
 export default async function AccountSettings() {
-  const user = requireUser();
-  const settings = await getAccountSettingsByUserId(user.id);
+  const user = await requireUser();
+  const userDetails: UserDetails = await getUserDetailsById(user.id);
 
   return (
     <main className="space-y-4 pb-10">
@@ -43,39 +44,40 @@ export default async function AccountSettings() {
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
           </TabsList>
-
           <TabsContent value="general" className="space-y-6">
             <GeneralSettings
-              initialImageUrl={settings.avatarUrl}
-              initialSettings={settings}
+              initialImageUrl={
+                userDetails.avatarUrl
+                  ? userDetails.avatarUrl
+                  : userDetails.image
+              }
+              initialSettings={userDetails}
+              userId={user.id}
             />
 
-            <DangerZone userId={userId} />
+            <DangerZone userId={user.id} />
           </TabsContent>
-
-          <TabsContent value="sharing">
-            <SharingSettingsForm initialSettings={settings} userId={userId} />
+          // app/account/page.tsx
+          <TabsContent value="sharing" className="mt-6">
+            <SharingSettingsForm
+              initialSettings={userDetails.AccountSettings} // 👈 Pass .AccountSettings here!
+              userId={user.id}
+            />
           </TabsContent>
-
-          <TabsContent value="notifications">
+          <TabsContent value="notifications" className="mt-6">
             <NotificationSettingsForm
-              initialSettings={settings}
-              userId={userId}
+              initialSettings={userDetails.AccountSettings} // 👈 Pass .AccountSettings here!
+              userId={user.id}
             />
           </TabsContent>
-
-          <TabsContent value="billing">
-            <BillingForm currentBillingPlan={settings} userId={userId} />
+          <TabsContent value="billing" className="mt-6">
+            <BillingForm
+              billingInfo={userDetails.BillingInformation} // 👈 Pass .BillingInformation here!
+              userId={user.id}
+            />
           </TabsContent>
         </Tabs>
       </Card>
     </main>
   );
-}
-
-function calculateCompletion(settings) {
-  // Calculate profile completion percentage based on filled fields
-  const totalFields = 100; // Adjust based on your fields
-  const filledFields = Object.values(settings).filter(Boolean).length;
-  return Math.round((filledFields / totalFields) * 100);
 }

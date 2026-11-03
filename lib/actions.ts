@@ -717,50 +717,7 @@ export async function getConversationAnalysisByUserId(userId: string) {
   } catch (error) {}
 }
 
-export async function updateAccountSettings(data: any) {
-  try {
-    console.log("data:", data);
-    const {
-      userId,
-      language,
-      avatarUrl,
-      displayName,
-      aiVoicePreference,
-      billingPlan,
-      dailyEmails,
-      weeklyEmails,
-      shareReadingLogs,
-      shareConversationActivity,
-      shareAchievements,
-    } = data;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) {
-      throw new Error("User not found");
-    }
-    await prisma.accountSettings.update({
-      where: { userId: user.id },
-      data: {
-        displayName,
-        language,
-        avatarUrl,
-        aiVoicePreference,
-        dailyEmails,
-        weeklyEmails,
-        shareReadingLogs,
-        shareConversationActivity,
-        shareAchievements,
-      },
-    });
-  } catch (error) {
-    console.error("Error updating account settings:", error.message);
-    throw new Error("Failed to update account settings");
-  } finally {
-    // Trigger revalidation after saving data
-    revalidatePath(`/account`);
-  }
-}
+
 
 export async function getAccountSettingsByUserId(userId:string) {
   try {
@@ -785,35 +742,147 @@ export async function getAccountSettingsByUserId(userId:string) {
   }
 }
 
-// export async function testApiRoute(formData) {
-//   const headersList = await headers();
-//   const host = headersList.get("host");
-//   const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+export async function getUserDetailsById(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        image: true,
+        avatarUrl: true,
+        displayUsername: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        gender: true,
+        phone: true,
+        role: true,
+        nativeLanguage: true,
+        targetLanguage: true,
+        AccountSettings: true,
+        BillingInformation: true,
+        spriteProfile: {
+          include: {
+            sprite: true,
+          },
+        }, // ✅ Fixed missing closing brace here
+      },
+    });
 
-//   try {
-//     const name = formData.get("name");
-//     console.log("name", name);
+    if (!user) {
+      throw new Error("User not found");
+    }
 
-//     const response = await fetch(`${protocol}://${host}/api/test-api-route`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({ name }),
-//     });
+    return user;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error fetching user details:", message);
+    throw new Error("Failed to fetch user details");
+  }
+}
 
-//     if (!response.ok) {
-//       throw new Error(`API request failed with status ${response.status}`);
-//     }
+export type UserDetails = Awaited<ReturnType<typeof getUserDetailsById>>;
 
-//     const responseData = await response.json();
-//     console.log("Response data:", responseData);
-//     return { success: true, data: responseData };
-//   } catch (error) {
-//     console.error("Error in test API route:", error);
-//     return { success: false, error: error.message };
-//   }
-// }
+/**
+ * Unified Server Action to update User, AccountSettings, and SpriteProfile
+ */
+export async function updateAccountSettings(
+  userId: string,
+  data: {
+    // User fields
+    displayUsername?: string;
+    firstName?: string;
+    lastName?: string;
+    nativeLanguage?: string;
+    targetLanguage?: string;
+    gender?: string;
+    image?: string | null;
+    // SpriteProfile fields
+    spriteSlug?: string; // "vox" | "vivi"
+    targetVoiceId?: string;
+    // AccountSettings fields (Notifications & Sharing)
+    dailyEmails?: boolean;
+    weeklyEmails?: boolean;
+    promotionEmails?: boolean;
+    shareReadingLogs?: boolean;
+    shareConversationActivity?: boolean;
+    shareAchievements?: boolean;
+    shareLessonsAndCourses?: boolean;
+  }
+) {
+  try {
+    // 1. Update core User fields if provided
+    const userUpdateData: Record<string, unknown> = {};
+    if (data.displayUsername !== undefined) userUpdateData.displayUsername = data.displayUsername;
+    if (data.firstName !== undefined) userUpdateData.firstName = data.firstName;
+    if (data.lastName !== undefined) userUpdateData.lastName = data.lastName;
+    if (data.nativeLanguage !== undefined) userUpdateData.nativeLanguage = data.nativeLanguage;
+    if (data.targetLanguage !== undefined) userUpdateData.targetLanguage = data.targetLanguage;
+    if (data.gender !== undefined) userUpdateData.gender = data.gender;
+    if (data.image !== undefined) userUpdateData.image = data.image;
+
+    if (Object.keys(userUpdateData).length > 0) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: userUpdateData,
+      });
+    }
+
+    // 2. Update SpriteProfile if sprite or voice changed
+    if (data.spriteSlug || data.targetVoiceId) {
+      const sprite = data.spriteSlug
+        ? await prisma.sprite.findUnique({ where: { slug: data.spriteSlug } })
+        : null;
+
+      await prisma.spriteProfile.updateMany({
+        where: { userId },
+        data: {
+          ...(sprite ? { spriteId: sprite.id } : {}),
+          ...(data.targetVoiceId ? { targetVoiceId: data.targetVoiceId } : {}),
+          ...(data.targetLanguage ? { targetLanguage: data.targetLanguage } : {}),
+          ...(data.nativeLanguage ? { nativeLanguage: data.nativeLanguage } : {}),
+        },
+      });
+    }
+
+    // 3. Upsert AccountSettings (Sharing & Notifications)
+    const settingsFields = [
+      "dailyEmails",
+      "weeklyEmails",
+      "promotionEmails",
+      "shareReadingLogs",
+      "shareConversationActivity",
+      "shareAchievements",
+      "shareLessonsAndCourses",
+    ] as const;
+
+    const settingsUpdate: Record<string, boolean> = {};
+    for (const key of settingsFields) {
+      if (data[key] !== undefined) {
+        settingsUpdate[key] = data[key]!;
+      }
+    }
+
+    if (Object.keys(settingsUpdate).length > 0) {
+      await prisma.accountSettings.upsert({
+        where: { userId },
+        update: settingsUpdate,
+        create: {
+          userId,
+          ...settingsUpdate,
+        },
+      });
+    }
+
+    revalidatePath("/account");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update account settings:", error);
+    throw new Error("Failed to update settings");
+  }
+}
+
 
 export async function getSharedActivity() {
   try {
@@ -865,11 +934,8 @@ export async function getSharedActivity() {
             include: {
               user: {
                 select: {
-                  AccountSettings: {
-                    select: {
-                      avatarUrl: true,
-                    },
-                  },
+                 image: true,
+                 avatarUrl: true,
                 },
               },
             },
@@ -1464,19 +1530,16 @@ export async function getUserAvatarImage(userId: string) {
     const user = await prisma.user.findFirst({
       where: { id: userId },
       select: {
-        AccountSettings: {
-          select: {
-            avatarUrl: true,
-          },
-        },
+        image:true,
+        avatarUrl: true,
       },
     });
 
-    if (!user || !user.AccountSettings) {
+    if (!user) {
       throw new Error("User not found");
     }
 
-    return user.AccountSettings.avatarUrl;
+    return user.avatarUrl ? user.avatarUrl : user.image;
   } catch (error) {
     console.error("Error fetching user avatar image:", error.message);
     throw new Error("Failed to fetch user avatar image");
@@ -1495,9 +1558,8 @@ export async function getAllGames() {
             user: {
               select: {
                 name: true,
-                AccountSettings: {
-                  select: { avatarUrl: true },
-                },
+                image: true,
+                avatarUrl: true,
               },
             },
           },

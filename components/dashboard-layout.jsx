@@ -25,7 +25,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import { Bell } from "lucide-react";
-import NotificationCard from "./notifications/NotificationCard";
+import NotificationCard from "./notifications/notification-card";
 import { Button } from "./ui/button";
 
 const navItems = [

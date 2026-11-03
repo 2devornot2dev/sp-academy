@@ -62,5 +62,6 @@ export async function hasActiveAccess(userId: string) {
 export async function isUser(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
+    select: { id: true, role: true, displayUsername: true, image: true,  },
   });
 }
