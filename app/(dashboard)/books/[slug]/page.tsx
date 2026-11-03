@@ -6,7 +6,7 @@ import { BookReaderClient } from "@/components/books/book-reader-client";
 import type { SpoonBookWebhookPayload } from "@/lib/schema/book-schema";
 
 interface BookReaderPageProps {
-  params: Promise<{ bookId: string }>;
+  params: Promise<{ slug: string }>;
 }
 
 function resolveS3Key(key?: string | null) {
@@ -17,11 +17,11 @@ function resolveS3Key(key?: string | null) {
 }
 
 export default async function BookReaderPage({ params }: BookReaderPageProps) {
-  const { bookId } = await params;
+  const { slug } = await params;
   const user = await requireUser();
 
   const book = await prisma.spoonBook.findUnique({
-    where: { id: bookId },
+    where: { slug },
     include: {
       progress: {
         where: { userId: user.id },
