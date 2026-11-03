@@ -1,7 +1,7 @@
 // components/books/book-wrapper.tsx
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -13,132 +13,28 @@ import {
   VolumeX,
   Sparkles,
   BookOpen,
+  Mic,
 } from "lucide-react";
 import { useSprite } from "@/context/sprite-context";
 import type {
   SpoonBookWebhookPayload,
-  LocalizedBookPage,
-  BookSentence,
-  BookPageCheckpoint,
+  LocalizedPage, // 👈 Changed from LocalizedPageContent
+  CheckpointOption,
 } from "@/lib/schema/book-schema";
 
-// ============================================================================
-// 📘 JSDOC COMPONENT BLUEPRINTS (Reference for building remaining 4 files)
-// ============================================================================
-
-/**
- * ----------------------------------------------------------------------------
- * 1. BookIntro (`components/books/book-intro.tsx`)
- * ----------------------------------------------------------------------------
- * @description Page 0: The Hook & Cinematic Cover.
- *
- * PROPS EXPECTED:
- * @param {string} title - Localized book title
- * @param {string} synopsis - 1-sentence hook in user's native language
- * @param {string} characterName - Name of the star (e.g. "Léo")
- * @param {string} characterAvatarUrl - Cloudinary reference portrait
- * @param {string | null} introVideoUrl - Presigned S3 URL of the 5s Pruna video
- * @param {string} coverImageUrl - Presigned S3 URL of Page 1's 3D illustration
- * @param {string} levelBand - "beginner" | "intermediate" | "advanced"
- * @param {() => void} onStartReading - Callback to advance to Page 1
- *
- * HOW TO BUILD:
- * - Render introVideoUrl in an autoplaying, looping, muted <video> (falls back to coverImageUrl).
- * - Display title, characterAvatarUrl badge, and synopsis.
- * - Glowing "[ Open Storybook ➔ ]" CTA button that calls onStartReading().
- */
-
-/**
- * ----------------------------------------------------------------------------
- * 2. BookPage (`components/books/book-page.tsx`)
- * ----------------------------------------------------------------------------
- * @description Pages 1 to 5: The Interactive Reader with 60fps Whisper Read-Along.
- *
- * PROPS EXPECTED:
- * @param {number} pageNumber - 1 to 5
- * @param {string} imageUrl - Presigned S3 URL for this page's 5:4 3D scene
- * @param {BookSentence[]} sentences - 2 to 3 sentences with textTarget, textNative, audioUrl, wordTimestamps
- * @param {boolean} isAudioMuted - Whether audio narration is muted
- * @param {boolean} isCheckpointCompleted - Whether the user has passed this page's '?' challenge
- * @param {() => void} onOpenCheckpoint - Callback when user taps the floating '?' button
- *
- * HOW TO BUILD:
- * - Top 55%: High-contrast 5:4 aspect ratio image (<img src={imageUrl} />).
- * - Bottom 45%: Sentences container. Plays sentence 0 audio -> highlights words at 60fps via
- *   `wordTimestamps` -> onended advances to sentence 1 -> sentence 2.
- * - Allow tapping any sentence to isolate and replay only that line!
- * - Floating in bottom-right: Pulsing button: `[ ? Checkpoint ]` (calls onOpenCheckpoint()).
- */
-
-/**
- * ----------------------------------------------------------------------------
- * 3. BookSpriteQuestionnaire (`components/books/book-sprite-questionnaire.tsx`)
- * ----------------------------------------------------------------------------
- * @description The '?' Checkpoint overlay: 3 options with pre-baked Sprite teaching reactions!
- *
- * PROPS EXPECTED:
- * @param {BookPageCheckpoint} checkpoint - Contains questionNative, options[], speakChallenge, explanationNative
- * @param {string} spriteName - "Vox" | "Vivi" from useSprite()
- * @param {string} avatarSrc - Default avatar image from useSprite()
- * @param {string[]} moodUrls - [excitedUrl, thinkingUrl, celebratingUrl] from sprite profile
- * @param {boolean} isCompleted - Whether currently solved
- * @param {(optionIndex: number) => void} onSelectOption - Callback when option tapped
- * @param {() => void} onPassCheckpoint - Callback to mark checkpoint solved & unlock next page
- * @param {() => void} onClose - Callback to close overlay and look back at the page text
- *
- * HOW TO BUILD:
- * - Slides up as an overlay over the bottom half of BookPage.
- * - Displays questionNative and 3 options.
- * - When option X is tapped:
- *   * Instantly highlights option (teal if isCorrect, red/shake if wrong).
- *   * Sprite slides up using `option.spriteMood` pose (from moodUrls).
- *   * Speech bubble displays `option.spriteReaction` (Praise + Secret if correct; Trap breakdown if wrong).
- *   * If correct, calls onPassCheckpoint() and displays "[ Turn to Next Page ➔ ]".
- */
-
-/**
- * ----------------------------------------------------------------------------
- * 4. BookOutro (`components/books/book-outro.tsx`)
- * ----------------------------------------------------------------------------
- * @description Page 6: The Climax Payoff, Scorecard & Bookshelf Completion Wax Seal.
- *
- * PROPS EXPECTED:
- * @param {string} title - Localized title
- * @param {string} coverImageUrl - Cover image
- * @param {number} totalCheckpointsCleared - e.g. 5
- * @param {string} spriteName - "Vox" | "Vivi"
- * @param {() => void} onReRead - Reset to Page 0
- * @param {() => void} onReturnToLibrary - Return to /books library
- *
- * HOW TO BUILD:
- * - Displays a golden wax seal stamped on the book cover: "COMPLETED".
- * - Shows "5 / 5 Checkpoints Cleared" scorecard.
- * - Celebrating Sprite avatar thanking them for reading.
- * - Two buttons: "[ Re-read Story ]" and "[ Return to Bookshelf ]".
- */
-
-// ============================================================================
-// MASTER COMPONENT PROPS
-// ============================================================================
-
 export interface BookWrapperProps {
-  /** The full SpoonBook record from Postgres */
   book: SpoonBookWebhookPayload & {
     id: string;
-    /** Presigned URLs map for S3 assets (optional, or pass keys) */
     mediaUrls?: {
       coverImageUrl?: string;
       introVideoUrl?: string;
       pageImageUrls?: string[];
-      sentenceAudioUrls?: Record<string, string>; // keyed by audioS3Key
+      sentenceAudioUrls?: Record<string, string>;
     };
   };
-  /** User's subscription plan id: "trial" | "founder" | "unlimited" */
   userPlan?: string;
-  /** Initial progress if resuming (from UserBookProgress) */
   initialPage?: number;
   initialCompletedCheckpoints?: number[];
-  /** Callbacks */
   onBackToLibrary: () => void;
   onSaveProgress?: (progress: {
     bookId: string;
@@ -157,20 +53,22 @@ export function BookWrapper({
   onBackToLibrary,
   onSaveProgress,
 }: BookWrapperProps) {
-  const { profile, spriteName, avatarSrc } = useSprite();
+  const { profile, spriteName } = useSprite();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 1. LANGUAGE LOCKING LOGIC
-  // Default to learner's active target language (e.g. "fr-FR")
   const defaultLang = profile?.targetLanguage || "fr-FR";
-  const [selectedLang, setSelectedLang] = useState<string>(defaultLang);
+  const availableLanguages = Object.keys(book.translations || {});
+  const [selectedLang, setSelectedLang] = useState<string>(
+    book.translations[defaultLang]
+      ? defaultLang
+      : availableLanguages[0] || "fr-FR"
+  );
 
-  // GATING: Only Spoon Unlimited+ or Enterprise can toggle between foreign editions!
   const isMultiLangUnlocked =
     userPlan === "unlimited" || userPlan === "enterprise";
 
-  const availableLanguages = Object.keys(book.translations || {});
-
-  // 2. ACTIVE LOCALIZED SCRIPT
+  // 2. ACTIVE LOCALIZED SCRIPT & DYNAMIC PAGE COUNT
   const currentTranslation = useMemo(() => {
     return (
       book.translations[selectedLang] ||
@@ -179,13 +77,40 @@ export function BookWrapper({
     );
   }, [book.translations, selectedLang, defaultLang, availableLanguages]);
 
-  // 3. MASTER PAGE STATE (0 = Intro, 1..5 = Story Pages, 6 = Outro)
+  const totalPages =
+    currentTranslation?.pages?.length || book.pageImageS3Keys?.length || 5;
+  const outroPage = totalPages + 1;
+
+  // 3. MASTER PAGE STATE (0 = Intro, 1..totalPages = Story Pages, outroPage = Outro)
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [completedCheckpoints, setCompletedCheckpoints] = useState<Set<number>>(
     new Set(initialCompletedCheckpoints)
   );
   const [isCheckpointOverlayOpen, setIsCheckpointOverlayOpen] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<CheckpointOption | null>(
+    null
+  );
   const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [playingAudioKey, setPlayingAudioKey] = useState<string | null>(null);
+
+  const playAudioByKey = useCallback(
+    (s3Key?: string) => {
+      if (!s3Key || isAudioMuted) return;
+      const url = book.mediaUrls?.sentenceAudioUrls?.[s3Key] || s3Key;
+      if (!url) return;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      setPlayingAudioKey(s3Key);
+      audio.onended = () => setPlayingAudioKey(null);
+      audio.onerror = () => setPlayingAudioKey(null);
+      void audio.play().catch(() => setPlayingAudioKey(null));
+    },
+    [book.mediaUrls?.sentenceAudioUrls, isAudioMuted]
+  );
 
   // Sync progress silently to database
   const syncProgress = useCallback(
@@ -196,17 +121,18 @@ export function BookWrapper({
         targetLanguage: selectedLang,
         currentPage: page,
         completedCheckpoints: Array.from(checkpoints),
-        isFinished: page === 6,
+        isFinished: page === outroPage,
       });
     },
-    [book.id, selectedLang, onSaveProgress]
+    [book.id, selectedLang, onSaveProgress, outroPage]
   );
 
   const handleNextPage = () => {
-    if (currentPage >= 6) return;
+    if (currentPage >= outroPage) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     setIsCheckpointOverlayOpen(false);
+    setSelectedOption(null);
     syncProgress(nextPage, completedCheckpoints);
   };
 
@@ -215,25 +141,25 @@ export function BookWrapper({
     const prevPage = currentPage - 1;
     setCurrentPage(prevPage);
     setIsCheckpointOverlayOpen(false);
+    setSelectedOption(null);
     syncProgress(prevPage, completedCheckpoints);
   };
 
   const handleCompleteCurrentCheckpoint = () => {
-    if (currentPage < 1 || currentPage > 5) return;
+    if (currentPage < 1 || currentPage > totalPages) return;
     const nextSet = new Set(completedCheckpoints);
     nextSet.add(currentPage);
     setCompletedCheckpoints(nextSet);
     syncProgress(currentPage, nextSet);
   };
 
-  // Check if current page is gated (must solve '?' before turning to next page)
   const isCurrentPageGated =
     currentPage >= 1 &&
-    currentPage <= 5 &&
+    currentPage <= totalPages &&
     !completedCheckpoints.has(currentPage);
 
-  const activePageContent: LocalizedBookPage | undefined =
-    currentPage >= 1 && currentPage <= 5
+  const activePageContent: LocalizedPage | undefined =
+    currentPage >= 1 && currentPage <= totalPages
       ? currentTranslation?.pages?.[currentPage - 1]
       : undefined;
 
@@ -242,48 +168,44 @@ export function BookWrapper({
     book.pageImageS3Keys?.[currentPage - 1];
 
   return (
-    <div className="relative z-30 flex h-screen w-full flex-col overflow-hidden bg-[#0A0E17] text-white font-sans selection:bg-teal-500/30">
+    <div className="relative z-30 flex h-screen w-full flex-col overflow-hidden bg-[#0A0E17] font-sans text-white selection:bg-teal-500/30">
       {/* =====================================================================
-          1. TOP MINIMAL CHROME BAR (Only 48px tall)
+          1. TOP MINIMAL CHROME BAR
           ===================================================================== */}
       <header className="relative z-20 flex h-12 w-full shrink-0 items-center justify-between border-b border-white/10 bg-[#0C121E]/95 px-4 backdrop-blur-md">
-        {/* LEFT: Exit to Library */}
         <button
           type="button"
           onClick={onBackToLibrary}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-400 hover:bg-white/10 hover:text-white transition"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-400 transition hover:bg-white/10 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Bookshelf</span>
         </button>
 
-        {/* CENTER: Title & Page Progress Indicator */}
-        <div className="flex items-center gap-2 max-w-[50%] truncate text-center">
-          <BookOpen className="h-4 w-4 text-teal-400 shrink-0" />
-          <span className="text-xs font-black text-white truncate">
+        <div className="flex max-w-[50%] items-center gap-2 truncate text-center">
+          <BookOpen className="h-4 w-4 shrink-0 text-teal-400" />
+          <span className="truncate text-xs font-black text-white">
             {currentTranslation?.title || book.slug}
           </span>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300 shrink-0">
+          <span className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-300">
             {currentPage === 0
               ? "Intro"
-              : currentPage === 6
+              : currentPage === outroPage
                 ? "Outro"
-                : `${currentPage} / 5`}
+                : `${currentPage} / ${totalPages}`}
           </span>
         </div>
 
-        {/* RIGHT: Language Selector (Gated) & Volume Toggle */}
         <div className="flex items-center gap-2">
-          {/* Language Gate */}
           <div className="relative flex items-center">
             {isMultiLangUnlocked ? (
               <select
                 value={selectedLang}
                 onChange={(e) => {
                   setSelectedLang(e.target.value);
-                  setCurrentPage(0); // Reset to intro on language switch
+                  setCurrentPage(0);
                 }}
-                className="rounded-lg border border-white/15 bg-slate-900 px-2 py-1 text-[11px] font-black uppercase text-teal-300 focus:outline-none"
+                className="rounded-lg border border-white/15 bg-slate-900 px-2 py-1 text-[11px] font-black text-teal-300 uppercase focus:outline-none"
               >
                 {availableLanguages.map((lang) => (
                   <option key={lang} value={lang}>
@@ -293,21 +215,20 @@ export function BookWrapper({
               </select>
             ) : (
               <div
-                className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-slate-400 cursor-not-allowed"
+                className="inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-white/10 bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-slate-400"
                 title="Multi-language book editions unlocked on Spoon Unlimited+"
               >
                 <Globe2 className="h-3 w-3 text-teal-400" />
                 <span>{selectedLang.split("-")[0].toUpperCase()}</span>
-                <Lock className="h-2.5 w-2.5 text-amber-400/80 ml-0.5" />
+                <Lock className="ml-0.5 h-2.5 w-2.5 text-amber-400/80" />
               </div>
             )}
           </div>
 
-          {/* Audio Mute Toggle */}
           <button
             type="button"
             onClick={() => setIsAudioMuted((prev) => !prev)}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
             title={isAudioMuted ? "Unmute audio" : "Mute audio"}
           >
             {isAudioMuted ? (
@@ -320,9 +241,9 @@ export function BookWrapper({
       </header>
 
       {/* =====================================================================
-          2. MAIN FULL-STAGE VIEWPORT (Pages 0..6)
+          2. MAIN FULL-STAGE VIEWPORT
           ===================================================================== */}
-      <main className="relative flex-1 overflow-hidden flex flex-col items-center justify-center">
+      <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden">
         <AnimatePresence mode="wait">
           {currentPage === 0 ? (
             /* ================= PAGE 0: BOOK INTRO ================= */
@@ -331,10 +252,9 @@ export function BookWrapper({
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="flex-1 w-full max-w-xl flex flex-col justify-between p-6 text-center my-auto"
+              className="my-auto flex w-full max-w-xl flex-1 flex-col justify-between p-6 text-center"
             >
-              <div className="space-y-4 my-auto">
-                {/* 3D Cover Image or Intro Video Preview */}
+              <div className="my-auto space-y-4">
                 <div className="relative mx-auto aspect-[5/4] w-full max-w-md overflow-hidden rounded-3xl border-2 border-teal-500/30 bg-slate-900 shadow-2xl">
                   {book.mediaUrls?.introVideoUrl ? (
                     <video
@@ -356,16 +276,16 @@ export function BookWrapper({
                     />
                   )}
 
-                  <div className="absolute top-3 left-3 rounded-full bg-slate-950/80 border border-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-teal-300 backdrop-blur-md">
+                  <div className="absolute top-3 left-3 rounded-full border border-white/15 bg-slate-950/80 px-3 py-1 text-[10px] font-black tracking-wider text-teal-300 uppercase backdrop-blur-md">
                     Starring {book.characterName}
                   </div>
                 </div>
 
                 <div className="space-y-1.5 pt-2">
-                  <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                     {currentTranslation?.title}
                   </h1>
-                  <p className="text-xs sm:text-sm font-medium text-slate-300 max-w-md mx-auto leading-relaxed">
+                  <p className="mx-auto max-w-md text-xs leading-relaxed font-medium text-slate-300 sm:text-sm">
                     {currentTranslation?.synopsis}
                   </p>
                 </div>
@@ -375,25 +295,25 @@ export function BookWrapper({
                 <button
                   type="button"
                   onClick={handleNextPage}
-                  className="w-full max-w-md inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-indigo-500 px-6 py-4 text-sm font-black text-slate-950 shadow-xl hover:brightness-110 active:scale-[0.98] transition"
+                  className="inline-flex w-full max-w-md items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-indigo-500 px-6 py-4 text-sm font-black text-slate-950 shadow-xl transition hover:brightness-110 active:scale-[0.98]"
                 >
                   <span>Open Storybook</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </motion.div>
-          ) : currentPage >= 1 && currentPage <= 5 ? (
-            /* ================= PAGES 1..5: STORY PAGE ================= */
+          ) : currentPage >= 1 && currentPage <= totalPages ? (
+            /* ================= PAGES 1..N: STORY PAGE ================= */
             <motion.div
               key={`page-${currentPage}`}
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.28, ease: "easeOut" }}
-              className="flex-1 w-full max-w-2xl flex flex-col justify-between p-4 sm:p-6 overflow-y-auto"
+              className="flex w-full max-w-2xl flex-1 flex-col justify-between overflow-y-auto p-4 sm:p-6"
             >
               {/* Top 3D Scene Illustration */}
-              <div className="relative mx-auto aspect-[5/4] w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-slate-900 shadow-2xl shrink-0">
+              <div className="relative mx-auto aspect-[5/4] w-full max-w-lg shrink-0 overflow-hidden rounded-3xl border border-white/15 bg-slate-900 shadow-2xl">
                 {activePageImageUrl && (
                   <img
                     src={activePageImageUrl}
@@ -402,13 +322,12 @@ export function BookWrapper({
                   />
                 )}
 
-                {/* Floating Checkpoint Status Badge */}
                 <div className="absolute top-3 right-3">
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider backdrop-blur-md ${
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black tracking-wider uppercase backdrop-blur-md ${
                       completedCheckpoints.has(currentPage)
-                        ? "bg-teal-400/20 border border-teal-400/40 text-teal-300"
-                        : "bg-amber-400/20 border border-amber-300/40 text-amber-300 animate-pulse"
+                        ? "border border-teal-400/40 bg-teal-400/20 text-teal-300"
+                        : "animate-pulse border border-amber-300/40 bg-amber-400/20 text-amber-300"
                     }`}
                   >
                     <Sparkles className="h-3 w-3" />
@@ -419,43 +338,80 @@ export function BookWrapper({
                 </div>
               </div>
 
-              {/* Story Sentences Stream (Sequential Read-Along) */}
-              <div className="my-auto py-4 space-y-3">
-                {activePageContent?.sentences.map((sent, i) => (
-                  <div
-                    key={sent.sentenceIndex || i}
-                    className="group rounded-2xl bg-white/[0.03] border border-white/10 p-3.5 hover:border-teal-400/40 transition cursor-pointer"
-                  >
-                    <p className="text-base sm:text-lg font-bold text-white leading-relaxed">
-                      {sent.textTarget}
-                    </p>
-                    <p className="text-xs font-semibold text-slate-400 mt-1 leading-snug">
-                      {sent.textNative}
-                    </p>
-                  </div>
-                ))}
+              {/* Story Sentences + Spotlight Vocabulary */}
+              <div className="my-auto space-y-3 py-4">
+                {activePageContent?.sentences.map((sent, i) => {
+                  const isPlaying =
+                    playingAudioKey && sent.audioS3Key === playingAudioKey;
+                  return (
+                    <div
+                      key={sent.sentenceIndex ?? i}
+                      onClick={() => playAudioByKey(sent.audioS3Key)}
+                      className={`group cursor-pointer rounded-2xl border p-3.5 transition ${
+                        isPlaying
+                          ? "border-teal-400 bg-teal-500/10"
+                          : "border-white/10 bg-white/[0.03] hover:border-teal-400/40"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-base leading-relaxed font-bold text-white sm:text-lg">
+                          {sent.textTarget}
+                        </p>
+                        <Volume2 className="mt-1 h-4 w-4 shrink-0 text-teal-400 opacity-70 group-hover:opacity-100" />
+                      </div>
+                      <p className="mt-1 text-xs leading-snug font-semibold text-slate-400">
+                        {sent.textNative}
+                      </p>
+                    </div>
+                  );
+                })}
+
+                {/* Spotlight Definitions */}
+                {activePageContent?.definitions &&
+                  activePageContent.definitions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {activePageContent.definitions.map((defn, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => playAudioByKey(defn.audioS3Key)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-left text-xs transition hover:border-indigo-400"
+                        >
+                          <Volume2 className="h-3.5 w-3.5 text-indigo-300" />
+                          <span className="font-black text-indigo-200">
+                            {defn.word}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            [{defn.phonetic}]
+                          </span>
+                          <span className="text-slate-300">
+                            — {defn.translation}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
               </div>
 
               {/* Bottom Stage Action: Checkpoint Trigger & Page Turn Controls */}
-              <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/10">
+              <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
                 <button
                   type="button"
                   onClick={handlePrevPage}
-                  className="inline-flex items-center gap-1 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/10 transition"
+                  className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/10"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span>Previous</span>
                 </button>
 
-                {/* Pulsing '?' Checkpoint Button */}
                 {activePageContent?.checkpoint && (
                   <button
                     type="button"
                     onClick={() => setIsCheckpointOverlayOpen(true)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-black transition shadow-lg ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-black shadow-lg transition ${
                       completedCheckpoints.has(currentPage)
-                        ? "bg-slate-800 border border-teal-400/40 text-teal-300"
-                        : "bg-amber-300 text-slate-950 hover:bg-amber-200 animate-bounce"
+                        ? "border border-teal-400/40 bg-slate-800 text-teal-300"
+                        : "animate-bounce bg-amber-300 text-slate-950 hover:bg-amber-200"
                     }`}
                   >
                     <span>? Checkpoint</span>
@@ -469,22 +425,18 @@ export function BookWrapper({
                   onClick={handleNextPage}
                   className={`inline-flex items-center gap-1 rounded-xl px-4 py-2.5 text-xs font-black transition ${
                     isCurrentPageGated
-                      ? "bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed"
-                      : "bg-teal-400 text-slate-950 hover:bg-teal-300 shadow-md"
+                      ? "cursor-not-allowed border border-white/10 bg-slate-800 text-slate-500"
+                      : "bg-teal-400 text-slate-950 shadow-md hover:bg-teal-300"
                   }`}
-                  title={
-                    isCurrentPageGated
-                      ? "Complete the '?' Checkpoint to turn the page!"
-                      : "Turn page"
-                  }
                 >
-                  <span>Next Page</span>
+                  <span>
+                    {currentPage === totalPages ? "Finish Book" : "Next Page"}
+                  </span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
 
-              {/* CHECKPOINT OVERLAY PLACEHOLDER
-                  (Will render <BookSpriteQuestionnaire /> once created) */}
+              {/* CHECKPOINT OVERLAY (Supports both multiple_choice & speak_phrase) */}
               <AnimatePresence>
                 {isCheckpointOverlayOpen && activePageContent?.checkpoint && (
                   <motion.div
@@ -493,10 +445,10 @@ export function BookWrapper({
                     exit={{ opacity: 0, y: 50 }}
                     className="absolute inset-x-4 bottom-4 z-40 rounded-3xl border-2 border-amber-300/60 bg-[#0F172A] p-5 shadow-2xl"
                   >
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="mb-3 flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="rounded-md bg-amber-300 px-2 py-0.5 text-[10px] font-black uppercase text-slate-950">
-                          Reading Buddy
+                        <span className="rounded-md bg-amber-300 px-2 py-0.5 text-[10px] font-black text-slate-950 uppercase">
+                          {spriteName || "Reading Buddy"}
                         </span>
                         <h4 className="text-sm font-bold text-white">
                           {activePageContent.checkpoint.questionNative}
@@ -511,55 +463,123 @@ export function BookWrapper({
                       </button>
                     </div>
 
-                    {/* Pre-baked Options */}
-                    <div className="space-y-2">
-                      {activePageContent.checkpoint.options?.map((opt, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => {
-                            if (opt.isCorrect) {
-                              handleCompleteCurrentCheckpoint();
+                    {activePageContent.checkpoint.type === "multiple_choice" &&
+                    activePageContent.checkpoint.options ? (
+                      <div className="space-y-2">
+                        {activePageContent.checkpoint.options.map((opt, i) => {
+                          const isSelected = selectedOption?.text === opt.text;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setSelectedOption(opt);
+                                if (opt.isCorrect) {
+                                  handleCompleteCurrentCheckpoint();
+                                }
+                              }}
+                              className={`flex w-full items-center justify-between rounded-xl border p-3 text-left text-xs font-bold transition ${
+                                isSelected
+                                  ? opt.isCorrect
+                                    ? "border-teal-400 bg-teal-400/20 text-teal-200"
+                                    : "border-rose-400 bg-rose-500/20 text-rose-200"
+                                  : "border-white/10 bg-slate-800 text-white hover:border-amber-300"
+                              }`}
+                            >
+                              <span>{opt.text}</span>
+                              <span className="text-[10px] text-slate-400">
+                                {opt.spriteMood}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        {selectedOption && (
+                          <div className="mt-3 rounded-xl border border-white/10 bg-slate-900/90 p-3 text-xs leading-relaxed text-slate-200">
+                            <span className="font-black text-amber-300">
+                              {spriteName || "Vox"}:{" "}
+                            </span>
+                            {selectedOption.spriteReaction}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* SPEAK PHRASE CHECKPOINT */
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-teal-400/30 bg-slate-900 p-3.5 text-center">
+                          <p className="text-base font-black text-teal-300">
+                            &ldquo;
+                            {
+                              activePageContent.checkpoint.speakChallenge
+                                ?.targetPhrase
                             }
-                          }}
-                          className={`w-full text-left rounded-xl border p-3 text-xs font-bold transition flex items-center justify-between ${
-                            opt.isCorrect &&
-                            completedCheckpoints.has(currentPage)
-                              ? "bg-teal-400/20 border-teal-400 text-teal-200"
-                              : "bg-slate-800 border-white/10 text-white hover:border-amber-300"
-                          }`}
+                            &rdquo;
+                          </p>
+                          {activePageContent.checkpoint.speakChallenge
+                            ?.phoneticGuide && (
+                            <p className="mt-1 text-xs text-slate-400">
+                              [
+                              {
+                                activePageContent.checkpoint.speakChallenge
+                                  .phoneticGuide
+                              }
+                              ]
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleCompleteCurrentCheckpoint}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-400 py-3 text-xs font-black text-slate-950 transition hover:bg-teal-300"
                         >
-                          <span>{opt.text}</span>
-                          <span className="text-[10px] text-slate-400">
-                            {opt.spriteMood}
+                          <Mic className="h-4 w-4" />
+                          <span>
+                            {completedCheckpoints.has(currentPage)
+                              ? "Pronunciation Checked ✓"
+                              : "Tap after saying out loud"}
                           </span>
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+
+                    {completedCheckpoints.has(currentPage) && (
+                      <button
+                        type="button"
+                        onClick={handleNextPage}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 py-2.5 text-xs font-black text-slate-950"
+                      >
+                        <span>Continue to Next Page</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </motion.div>
           ) : (
-            /* ================= PAGE 6: BOOK OUTRO & SCORECARD ================= */
+            /* ================= OUTRO & SCORECARD ================= */
             <motion.div
               key="book-outro"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 w-full max-w-md flex flex-col justify-between p-6 text-center my-auto space-y-6"
+              className="my-auto flex w-full max-w-md flex-1 flex-col justify-between space-y-6 p-6 text-center"
             >
-              <div className="space-y-3 my-auto">
+              <div className="my-auto space-y-3">
                 <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-amber-300 bg-amber-400/20 shadow-[0_0_50px_rgba(251,191,36,0.35)]">
-                  <span className="text-3xl font-black text-amber-300">5/5</span>
+                  <span className="text-3xl font-black text-amber-300">
+                    {totalPages}/{totalPages}
+                  </span>
                 </div>
 
                 <h2 className="text-2xl font-black text-white">
                   Story Completed! 🏆
                 </h2>
-                <p className="text-xs font-medium text-slate-300 leading-relaxed">
-                  You conquered all 5 pages and cleared every checkpoint in{" "}
-                  <span className="text-teal-300 font-bold">
+                <p className="text-xs leading-relaxed font-medium text-slate-300">
+                  You conquered all {totalPages} pages and cleared every
+                  checkpoint in{" "}
+                  <span className="font-bold text-teal-300">
                     {currentTranslation?.title}
                   </span>
                   . Your digital bookshelf has been stamped!
@@ -573,7 +593,7 @@ export function BookWrapper({
                     setCurrentPage(1);
                     setCompletedCheckpoints(new Set());
                   }}
-                  className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-xs font-bold text-slate-200 hover:bg-white/10 transition"
+                  className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-xs font-bold text-slate-200 transition hover:bg-white/10"
                 >
                   Re-read Story
                 </button>
@@ -581,7 +601,7 @@ export function BookWrapper({
                 <button
                   type="button"
                   onClick={onBackToLibrary}
-                  className="w-full rounded-2xl bg-teal-400 py-3.5 text-xs font-black text-slate-950 hover:bg-teal-300 transition shadow-lg"
+                  className="w-full rounded-2xl bg-teal-400 py-3.5 text-xs font-black text-slate-950 shadow-lg transition hover:bg-teal-300"
                 >
                   Return to Bookshelf
                 </button>
