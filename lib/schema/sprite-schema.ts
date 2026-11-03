@@ -38,6 +38,7 @@ export const BoardStepSchema = z.object({
   correctionGiven: BoardFeedbackSchema.nullable().optional(),
   completedAt: z.string().nullable().optional(),
 });
+
 // Legacy item schema kept optional so old History sessions never fail validation
 export const ChalkboardItemSchema = z.object({
   label: z.string(),
@@ -150,6 +151,19 @@ export const SpriteContextSchema = z.object({
   lastUpdated: z.string().datetime(),
 });
 
+// 🟢 7. Sprite Notification / Post Item Schema (Added here)
+export const SpritePostItemSchema = z.object({
+  nodeId: z.string().optional(),
+  orderIndex: z.number().int(),
+  header: z.string(),
+  nativeBody: z.string(),
+  targetBody: z.string(),
+  action: z.string().nullable().optional(),
+  nativeAudioUrl: z.string().nullable().optional(),
+  targetAudioUrl: z.string().nullable().optional(),
+  // Include the new video URL mapping from Lambda
+  videoUrl: z.string().nullable().optional(),
+});
 
 
 export type BoardStepType = z.infer<typeof BoardStepTypeSchema>;
@@ -163,3 +177,4 @@ export type ProgressReportResult = z.infer<typeof ProgressReportResultSchema>;
 export type SpriteAction = z.infer<typeof SpriteActionSchema>;
 export type SpriteTurn = z.infer<typeof SpriteTurnSchema>;
 export type SpriteSessionData = z.infer<typeof SpriteSessionSchema>;
+export type SpritePostItem = z.infer<typeof SpritePostItemSchema>; // 🟢 Type export

@@ -127,7 +127,7 @@ export async function handleBossGeneration(
         data: {
           status: "READY",
           // Map the JSON introVideoKey to the Prisma column!
-          introVideoS3Key: scenarioData.boss.introVideoKey || null, 
+          introVideoS3Key: scenarioData.boss.introVideoS3Key || null, 
           scenarioData: scenarioData as unknown as Prisma.InputJsonValue,
         },
       }),

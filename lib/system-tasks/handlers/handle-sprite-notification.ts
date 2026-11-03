@@ -43,6 +43,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: body.targetBody || "",
           nativeAudioUrl: body.nativeAudioUrl ?? null,
           targetAudioUrl: body.targetAudioUrl ?? null,
+          videoUrl: body.videoUrl ?? null, // 🟢 Add video fallback mapping
           action: body.action ?? null,
         },
       ];
@@ -73,6 +74,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: post.targetBody || "",
           nativeAudioUrl: post.nativeAudioUrl ?? null,
           targetAudioUrl: post.targetAudioUrl ?? null,
+          videoUrl: post.videoUrl ?? null, // 🟢 Save to DB!
           action: post.action ?? null,
         },
         create: {
@@ -88,6 +90,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: post.targetBody || "",
           nativeAudioUrl: post.nativeAudioUrl ?? null,
           targetAudioUrl: post.targetAudioUrl ?? null,
+          videoUrl: post.videoUrl ?? null, // 🟢 Save to DB!
           action: post.action ?? null,
         },
       });
@@ -115,6 +118,7 @@ export async function handleSpriteNotificationGeneration(
         targetBody: firstPost.targetBody || "",
         nativeAudioUrl: firstPost.nativeAudioUrl ?? null,
         targetAudioUrl: firstPost.targetAudioUrl ?? null,
+        videoUrl: firstPost.videoUrl ?? null, // 🟢 Pass video S3 key to Frontend!
         action: firstPost.action ?? null,
       });
     } catch (err) {

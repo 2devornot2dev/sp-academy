@@ -78,6 +78,8 @@ model SpriteNode {
   targetVoiceId  String // "fr-FR-boy-01"
   orderIndex     Int // 1=Spoon1, 2=Spoon2, 3=Spoon3, 4=Boss1
 
+  videoUrl       String?
+
   header         String // "Spoon 1 Ready 🥄"
   nativeBody     String  @db.Text
   targetBody     String  @db.Text
