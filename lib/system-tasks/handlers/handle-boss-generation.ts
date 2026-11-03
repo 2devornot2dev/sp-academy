@@ -120,12 +120,14 @@ export async function handleBossGeneration(
       );
     }
 
-    // 5. Save scenarioData & mark BossStage as READY (adjust status enum if needed)
+    // 🟢 5. Save scenarioData, set introVideoS3Key top-level, & mark BossStage as READY
     await prisma.$transaction([
       prisma.foundationBossStage.update({
         where: { id: bossStageId },
         data: {
           status: "READY",
+          // Map the JSON introVideoKey to the Prisma column!
+          introVideoS3Key: scenarioData.boss.introVideoKey || null, 
           scenarioData: scenarioData as unknown as Prisma.InputJsonValue,
         },
       }),

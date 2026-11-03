@@ -139,6 +139,8 @@ model FoundationBossStage {
   foundationCourseId String
   course             FoundationCourse @relation(fields: [foundationCourseId], references: [id])
 
+  introVideoS3Key String?
+
   milestoneIndex Int // e.g., 1 (for Spoons 1-3), 2 (for Spoons 4-6)
 
   // --- THE ARRAYS ---

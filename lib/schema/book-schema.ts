@@ -1,6 +1,28 @@
 // lib/schema/book-schema.ts
 import { z } from "zod";
 
+
+export const BossAvatarSchema = z.object({
+  default: z.string().nullable().optional(),
+  happy: z.string().nullable().optional(),
+  sad: z.string().nullable().optional(),
+  angry: z.string().nullable().optional(),
+});
+
+export const BossInfoSchema = z.object({
+  name: z.string(),
+  persona: z.string(),
+  introMessage: z.string(),
+  appearance: z.string(),
+  sceneDescription: z.string(),
+  coverUrl: z.string().nullable().optional(),
+  avatar: BossAvatarSchema.nullable().optional(),
+  
+  // 🟢 NEW: Add the audio and video keys from Lambda
+  introAudioKey: z.string().nullable().optional(),
+  introVideoKey: z.string().nullable().optional(),
+});
+
 export const BookWordTimestampSchema = z.object({
   word: z.string(),
   startMs: z.number().int().nonnegative(),
