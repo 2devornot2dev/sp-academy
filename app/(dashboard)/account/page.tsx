@@ -11,7 +11,7 @@ import { BillingForm } from "@/components/account/billing-form";
 import { SharingSettingsForm } from "@/components/account/sharing-settings-form";
 import { NotificationSettingsForm } from "@/components/account/notifications-settings-form";
 import { ProfilePictureUploader } from "@/components/account/ProfilePictureUploader";
-import { DangerZone } from "@/components/account/DangerZone";
+import { DangerZone } from "@/components/account/dange-zone";
 import { ProfileCompletion } from "@/components/account/ProfileCompletion";
 import { GeneralSettings } from "@/components/account/general-settings";
 

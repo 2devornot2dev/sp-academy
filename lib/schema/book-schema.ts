@@ -38,6 +38,8 @@ export const BookSentenceSchema = z.object({
   wordTimestamps: z.array(BookWordTimestampSchema).default([]),
 });
 
+
+
 // 🟢 Universal Option Schema with Dedicated Sprite Feedback
 export const CheckpointOptionSchema = z.object({
   text: z.string(), // Option text in target language
@@ -110,3 +112,4 @@ export type LocalizedBookTranslation = z.infer<
   typeof LocalizedBookTranslationSchema
 >;
 export type SpoonBookWebhookPayload = z.infer<typeof SpoonBookWebhookSchema>;
+

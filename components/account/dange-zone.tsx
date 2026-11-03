@@ -1,11 +1,11 @@
-// components/account/DangerZone.tsx
+// components/account/danger-zone.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 
-export function DangerZone({ userId }) {
+export function DangerZone({ userId }: { userId: string }) {
   const handleDeleteAccount = async () => {
     if (
       confirm(
