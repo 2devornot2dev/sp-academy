@@ -126,8 +126,11 @@ export async function handleBossGeneration(
         where: { id: bossStageId },
         data: {
           status: "READY",
-          // Map the JSON introVideoKey to the Prisma column!
-          introVideoS3Key: scenarioData.boss.introVideoS3Key || null, 
+          // Map either introVideoS3Key or introVideoKey from Lambda to the Prisma column
+          introVideoS3Key:
+            scenarioData.boss.introVideoS3Key ||
+            scenarioData.boss.introVideoKey ||
+            null,
           scenarioData: scenarioData as unknown as Prisma.InputJsonValue,
         },
       }),
@@ -138,7 +141,7 @@ export async function handleBossGeneration(
         },
       }),
     ]);
-
+    
     console.log(
       `✅ Boss Stage ${bossStageId} marked READY (${scenarioData.exerciseBank.length} exercises)`
     );

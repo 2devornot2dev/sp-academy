@@ -24,7 +24,7 @@ export default async function BookReportsPage() {
           </div>
 
           <div className="max-w-3xl">
-            <h1 className="flex items-center gap-3.5 text-3xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-4xl lg:text-5xl">
+            <h1 className="flex items-center gap-3.5 font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] text-2xl sm:text-3xl md:text-4xl">
               <span>Interactive Books</span>
               <BookOpen
                 strokeWidth={2}

@@ -74,7 +74,7 @@ export function DashboardHeader({
 
         {/* Main Greeting Copy with Subtle Text Shadow for Crisp Readability */}
         <div className="max-w-3xl">
-          <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-4xl lg:text-5xl">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)]">
             {greetingText} Ready to learn today?
           </h1>
           <p className="mt-2.5 text-base font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-lg">
