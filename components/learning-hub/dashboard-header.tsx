@@ -31,13 +31,9 @@ export function DashboardHeader({
   const greetingText = name ? `${greeting}, ${name}!` : `${greeting}!`;
 
   return (
-    <header className="relative overflow-hidden animate-bg pt-9 pb-22 text-white shadow-lg">
-      {/* Subtle dark-glass contrast scrim so white text is always razor-sharp against bright Spoon colors */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
-
-      {/* Soft ambient highlights */}
-      <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
-
+   <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
         {/* Top Bar: Frosted Dark-Glass Pills */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">

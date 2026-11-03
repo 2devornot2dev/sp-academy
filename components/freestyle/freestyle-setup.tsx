@@ -165,9 +165,9 @@ export default function FreestyleSetup({
   return (
     <div className="min-h-screen bg-slate-100/80 font-sans text-slate-900">
       {/* 1. SPOON HEADER BANNER (Matches Learning Hub Header) */}
-      <header className="relative overflow-hidden animate-bg pt-9 pb-22 text-white shadow-lg">
+      <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
           {/* Top Frosted Glass Pills */}
