@@ -50,7 +50,7 @@ export async function dismissNotification(
   await prisma.spriteNotification.updateMany({
     where: {
       id: notificationId,
-      spriteProfile: { userId },
+      profile: { userId },
       dismissedAt: null,
     },
     data: { dismissedAt: new Date() },
@@ -60,7 +60,7 @@ export async function dismissNotification(
 /** "Clear all" */
 export async function dismissAllNotifications(userId: string) {
   await prisma.spriteNotification.updateMany({
-    where: { spriteProfile: { userId }, dismissedAt: null, resolvedAt: null },
+    where: { profile: { userId }, dismissedAt: null, resolvedAt: null },
     data: { dismissedAt: new Date() },
   });
 }

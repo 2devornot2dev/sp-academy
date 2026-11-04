@@ -76,7 +76,7 @@ model SpriteProfile {
   // 🟢 NEW: Saved Chat Sessions
   sessions            SpriteSession[]
   spriteExercises     SpriteExercise[]
-  spriteNotifications SpriteNotification[]
+  notifications       SpriteNotification[]
 
   dismissedCards String[]
 }
