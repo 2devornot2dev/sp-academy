@@ -15,19 +15,27 @@ import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
 import { useSpeakWord, cleanWord } from "@/components/foundation/word-tap";
 
-// Auto-detects French/Spanish article & gender tag from the word string (zero backend changes!)
+// Auto-detects French/Spanish article & gender tag from the word string
 function getWordGrammarBadge(rawWord: string): {
   label: string;
   className: string;
 } {
   const lower = (rawWord || "").trim().toLowerCase();
-  if (lower.startsWith("le ") || lower.startsWith("un ") || lower.startsWith("el ")) {
+  if (
+    lower.startsWith("le ") ||
+    lower.startsWith("un ") ||
+    lower.startsWith("el ")
+  ) {
     return {
       label: "Masculine",
       className: "bg-sky-100 text-blue-700 ring-sky-200",
     };
   }
-  if (lower.startsWith("la ") || lower.startsWith("une ") || lower.startsWith("una ")) {
+  if (
+    lower.startsWith("la ") ||
+    lower.startsWith("une ") ||
+    lower.startsWith("una ")
+  ) {
     return {
       label: "Feminine",
       className: "bg-pink-100 text-rose-700 ring-pink-200",
@@ -67,14 +75,10 @@ export function VocabMomentStep({
   const { trackInteraction } = useMatrix();
   const speak = useSpeakWord();
 
-  // Track which indices have been listened to in Phase 1
   const [heardIndices, setHeardIndices] = useState<Set<number>>(new Set());
-  // Track which indices have been matched in Phase 2
   const [matchedIndices, setMatchedIndices] = useState<Set<number>>(new Set());
-  // Track wrong tap shake animation on a card index
   const [wrongIdx, setWrongIdx] = useState<number | null>(null);
 
-  // Shuffled order of indices [0, 1, 2] for the Phase 2 Quick Match quiz
   const quizOrder = useMemo(() => {
     const indices = data.map((_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
@@ -84,7 +88,6 @@ export function VocabMomentStep({
     return indices;
   }, [data]);
 
-  // Matrix: every vocab word shown on this screen counts as "seen" once
   useEffect(() => {
     data.forEach((item) => {
       const key = cleanWord(item.word);
@@ -97,7 +100,6 @@ export function VocabMomentStep({
   const allHeard = heardIndices.size >= totalWords && totalWords > 0;
   const allMatched = matchedIndices.size >= totalWords && totalWords > 0;
 
-  // Current target index in quizOrder that hasn't been matched yet
   const activeQuizTargetIdx = useMemo(() => {
     if (!allHeard || allMatched) return null;
     return quizOrder.find((idx) => !matchedIndices.has(idx)) ?? null;
@@ -107,10 +109,8 @@ export function VocabMomentStep({
     activeQuizTargetIdx !== null ? data[activeQuizTargetIdx] : null;
 
   const handleCardTap = (idx: number, item: any) => {
-    // Always play the word audio when tapped
     speak(item.word);
 
-    // Phase 1: Recording that the user listened to this card
     if (!allHeard) {
       setHeardIndices((prev) => {
         const next = new Set(prev);
@@ -120,9 +120,8 @@ export function VocabMomentStep({
       return;
     }
 
-    // Phase 2: Quick Memory Match!
     if (allHeard && !allMatched && activeQuizTargetIdx !== null) {
-      if (matchedIndices.has(idx)) return; // Already matched this card
+      if (matchedIndices.has(idx)) return;
 
       if (idx === activeQuizTargetIdx) {
         setWrongIdx(null);
@@ -146,35 +145,82 @@ export function VocabMomentStep({
   return (
     <div className="flex h-full flex-col justify-between p-6 sm:p-10 animate-in fade-in duration-500">
       {/* =====================================================================
-          1. TOP HEADER & 2-STAGE PROGRESS PILL
+          1. CLEAN HEADER + INLINE STEP PROMPT BANNER RIGHT UNDERNEATH
           ===================================================================== */}
-      <div className="space-y-3 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-1.5 text-xs font-black tracking-wide text-amber-800 uppercase ring-1 ring-amber-200/80">
-          <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
-          <span>
+      <div className="space-y-5 text-center">
+        <div>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
             {allMatched
-              ? "Step 2 of 2 Complete • All Vocab Locked In!"
+              ? "Vocabulary Locked In! 🎉"
               : allHeard
-                ? `Step 2 of 2 • Memory Check (${matchedIndices.size}/${totalWords})`
-                : `Step 1 of 2 • Tap All ${totalWords} Cards to Listen (${heardIndices.size}/${totalWords})`}
-          </span>
+                ? "Quick Memory Match"
+                : "Core Vocabulary"}
+          </h2>
+          <p className="mt-1.5 text-sm sm:text-base font-medium text-slate-500">
+            {allMatched
+              ? "You've unlocked and matched every word. Tap any card to listen again or start your drills."
+              : allHeard
+                ? "The English meanings are hidden—tap the French card that matches the prompt below."
+                : "Tap each card to hear its native pronunciation and unlock the quick match."}
+          </p>
         </div>
 
-        <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
-          {allMatched
-            ? "Vocabulary Locked In! 🎉"
-            : allHeard
-              ? "Quick Memory Match"
-              : "Core Vocabulary"}
-        </h2>
+        {/* Live Step / Target Prompt Banner Directly Below Title */}
+        <div className="mx-auto flex max-w-xl items-center justify-center gap-3.5 rounded-2xl bg-slate-50 px-5 py-3.5 ring-1 ring-slate-200/80">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-white shadow-2xs ${
+              allMatched
+                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600"
+                : allHeard
+                  ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950"
+                  : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600"
+            }`}
+          >
+            {allMatched ? (
+              <Sparkles className="h-4 w-4" />
+            ) : allHeard ? (
+              <Zap className="h-4 w-4 fill-current" />
+            ) : (
+              <Headphones className="h-4 w-4" />
+            )}
+          </div>
 
-        <p className="mx-auto max-w-lg text-sm sm:text-base font-medium text-slate-500">
-          {allMatched
-            ? "You've unlocked and matched every word. Tap any card to listen again or start your drills!"
-            : allHeard
-              ? "The English meanings are hidden! Tap the French card that matches the prompt below."
-              : "Tap each 3D card below to hear its native pronunciation and unlock the quick match."}
-        </p>
+          <div className="text-left">
+            {!allHeard ? (
+              <>
+                <p className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
+                  Step 1 of 2 • Audio Discovery ({heardIndices.size}/
+                  {totalWords})
+                </p>
+                <p className="text-sm sm:text-base font-extrabold text-slate-800">
+                  Tap all {totalWords} cards below to hear their pronunciation
+                </p>
+              </>
+            ) : !allMatched && activeQuizItem ? (
+              <>
+                <p className="text-[10px] font-black tracking-wider text-amber-700 uppercase">
+                  Step 2 of 2 • Quick Match ({matchedIndices.size + 1} of{" "}
+                  {totalWords})
+                </p>
+                <p className="text-sm sm:text-base font-extrabold text-slate-900">
+                  Tap the French card below for:{" "}
+                  <span className="rounded-lg bg-amber-200/90 px-2 py-0.5 font-black text-slate-950">
+                    &ldquo;{activeQuizItem.gloss}&rdquo;
+                  </span>
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] font-black tracking-wider text-emerald-600 uppercase">
+                  Step 2 of 2 Complete • {totalWords}/{totalWords} Mastered
+                </p>
+                <p className="text-sm sm:text-base font-extrabold text-slate-800">
+                  All words locked in! Click below to begin your Cooldown Drills.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* =====================================================================
@@ -188,7 +234,6 @@ export function VocabMomentStep({
           const isWrongShake = wrongIdx === idx;
           const grammarBadge = getWordGrammarBadge(item.word);
 
-          // In Phase 2 (allHeard && !allMatched), hide the English gloss on unmatched cards so they have to recall it!
           const hideGlossForQuiz = allHeard && !isMatched;
 
           return (
@@ -257,12 +302,12 @@ export function VocabMomentStep({
                 </h3>
               </div>
 
-              {/* Bottom Meaning Slot (Visible in Phase 1 & once Matched; Hidden during Phase 2 Quiz!) */}
+              {/* Bottom Meaning Slot */}
               <div className="w-full rounded-2xl bg-slate-50 px-4 py-2.5 ring-1 ring-slate-200/70">
                 {hideGlossForQuiz ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-600">
                     <HelpCircle className="h-3.5 w-3.5" />
-                    Tap if this matches below
+                    Tap if this matches above
                   </span>
                 ) : (
                   <p className="text-base font-bold text-slate-600">
@@ -276,82 +321,23 @@ export function VocabMomentStep({
       </div>
 
       {/* =====================================================================
-          3. INTERACTIVE CHALLENGE DOCK & GATED NEXT BUTTON
+          3. CLEAN FOOTER CTA
           ===================================================================== */}
-      <div className="mt-auto rounded-3xl bg-slate-50 p-4 sm:p-5 ring-1 ring-slate-200/80">
-        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          {/* Left Status / Quiz Prompt */}
-          <div className="flex items-center gap-3.5 text-center sm:text-left">
-            <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 text-white shadow-sm ${
-                allMatched
-                  ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600"
-                  : allHeard
-                    ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950"
-                    : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600"
-              }`}
-            >
-              {allMatched ? (
-                <Sparkles className="h-5 w-5" />
-              ) : allHeard ? (
-                <Zap className="h-5 w-5 fill-current" />
-              ) : (
-                <Headphones className="h-5 w-5" />
-              )}
-            </div>
-
-            <div>
-              {!allHeard ? (
-                <>
-                  <p className="text-xs font-black tracking-wider text-blue-600 uppercase">
-                    Step 1 • Audio Discovery ({heardIndices.size}/{totalWords})
-                  </p>
-                  <p className="text-sm sm:text-base font-extrabold text-slate-800">
-                    Tap all {totalWords} cards above to hear their pronunciation
-                  </p>
-                </>
-              ) : !allMatched && activeQuizItem ? (
-                <>
-                  <p className="text-xs font-black tracking-wider text-amber-700 uppercase">
-                    Step 2 • Quick Match ({matchedIndices.size + 1} of{" "}
-                    {totalWords})
-                  </p>
-                  <p className="text-sm sm:text-lg font-extrabold text-slate-900">
-                    Tap the French card above for:{" "}
-                    <span className="rounded-lg bg-amber-200/80 px-2.5 py-0.5 text-slate-950">
-                      &ldquo;{activeQuizItem.gloss}&rdquo;
-                    </span>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs font-black tracking-wider text-emerald-600 uppercase">
-                    All {totalWords} Words Mastered
-                  </p>
-                  <p className="text-sm sm:text-base font-extrabold text-slate-800">
-                    Awesome job! You&apos;re ready for the Cooldown Drills.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right Gated Action Button */}
-          <button
-            type="button"
-            disabled={!allMatched}
-            onClick={handleNext}
-            className={`inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2.5 rounded-2xl px-8 py-4 text-sm sm:text-base font-black transition-all ${
-              allMatched
-                ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
-                : "cursor-not-allowed bg-slate-200/80 text-slate-400"
-            }`}
-          >
-            {!allMatched && <Lock className="h-4 w-4" />}
-            <span>Begin Cooldown Drills</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="mt-auto flex justify-center border-t border-slate-100 pt-6">
+        <button
+          type="button"
+          disabled={!allMatched}
+          onClick={handleNext}
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl px-12 py-4 text-base font-black transition-all ${
+            allMatched
+              ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+              : "cursor-not-allowed bg-slate-200/80 text-slate-400"
+          }`}
+        >
+          {!allMatched && <Lock className="h-4 w-4" />}
+          <span>Begin Cooldown Drills</span>
+          <ArrowRight className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
