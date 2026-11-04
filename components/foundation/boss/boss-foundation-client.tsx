@@ -65,7 +65,8 @@ export default function BossFoundationClient({
   const totalExercises =
     scenarioData?.rules?.totalExercises || playlist.length || 0;
   const passingScore =
-    scenarioData?.rules?.passingScore || Math.max(1, Math.round(totalExercises * 0.8));
+    scenarioData?.rules?.passingScore ||
+    Math.max(1, Math.round(totalExercises * 0.8));
 
   const milestoneIndex = (session as any)?.milestoneIndex ?? 1;
   const attempts = (session as any)?.attempts ?? 0;
@@ -76,15 +77,23 @@ export default function BossFoundationClient({
     (session as any)?.targetLanguage ||
     "fr-FR";
 
+  // Grab introVideoS3Key from the DB row or scenarioData.boss fallback
+  const introVideoKey: string | undefined =
+    (session as any)?.introVideoS3Key ??
+    (boss as any)?.introVideoKey ??
+    (boss as any)?.introVideoS3Key ??
+    undefined;
+
   const avatarKeys = useMemo(() => getBossAvatarKeys(boss), [boss]);
 
   const allKeys = useMemo(() => {
     const keys: (string | undefined)[] = [
-      avatarKeys.default,
-      boss?.coverUrl ?? undefined,
-      avatarKeys.happy,
-      avatarKeys.sad,
-      avatarKeys.angry,
+      avatarKeys.default,       // index 0
+      boss?.coverUrl ?? undefined, // index 1
+      avatarKeys.happy,         // index 2
+      avatarKeys.sad,           // index 3
+      avatarKeys.angry,         // index 4
+      introVideoKey,            // index 5 (Boss Intro Video!)
     ];
     playlist.forEach((item) => {
       keys.push(item.audioKey ?? undefined);
@@ -95,14 +104,16 @@ export default function BossFoundationClient({
       }
     });
     return keys;
-  }, [boss, avatarKeys, playlist]);
+  }, [boss, avatarKeys, introVideoKey, playlist]);
 
   const { urls, isLoading } = useS3Media(allKeys);
 
   const resolvedDefaultAvatarUrl = urls[0];
   const resolvedCoverUrl = urls[1];
   const bossAvatar = resolvedDefaultAvatarUrl || FALLBACK_AVATAR;
-  const bossVideoUrl = urls[2];
+  const resolvedIntroVideoUrl =
+    urls[5] ||
+    (introVideoKey?.startsWith("http") ? introVideoKey : undefined);
 
   return (
     <div className="min-h-screen w-full animate-bg p-4 sm:p-6 flex flex-col justify-center">
@@ -138,7 +149,8 @@ export default function BossFoundationClient({
                 <div className="absolute right-5 top-5 flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-extrabold text-slate-700 shadow-sm backdrop-blur-md">
                   <RotateCcw size={13} className="text-indigo-500" />
                   Attempt #{attempts + 1}
-                  {bestScore !== null && ` • Last: ${bestScore}/${totalExercises}`}
+                  {bestScore !== null &&
+                    ` • Last: ${bestScore}/${totalExercises}`}
                 </div>
               )}
             </div>
@@ -162,7 +174,7 @@ export default function BossFoundationClient({
                 {boss?.name || "Milestone Boss"}
               </h1>
 
-              {/* Full Persona Bio (no cramped scrollbar needed on wider card) */}
+              {/* Full Persona Bio */}
               <div className="mb-6 rounded-2xl bg-slate-50 px-6 py-4 text-center shadow-inner">
                 <p className="text-[15px] font-medium leading-relaxed text-slate-600">
                   {boss?.persona ||
@@ -239,7 +251,12 @@ export default function BossFoundationClient({
         >
           <MatrixProvider>
             <WordAudioProvider targetLang={rawLang}>
-              <BossFoundationFreestyle onEnd={handleEnd} onRetry={handleRetry} />
+              <BossFoundationFreestyle
+                onEnd={handleEnd}
+                onRetry={handleRetry}
+                introVideoUrl={resolvedIntroVideoUrl}
+                coverImageUrl={resolvedCoverUrl}
+              />
             </WordAudioProvider>
           </MatrixProvider>
         </BossFoundationProvider>

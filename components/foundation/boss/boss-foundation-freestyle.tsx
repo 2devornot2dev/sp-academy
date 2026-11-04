@@ -1,12 +1,16 @@
+// components/foundation/boss/boss-foundation-freestyle.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Heart,
   RotateCcw,
   Zap,
   Loader2,
+  Volume2,
+  VolumeX,
+  Sparkles,
 } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,11 +26,17 @@ import { ExerciseBlock } from "./exercise-block";
 interface Props {
   onEnd: () => void;
   onRetry: () => void;
+  introVideoUrl?: string;
+  coverImageUrl?: string;
   scenarioData?: unknown;
 }
 
-export default function BossFoundationFreestyle({ onEnd, onRetry }: Props) {
-  
+export default function BossFoundationFreestyle({
+  onEnd,
+  onRetry,
+  introVideoUrl,
+  coverImageUrl,
+}: Props) {
   const {
     boss,
     messages,
@@ -51,12 +61,15 @@ export default function BossFoundationFreestyle({ onEnd, onRetry }: Props) {
     playExerciseAudio,
     resolveAssetUrl,
     resetRecording,
-    handleReplay, // <-- add this
+    handleReplay,
   } = useBossFoundation();
 
   const { playWord, stopAudio: stopWordAudio } = useWordAudio();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
+  const [videoFinished, setVideoFinished] = useState(false);
 
   const showThinking = isAiProcessing && !isRecording;
 
@@ -72,6 +85,13 @@ export default function BossFoundationFreestyle({ onEnd, onRetry }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, transcript, isProcessing, isAiProcessing]);
+
+  // Pause intro video once the user clicks "Begin"
+  useEffect(() => {
+    if (hasStartedExercises && videoRef.current) {
+      videoRef.current.pause();
+    }
+  }, [hasStartedExercises]);
 
   return (
     <div className="relative mx-auto flex h-[calc(100vh-2rem)] max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-xl">
@@ -164,7 +184,49 @@ export default function BossFoundationFreestyle({ onEnd, onRetry }: Props) {
       {/* Chat and exercise area */}
       <div className="relative flex-1 overflow-hidden bg-slate-50/50">
         <ScrollArea className="h-full w-full">
-          <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-8">
+          <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-8">
+            {/* ===============================================================
+                BOSS INTRO VIDEO CUTSCENE (Shown before exercises begin!)
+                =============================================================== */}
+            {introVideoUrl && !hasStartedExercises && (
+              <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-indigo-500/20 bg-slate-950 shadow-xl animate-in fade-in zoom-in-95 duration-300">
+                <div className="relative aspect-[16/9] w-full">
+                  <video
+                    ref={videoRef}
+                    src={introVideoUrl}
+                    poster={coverImageUrl}
+                    autoPlay
+                    loop
+                    muted={isVideoMuted}
+                    playsInline
+                    onEnded={() => setVideoFinished(true)}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25" />
+
+                  {/* Top Left Cutscene Pill */}
+                  <div className="absolute top-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-300 backdrop-blur-md">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>{boss?.name || "Boss"} Intro</span>
+                  </div>
+
+                  {/* Top Right Mute/Unmute Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setIsVideoMuted((prev) => !prev)}
+                    className="absolute top-3.5 right-3.5 rounded-full bg-slate-950/75 p-2 text-white transition hover:bg-slate-900 backdrop-blur-md"
+                    title={isVideoMuted ? "Unmute video" : "Mute video"}
+                  >
+                    {isVideoMuted ? (
+                      <VolumeX className="h-4 w-4 text-slate-300" />
+                    ) : (
+                      <Volume2 className="h-4 w-4 text-emerald-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {messages.length === 0 && !isProcessing && !isRecording && (
               <div className="flex min-h-[200px] flex-col items-center justify-center text-center opacity-60">
                 <p className="text-sm font-medium text-slate-500">
@@ -231,7 +293,9 @@ export default function BossFoundationFreestyle({ onEnd, onRetry }: Props) {
           <button
             type="button"
             onClick={startExercises}
-            className="flex w-full animate-in items-center justify-center rounded-2xl border-b-4 border-indigo-800 bg-indigo-600 py-4 text-lg font-extrabold text-white shadow-sm transition-all slide-in-from-bottom-2 hover:bg-indigo-500 active:translate-y-1 active:border-b-0"
+            className={`flex w-full animate-in items-center justify-center rounded-2xl border-b-4 border-indigo-800 bg-indigo-600 py-4 text-lg font-extrabold text-white shadow-sm transition-all slide-in-from-bottom-2 hover:bg-indigo-500 active:translate-y-1 active:border-b-0 ${
+              videoFinished ? "ring-4 ring-indigo-300" : ""
+            }`}
           >
             {isProcessing ? "Skip Intro & Begin" : "I'm Ready, Let's Begin"}
           </button>
