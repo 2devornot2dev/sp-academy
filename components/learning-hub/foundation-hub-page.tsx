@@ -10,15 +10,19 @@ import {
   getBridgeSpriteOrderIndex,
   getBossSpriteOrderIndex,
 } from "@/lib/foundation/tools";
+import { vocabWordCount } from "./utils";
+import { generateDisplayTitles } from "@/lib/utils";
 
 import { DashboardHeader } from "./dashboard-header";
 import { PrimaryHeroCard } from "./primary-hero-card";
 import { GenerationCycleCard } from "./generation-cycle-card";
-import { LearningPathMiniCards } from "./learning-mini-path-cards";
+import {
+  LearningPathMiniCards,
+  PastSpoonsVocabSlimList,
+} from "./learning-mini-path-cards";
 import { WordMatrixCard } from "./word-matrix-card";
 
 import { SpriteChat } from "@/components/sprite/sprite-chat";
-import { vocabWordCount, generateDisplayTitles } from "@/lib/utils";
 
 type Props = {
   path: LearningPath | null;
@@ -37,8 +41,11 @@ export default function FoundationHubPage({
   const lessons = path?.lessons ?? [];
   const courseId = path?.courseId ?? (path as any)?.id ?? "default";
   const user = path?.user;
-  const displayTitles = useMemo(() => generateDisplayTitles(lessons), [lessons]);
 
+  const displayTitles = useMemo(
+    () => generateDisplayTitles(lessons),
+    [lessons],
+  );
 
   // --- ENGINE STATE ---
   const currentFocus = path?.currentFocus ?? null;
@@ -50,7 +57,6 @@ export default function FoundationHubPage({
     currentFocus?.type === "SPOON" ? currentFocus.data : undefined;
   const bossDue = currentFocus?.type === "BOSS" ? currentFocus.data : undefined;
 
-  // A Spoon row is created immediately in DB, so if title & imageUrl are still empty, Lambda is still baking it
   const waitingOnSpoon =
     currentFocus?.type === "SPOON" &&
     !currentFocus.data.title &&
@@ -92,15 +98,14 @@ export default function FoundationHubPage({
     )
     .reverse();
 
-const getLessonHref = (lessonId: string) =>
+  const getLessonHref = (lessonId: string) =>
     `/foundation/${lessonId}/${courseId}`;
 
-  const getVocabHref = (bridgeId: string) =>
-    `/foundation/vocab/${bridgeId}`;
+  const getVocabHref = (bridgeId: string) => `/foundation/vocab/${bridgeId}`;
 
   const getBossHref = (bossId: string) => `/foundation/boss/${bossId}`;
 
-  // Poll while Lambda is generating (pause polling if the task explicitly FAILED)
+  // Poll while Lambda is generating
   useEffect(() => {
     if (!isGenerating || liveTask?.status === "FAILED") return;
     const interval = setInterval(() => router.refresh(), 4000);
@@ -145,9 +150,9 @@ const getLessonHref = (lessonId: string) =>
     const focusItemId =
       nextLesson?.id ?? vocabDue?.id ?? bossDue?.id ?? String(orderIndex);
 
-   summonSpriteNode({
+    summonSpriteNode({
       orderIndex,
-      stepType: currentFocus?.type, // "SPOON" | "BRIDGE" | "BOSS"
+      stepType: currentFocus?.type,
       dedupeKey: `sprite_seen_${orderIndex}_${focusItemId}`,
       actionLabel: stepLabel,
       onAction: () => router.push(actionHref!),
@@ -169,7 +174,6 @@ const getLessonHref = (lessonId: string) =>
 
   // --- SYNC GENERATION STATUS WITH SPRITE CONTEXT ---
   useEffect(() => {
-    // Don't overwrite a FAILED state with BUILDING!
     if (liveTask?.status === "FAILED") return;
 
     if (waitingOnSpoon) {
@@ -241,18 +245,18 @@ const getLessonHref = (lessonId: string) =>
               />
             )}
 
-           <LearningPathMiniCards
+            <LearningPathMiniCards
               courseId={courseId}
               currentFocus={currentFocus}
               nextLocked={nextLocked}
-              lessons={lessons} // 👈 Add this prop so the Unit Roadmap & Replay strip have the lesson history!
+              lessons={lessons}
               getLessonHref={getLessonHref}
               getBossHref={getBossHref}
               displayTitles={displayTitles}
             />
           </div>
 
-          {/* RIGHT PANEL */}
+          {/* RIGHT PANEL: Word Matrix + Slim Past Spoons & Vocab Remix List */}
           <div className="flex flex-col gap-6 lg:col-span-4">
             <WordMatrixCard
               totalWordsLearned={totalWordsLearned}
@@ -260,11 +264,22 @@ const getLessonHref = (lessonId: string) =>
               fallbackWords={recentBridgeWords}
               isLocked={completedLessonsCount === 0}
             />
+
+            <PastSpoonsVocabSlimList
+              courseId={courseId}
+              lessons={lessons}
+              getLessonHref={getLessonHref}
+              displayTitles={displayTitles}
+              onLaunchSpriteExercise={(lesson) => {
+                // Ready to wire into your Sprite Exercise / ⚡ Charge modal!
+                console.log("Launch Sprite Exercise for Spoon:", lesson.id);
+              }}
+            />
           </div>
         </div>
       </main>
 
-    {user?.id && (
+      {user?.id && (
         <SpriteChat
           userId={user.id}
           initialContext={{
@@ -274,7 +289,7 @@ const getLessonHref = (lessonId: string) =>
             currentLessonTitle:
               (currentFocus?.data as any)?.title ||
               `Spoon ${(currentFocus?.data as any)?.orderIndex || 1}`,
-            currentFocusType: currentFocus?.type ?? null, // <--- "SPOON" | "BRIDGE" | "BOSS"
+            currentFocusType: currentFocus?.type ?? null,
             wakeCycleKey:
               currentFocus?.type === "BOSS"
                 ? `boss-${
