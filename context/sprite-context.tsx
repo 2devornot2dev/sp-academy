@@ -43,13 +43,13 @@ export type SpritePayload = {
   id?: string;
   badge?: string;
   text: string;
-  targetText?: string; // Optional target language line from SpriteNode
+  targetText?: string;
   audioUrl?: string | null;
   targetAudioUrl?: string | null;
   autoPlayAudio?: boolean;
   sprite?: SpriteType;
   spriteUrl?: string;
-  duration?: number; // ms, pass Infinity to stay until closed/clicked
+  duration?: number;
   position?: "bottom-left" | "bottom-right" | "top-right";
   action?: SpriteAction;
   createdAt?: number;
@@ -76,14 +76,12 @@ export type SpriteProfileData = {
 } | null;
 
 interface SpriteContextValue {
-  // Identity & Profile
   activeSprite: SpriteType;
   setActiveSprite: (sprite: SpriteType) => void;
   profile: SpriteProfileData;
   spriteName: string;
   avatarSrc: string;
 
-  // Chat UI State & Navigation
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
   openChat: (options?: { tab?: ActiveTab; prompt?: string }) => void;
@@ -93,11 +91,9 @@ interface SpriteContextValue {
   viewMode: ChatViewMode;
   setViewMode: (mode: ChatViewMode) => void;
 
-  // Queued Prompt (for external buttons / notifications to trigger a chat turn)
   pendingPrompt: string | null;
   clearPendingPrompt: () => void;
 
-  // Notifications & SpriteNode Engine
   current: SpritePayload | null;
   notifications: SpritePayload[];
   unreadCount: number;
@@ -114,15 +110,12 @@ interface SpriteContextValue {
   dismissSprite: () => void;
   isShowing: boolean;
 
-  // Shared Audio Controls
   isPlaying: boolean;
   playAudioUrl: (urlOrKey: string) => Promise<void>;
   stopAudio: () => void;
 
-  // Session Management
   deleteSession: (sessionId: string) => Promise<boolean>;
 
-  // Live Builder Task State
   liveTask: LiveTaskStatus | null;
   setLiveTask: (task: LiveTaskStatus | null) => void;
   isRetryingTask: boolean;
@@ -145,13 +138,11 @@ export function SpriteProvider({
     (dbSprite?.slug as SpriteType) ?? "vox"
   );
 
-  // Chat UI states
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("session");
   const [viewMode, setViewMode] = useState<ChatViewMode>("single");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
-  // Notification states
   const [current, setCurrent] = useState<SpritePayload | null>(null);
   const [notifications, setNotifications] = useState<SpritePayload[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -175,7 +166,18 @@ export function SpriteProvider({
   const dismissSprite = useCallback(() => {
     stopAudio();
     if (timerRef.current) clearTimeout(timerRef.current);
-    setCurrent(null);
+    
+    // If you dismiss a FAILED task generation notification, remember it so it doesn't pop back up on refresh
+    setCurrent((prev) => {
+      if (prev?.id && prev.id.startsWith("fail_")) {
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`dismissed_${prev.id}`, "1");
+          }
+        } catch (e) {}
+      }
+      return null;
+    });
   }, [stopAudio]);
 
   const resolvePlayableUrl = useCallback(async (urlOrKey: string) => {
@@ -234,17 +236,15 @@ export function SpriteProvider({
         duration: payload.duration ?? 8000,
         position: payload.position ?? "bottom-right",
         createdAt: Date.now(),
-        read: isChatOpen, // If chat is already open, mark as read immediately
+        read: isChatOpen,
         ...payload,
       };
 
-      // 1. Add to persistent in-chat notification feed (avoid duplicates by ID)
       setNotifications((prev) => {
         const filtered = prev.filter((item) => item.id !== nextPayload.id);
         return [nextPayload, ...filtered].slice(0, 10);
       });
 
-      // 2. Only show floating toast if the Chat Drawer is closed
       if (!isChatOpen) {
         setCurrent(nextPayload);
 
@@ -255,7 +255,6 @@ export function SpriteProvider({
         }
       }
 
-      // 3. Play audio whether chat is open or closed
       if (nextPayload.audioUrl && nextPayload.autoPlayAudio) {
         playAudioUrl(nextPayload.audioUrl);
       }
@@ -279,7 +278,6 @@ export function SpriteProvider({
     }) => {
       if (!spriteData?.sprite) return;
 
-      // Safety check: Boss nodes are strictly multiples of 7 (7, 14, 21, 28, 35)
       if (stepType === "BOSS" && orderIndex % 7 !== 0) return;
       if (stepType !== "BOSS" && orderIndex % 7 === 0) return;
 
@@ -345,6 +343,13 @@ export function SpriteProvider({
   }, []);
 
   const dismissNotification = useCallback((id: string) => {
+    if (id.startsWith("fail_")) {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`dismissed_${id}`, "1");
+        }
+      } catch (e) {}
+    }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
@@ -443,8 +448,6 @@ export function SpriteProvider({
     [liveTask, summonSprite]
   );
 
-  // 1. Hydrate initial task state from Upstash Redis on mount
-  // 2. Subscribe to `user-${userId}` on Pusher for instant Lambda error/completion & SpriteNode events
   useEffect(() => {
     if (!userId) return;
 
@@ -454,6 +457,14 @@ export function SpriteProvider({
       if (!mounted || !cached) return;
       setLiveTask(cached);
       if (cached.status === "FAILED") {
+        // Halt summoning if this task fail card was already dismissed by the user previously
+        if (
+          typeof window !== "undefined" &&
+          localStorage.getItem(`dismissed_fail_${cached.taskId}`)
+        ) {
+          return;
+        }
+
         summonSprite({
           id: `fail_${cached.taskId}`,
           badge: `${cached.label || "Generation"} Hit a Snag ⚠️`,
@@ -485,6 +496,13 @@ export function SpriteProvider({
       };
       setLiveTask(nextState);
 
+      if (
+        typeof window !== "undefined" &&
+        localStorage.getItem(`dismissed_fail_${data.taskId}`)
+      ) {
+        return;
+      }
+
       summonSprite({
         id: `fail_${data.taskId}`,
         badge: `${nextState.label} Failed ⚠️`,
@@ -513,7 +531,6 @@ export function SpriteProvider({
       setLiveTask(null);
     };
 
-    // 🟢 NEW: Receives freshly baked (or cached) SpriteNode notifications from spoon-sprite-builder!
     const handleSpriteNodeReady = (node: {
       nodeId: string;
       orderIndex: number;
@@ -601,7 +618,6 @@ export function SpriteProvider({
     >
       {children}
 
-      {/* GLOBAL FLOATING SPRITE HUD (Only shown when Chat Drawer is closed) */}
       <AnimatePresence mode="wait">
         {current && !isChatOpen && (
           <motion.div
@@ -612,7 +628,6 @@ export function SpriteProvider({
             transition={{ type: "spring", stiffness: 360, damping: 26 }}
             className={`fixed ${positionClasses} z-50 flex w-[92vw] max-w-sm items-start gap-3.5 rounded-3xl border border-indigo-500/30 bg-slate-950/95 p-4 text-white shadow-2xl shadow-indigo-950/50 backdrop-blur-xl`}
           >
-            {/* Avatar + Speaking Aura */}
             <div className="relative shrink-0">
               <span
                 className={`absolute -inset-1 rounded-2xl bg-gradient-to-tr from-teal-400 via-indigo-500 to-fuchsia-500 blur-xs transition-opacity ${
@@ -640,7 +655,6 @@ export function SpriteProvider({
               </motion.div>
             </div>
 
-            {/* Bubble Content */}
             <div className="flex-1 min-w-0">
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="rounded-full bg-teal-400/20 px-2 py-0.5 text-[10px] font-black tracking-wider text-teal-300 uppercase">
@@ -658,7 +672,6 @@ export function SpriteProvider({
                 &ldquo;{current.text}&rdquo;
               </p>
 
-              {/* Controls Row: Listen + Primary Action + Open in Chat */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {current.audioUrl && (
                   <button
@@ -710,7 +723,6 @@ export function SpriteProvider({
                   </button>
                 )}
 
-                {/* Bridge button: moves user from notification toast right into the Chat UI */}
                 <button
                   type="button"
                   onClick={() => openChat({ tab: "briefing" })}
@@ -722,7 +734,6 @@ export function SpriteProvider({
               </div>
             </div>
 
-            {/* Close Button */}
             <button
               type="button"
               onClick={dismissSprite}
