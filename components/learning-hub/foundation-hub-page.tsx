@@ -282,7 +282,7 @@ export default function FoundationHubPage({
         </div>
       </main>
 
-      {user?.id && (
+      {/* {user?.id && (
         <SpriteChat
           userId={user.id}
           initialContext={{
@@ -333,7 +333,7 @@ export default function FoundationHubPage({
             avgPronunciation: path?.matrixStats?.avgPronunciation || 0,
           }}
         />
-      )}
+      )} */}
     </div>
   );
 }
