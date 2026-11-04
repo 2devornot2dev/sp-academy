@@ -1,12 +1,16 @@
 "use client";
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
-  AlertCircle,
   Volume2,
   CheckCircle2,
   XCircle,
   RotateCcw,
+  Zap,
+  Sparkles,
+  Lock,
+  Check,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
 import { useWordAudio } from "@/context/word-audio-context";
@@ -45,6 +49,13 @@ const shuffle = (arr: string[], seed: number) =>
 
 const hasLetters = (s: string) => /[\p{L}\p{N}]/u.test(s);
 
+const MECHANIC_LABELS: Record<string, string> = {
+  word_coupling: "Word Coupling",
+  variable_shift: "Sentence Builder",
+  context_clash: "Context Match",
+  video_spotlight: "Video Spotlight",
+};
+
 export function CooldownStep({
   data,
   onNext,
@@ -57,11 +68,12 @@ export function CooldownStep({
   const speak = useSpeakWord();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [status, setStatus] = useState<"idle" | "correct" | "incorrect">("idle");
+  const [status, setStatus] = useState<"idle" | "correct" | "incorrect">(
+    "idle"
+  );
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
 
-  // Track MC guesses so wrong answers turn red and correct turns green
   const [selectedMcOption, setSelectedMcOption] = useState<string | null>(null);
   const [wrongMcOptions, setWrongMcOptions] = useState<Set<string>>(new Set());
 
@@ -72,7 +84,6 @@ export function CooldownStep({
   const isBuilder = item.mechanic === "variable_shift";
   const isMultipleChoice = !isBuilder;
 
-  // Tokenized primary expected sentence for slot-by-slot green highlighting
   const expectedTokens = useMemo(
     () => tokenize(item.expected?.[0] ?? "").map(normalize),
     [item]
@@ -153,13 +164,13 @@ export function CooldownStep({
 
     if (isCorrect) {
       setStatus("correct");
-      setFeedbackMsg("✅ Great job! Spot on.");
+      setFeedbackMsg("Spot on! Great job.");
     } else {
       setStatus("incorrect");
       setWrongMcOptions((prev) => new Set(prev).add(guess));
       const specificHint =
         item.feedback?.[guess] || item.rejectFeedback?.[guess];
-      setFeedbackMsg(`❌ ${specificHint || "Not quite right. Try another option!"}`);
+      setFeedbackMsg(specificHint || "Not quite right. Try another option!");
     }
   };
 
@@ -170,7 +181,6 @@ export function CooldownStep({
     const nextSelected = [...selected, bankIndex];
     setSelected(nextSelected);
 
-    // Check if the newly formed sentence already matches an accepted answer!
     const nextPlaced = nextSelected.map((i) => bank[i]);
     const guess = normalize(nextPlaced.join(" "));
     const accepted = [
@@ -180,7 +190,7 @@ export function CooldownStep({
 
     if (accepted.includes(guess)) {
       setStatus("correct");
-      setFeedbackMsg("✅ Perfect adaptation!");
+      setFeedbackMsg("Perfect sentence adaptation!");
       nextPlaced.forEach((w) =>
         trackInteraction(cleanWord(w), { tappedCorrect: 1 })
       );
@@ -213,7 +223,7 @@ export function CooldownStep({
 
     if (accepted.includes(guess)) {
       setStatus("correct");
-      setFeedbackMsg("✅ Perfect adaptation!");
+      setFeedbackMsg("Perfect sentence adaptation!");
       placedWords.forEach((w) =>
         trackInteraction(cleanWord(w), { tappedCorrect: 1 })
       );
@@ -231,42 +241,56 @@ export function CooldownStep({
     );
     const hint = rejectKey
       ? item.rejectFeedback[rejectKey]
-      : "Green words are in the right spot! Tap any red/ misplaced word to adjust.";
-    setFeedbackMsg(`❌ ${hint}`);
+      : "Green words are in the right spot! Tap any red word to adjust.";
+    setFeedbackMsg(hint);
   };
 
+  const titleLabel =
+    MECHANIC_LABELS[item.mechanic] || item.mechanic.replace(/_/g, " ");
+
   return (
-    <div className="flex flex-col h-full p-6 md:p-10 animate-in fade-in duration-500 overflow-y-auto">
-      {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5 shrink-0">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+      {/* =====================================================================
+          1. TOP HEADER & SEGMENTED DRILL TRACKER
+          ===================================================================== */}
+      <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-1 capitalize">
-            {item.mechanic.replace(/_/g, " ")}
+          <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">
+            Cooldown Drill {currentIndex + 1} of {data.length}
+          </span>
+          <h2 className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-slate-900 capitalize">
+            {titleLabel}
           </h2>
-          <p className="text-gray-500 font-medium text-sm md:text-base">
-            Drill {currentIndex + 1} of {data.length}
-          </p>
         </div>
-        <div className="flex gap-2">
-          {data.map((_, idx) => (
-            <div
-              key={idx}
-              className={`h-2.5 w-8 rounded-full transition-colors ${
-                idx < currentIndex
-                  ? "bg-green-500"
-                  : idx === currentIndex
-                    ? "bg-indigo-500"
-                    : "bg-gray-200"
-              }`}
-            />
-          ))}
+
+        {/* Segmented Progress Pills */}
+        <div className="flex items-center gap-2">
+          {data.map((_, idx) => {
+            const isDone = idx < currentIndex;
+            const isCurrent = idx === currentIndex;
+            return (
+              <div
+                key={idx}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  isCurrent
+                    ? "w-10 bg-gradient-to-r from-sky-400 to-blue-600 shadow-2xs"
+                    : isDone
+                      ? "w-6 bg-emerald-500"
+                      : "w-6 bg-slate-200"
+                }`}
+              />
+            );
+          })}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full mb-6">
-        {/* Video Spotlight — Proper 16:9 Aspect Ratio & Better Height */}
+      {/* =====================================================================
+          2. MAIN DRILL STAGE
+          ===================================================================== */}
+      <div className="mx-auto my-auto flex w-full max-w-3xl flex-1 flex-col justify-center">
+        {/* Video Spotlight (16:9 Cinema Frame) */}
         {item.mechanic === "video_spotlight" && item.videoS3Key && (
-          <div className="mb-6 relative w-full aspect-video max-h-[340px] flex items-center justify-center overflow-hidden rounded-3xl bg-slate-950 shadow-lg border border-slate-800">
+          <div className="relative mb-6 flex aspect-video max-h-[300px] w-full items-center justify-center overflow-hidden rounded-3xl bg-slate-950 shadow-lg ring-1 ring-slate-200">
             {videoUrl ? (
               <video
                 key={item.videoS3Key}
@@ -278,32 +302,40 @@ export function CooldownStep({
                 className="h-full w-full object-contain"
               />
             ) : (
-              <div className="h-full w-full animate-pulse bg-slate-900 flex items-center justify-center text-slate-500 text-sm font-semibold">
+              <div className="flex h-full w-full animate-pulse items-center justify-center bg-slate-900 text-sm font-bold text-slate-400">
                 Loading video clip...
               </div>
             )}
           </div>
         )}
 
-        {/* Context & Instruction */}
-        <div className="bg-indigo-50/60 border border-indigo-100 p-5 md:p-6 rounded-2xl mb-6">
-          <p className="text-gray-700 text-base md:text-lg leading-relaxed font-medium mb-2">
-            {item.contextNative}
-          </p>
-          <p className="text-indigo-950 font-bold text-lg md:text-xl flex items-start md:items-center gap-2">
-            <AlertCircle size={20} className="text-indigo-600 shrink-0 mt-0.5 md:mt-0" />{" "}
-            <span>{item.instructionNative}</span>
-          </p>
+        {/* Context & Instruction Prompt Card */}
+        <div className="mb-6 flex items-start gap-4 rounded-3xl bg-slate-50 p-5 sm:p-6 ring-1 ring-slate-200/80">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-sm">
+            <Zap className="h-5 w-5 fill-current" />
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-sm sm:text-base font-semibold leading-relaxed text-slate-600">
+              {item.contextNative}
+            </p>
+            <p className="text-base sm:text-lg font-black text-slate-900">
+              {item.instructionNative}
+            </p>
+          </div>
         </div>
 
-        {/* Sentence Builder (variable_shift) */}
+        {/* =================================================================
+            A. SENTENCE BUILDER (variable_shift)
+            ================================================================= */}
         {isBuilder && (
           <>
-            <div className="mb-5 p-5 bg-white border border-gray-200 rounded-2xl text-center shadow-xs">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2.5">
-                Base Sentence (Tap any word to hear it)
+            {/* Base Sentence Card */}
+            <div className="mb-5 rounded-3xl border-2 border-slate-200/80 bg-white p-5 text-center shadow-xs">
+              <p className="mb-2.5 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                Base Sentence • Tap any word to hear
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
                 {(item.baseSentence ?? "")
                   .split(/\s+/)
                   .filter(Boolean)
@@ -312,26 +344,28 @@ export function CooldownStep({
                       <WordTap
                         key={i}
                         word={token}
-                        className="px-1.5 py-0.5 text-2xl font-bold text-gray-900"
+                        className="rounded-lg px-1.5 py-0.5 text-xl sm:text-2xl font-black text-slate-900 hover:bg-sky-50 hover:text-blue-600"
                       />
                     ) : (
                       <span
                         key={i}
-                        className="text-2xl font-bold text-gray-900"
+                        className="text-xl sm:text-2xl font-black text-slate-900"
                       >
                         {token}
                       </span>
                     )
                   )}
+
                 <button
+                  type="button"
                   onClick={() =>
                     speak(item.baseSentence, { each: true, track: true })
                   }
                   aria-label="Play full sentence"
-                  className={`ml-2 flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  className={`ml-2 flex h-10 w-10 items-center justify-center rounded-xl border-b-[3px] transition-all active:translate-y-0.5 active:border-b-0 ${
                     activeWord === item.baseSentence
-                      ? "bg-indigo-600 text-white"
-                      : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                      ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
+                      : "border-sky-200 bg-sky-50 text-blue-600 hover:bg-sky-100"
                   }`}
                 >
                   <Volume2 size={18} />
@@ -339,21 +373,22 @@ export function CooldownStep({
               </div>
             </div>
 
-            {/* Answer tray — Words in the exact right position turn GREEN! */}
+            {/* Answer Tray (Placed 3D Word Pills) */}
             <div
-              className={`mb-4 flex min-h-[82px] flex-wrap items-center gap-2.5 rounded-2xl border-2 border-dashed p-4 transition-colors ${
+              className={`mb-5 flex min-h-[84px] flex-wrap items-center gap-2.5 rounded-3xl border-2 border-dashed p-4 transition-colors ${
                 status === "correct"
-                  ? "border-green-400 bg-green-50/70"
+                  ? "border-emerald-400 bg-emerald-50/60"
                   : status === "incorrect"
-                    ? "border-red-300 bg-red-50/40"
-                    : "border-gray-300 bg-gray-50/80"
+                    ? "border-rose-300 bg-rose-50/40"
+                    : "border-slate-300 bg-slate-50/70"
               }`}
             >
               {placedWords.length === 0 && (
-                <span className="text-gray-400 font-medium w-full text-center">
-                  Tap the words below to build your sentence...
+                <span className="w-full text-center text-sm font-bold text-slate-400">
+                  Tap the 3D word tiles below to build your sentence...
                 </span>
               )}
+
               {selected.map((bankIndex, posIdx) => {
                 const word = bank[bankIndex];
                 const isRightSpot =
@@ -366,48 +401,45 @@ export function CooldownStep({
                 return (
                   <button
                     key={`${bankIndex}-${posIdx}`}
+                    type="button"
                     onClick={() => removeWord(bankIndex)}
                     disabled={status === "correct"}
                     title={
-                      isRightSpot
-                        ? "Correct position!"
-                        : "Tap to remove word"
+                      isRightSpot ? "Correct position!" : "Tap to remove word"
                     }
-                    className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-lg font-bold shadow-xs transition-all active:scale-95 disabled:cursor-default ${
+                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-base sm:text-lg font-black transition-all active:translate-y-0.5 active:border-b-2 disabled:cursor-default ${
                       isRightSpot
-                        ? "border-green-500 bg-green-100 text-green-900"
+                        ? "border-emerald-600 bg-gradient-to-b from-emerald-400 to-emerald-500 text-white shadow-sm"
                         : isWrongSpot
-                          ? "border-red-400 bg-red-100 text-red-900 hover:bg-red-200"
-                          : "border-indigo-300 bg-white text-indigo-900 hover:bg-indigo-50"
+                          ? "border-rose-600 bg-gradient-to-b from-rose-400 to-rose-500 text-white"
+                          : "border-blue-700 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm hover:brightness-105"
                     }`}
                   >
                     <span>{word}</span>
                     {isRightSpot && (
-                      <CheckCircle2
-                        size={16}
-                        className="text-green-600 shrink-0"
-                      />
+                      <Check size={16} className="shrink-0 stroke-[3]" />
                     )}
                   </button>
                 );
               })}
             </div>
 
-            {/* Word bank */}
+            {/* 3D Word Bank */}
             <div className="mb-6 flex flex-wrap justify-center gap-2.5">
               {bank.map((word, bankIndex) => {
                 const used = selected.includes(bankIndex);
                 return (
                   <button
                     key={bankIndex}
+                    type="button"
                     onClick={() => addWord(bankIndex)}
                     disabled={used || status === "correct"}
-                    className={`rounded-xl border-2 px-4 py-2.5 text-lg font-bold transition-all active:scale-95 ${
+                    className={`rounded-2xl border-2 border-b-4 px-4 py-2.5 text-base sm:text-lg font-black transition-all ${
                       used
-                        ? "cursor-not-allowed border-gray-100 bg-gray-100 text-transparent select-none"
+                        ? "cursor-not-allowed border-slate-200/60 bg-slate-100 text-transparent select-none"
                         : activeWord === word
-                          ? "border-indigo-400 bg-indigo-50 text-indigo-800 shadow-xs"
-                          : "border-gray-200 bg-white text-gray-800 shadow-xs hover:border-indigo-400 hover:bg-indigo-50"
+                          ? "-translate-y-0.5 border-blue-600 bg-sky-50 text-blue-800 shadow-sm"
+                          : "border-slate-200 border-b-slate-300 bg-white text-slate-800 shadow-2xs hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
                     }`}
                   >
                     {word}
@@ -416,24 +448,28 @@ export function CooldownStep({
               })}
             </div>
 
+            {/* Builder Actions: 3D Reset + 3D Check Answer */}
             {status !== "correct" && (
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => {
                     setSelected([]);
                     setStatus("idle");
                     setFeedbackMsg("");
                   }}
                   disabled={selected.length === 0}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-6 py-3.5 text-base font-bold text-gray-600 hover:bg-gray-200 active:scale-95 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-700 transition-all hover:bg-slate-50 active:translate-y-0.5 active:border-b-2 disabled:pointer-events-none disabled:opacity-40"
                 >
                   <RotateCcw size={16} />
-                  Reset
+                  <span>Reset</span>
                 </button>
+
                 <button
+                  type="button"
                   onClick={handleBuilderSubmit}
                   disabled={selected.length === 0}
-                  className="flex-1 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-lg shadow-md active:scale-95 disabled:opacity-50"
+                  className="flex-1 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-3.5 text-base font-black text-white shadow-md shadow-blue-500/20 transition-all hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-b-0 disabled:bg-slate-200 disabled:from-transparent disabled:to-transparent disabled:text-slate-400 disabled:shadow-none"
                 >
                   Check Answer
                 </button>
@@ -442,9 +478,11 @@ export function CooldownStep({
           </>
         )}
 
-        {/* Multiple Choice */}
+        {/* =================================================================
+            B. MULTIPLE CHOICE (3D Tactile Option Cards)
+            ================================================================= */}
         {isMultipleChoice && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {item.options?.map((opt: string, idx: number) => {
               const isSelectedCorrect =
                 status === "correct" && selectedMcOption === opt;
@@ -453,26 +491,31 @@ export function CooldownStep({
               return (
                 <button
                   key={idx}
+                  type="button"
                   disabled={status === "correct" || isTriedWrong}
                   onClick={() => handleMultipleChoiceGuess(opt)}
-                  className={`flex min-h-[76px] items-center justify-center gap-2 rounded-2xl border-2 p-4 text-center text-base font-bold leading-snug transition-all active:scale-95 sm:text-lg ${
+                  className={`flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-3xl border-2 border-b-[6px] p-5 text-center text-base sm:text-lg font-black leading-snug transition-all duration-150 ${
                     isSelectedCorrect
-                      ? "border-green-500 bg-green-100 text-green-900 shadow-sm"
+                      ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
                       : isTriedWrong
-                        ? "cursor-not-allowed border-red-300 bg-red-50 text-red-700 opacity-60"
+                        ? "cursor-not-allowed border-rose-300 bg-rose-50 text-rose-700 opacity-65"
                         : status === "correct"
-                          ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
+                          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
                           : activeWord === opt
-                            ? "border-indigo-400 bg-indigo-50 text-indigo-800 shadow-xs"
-                            : "border-gray-200 bg-white text-gray-800 shadow-xs hover:border-indigo-400 hover:bg-indigo-50"
+                            ? "-translate-y-0.5 border-blue-500 bg-sky-50 text-blue-900 shadow-md"
+                            : "border-slate-200 border-b-slate-300 bg-white text-slate-800 shadow-xs hover:-translate-y-1 hover:border-sky-400 hover:bg-sky-50/40 hover:shadow-md active:translate-y-0.5 active:border-b-2"
                   }`}
                 >
                   <span>{opt}</span>
                   {isSelectedCorrect && (
-                    <CheckCircle2 size={18} className="text-green-600 shrink-0" />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-black text-white">
+                      <CheckCircle2 size={14} /> Correct
+                    </span>
                   )}
                   {isTriedWrong && (
-                    <XCircle size={18} className="text-red-500 shrink-0" />
+                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-rose-600">
+                      <XCircle size={14} /> Try another
+                    </span>
                   )}
                 </button>
               );
@@ -481,31 +524,54 @@ export function CooldownStep({
         )}
       </div>
 
-      {/* Footer / Feedback */}
-      <div className="mt-auto min-h-[76px] flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-100 pt-5 shrink-0">
-        <div
-          className={`flex-1 font-bold text-base md:text-lg animate-in fade-in ${
-            status === "correct"
-              ? "text-green-600"
-              : status === "incorrect"
-                ? "text-red-500"
-                : "text-transparent select-none"
-          }`}
-        >
-          {feedbackMsg || "placeholder"}
+      {/* =====================================================================
+          3. ZERO-SHIFT FOOTER: FEEDBACK BAR + 3D NEXT BUTTON
+          ===================================================================== */}
+      <div className="mt-6 flex min-h-[80px] shrink-0 flex-col items-center justify-between gap-4 rounded-3xl bg-slate-50 p-4 sm:flex-row sm:px-6 ring-1 ring-slate-200/80">
+        <div className="flex items-center gap-3 text-center sm:text-left">
+          {status === "correct" ? (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs">
+              <Sparkles className="h-5 w-5" />
+            </div>
+          ) : status === "incorrect" ? (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+              <XCircle className="h-5 w-5" />
+            </div>
+          ) : null}
+
+          <p
+            className={`text-sm sm:text-base font-extrabold ${
+              status === "correct"
+                ? "text-emerald-800"
+                : status === "incorrect"
+                  ? "text-rose-700"
+                  : "text-slate-400"
+            }`}
+          >
+            {feedbackMsg ||
+              (isBuilder
+                ? "Build the adapted sentence above and check your answer."
+                : "Tap the matching option above to continue.")}
+          </p>
         </div>
 
         <button
+          type="button"
           onClick={handleNextQuestion}
           disabled={status !== "correct"}
-          className={`w-full sm:w-auto px-8 py-4 font-bold rounded-xl text-lg transition-all flex items-center justify-center gap-2 ${
+          className={`inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
             status === "correct"
-              ? "bg-gray-900 hover:bg-black text-white shadow-md active:scale-95"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+              : "cursor-not-allowed bg-slate-200/80 text-slate-400"
           }`}
         >
-          {currentIndex === data.length - 1 ? "Finish Cooldown" : "Next Drill"}{" "}
-          <ArrowRight size={20} />
+          {status !== "correct" && <Lock size={16} />}
+          <span>
+            {currentIndex === data.length - 1
+              ? "Finish Cooldown"
+              : "Next Drill"}
+          </span>
+          <ArrowRight size={18} />
         </button>
       </div>
     </div>
