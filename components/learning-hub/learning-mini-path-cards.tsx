@@ -1,6 +1,7 @@
 // learning-mini-path-cards.tsx
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Lock,
@@ -18,49 +19,49 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
-import { useState } from "react";
 
 type FocusState = LearningPath["currentFocus"];
 type Lesson = LearningPath["lessons"][number];
 
 const HARD_MODE_UNLOCK_SPOON = 30;
 
-// Tactile 3D Candy-Crush button styles for each step type
+// Unified 3-Color System:
+// - SPOON  = Primary Blue
+// - BRIDGE = Accent Amber
+// - BOSS   = Tertiary Purple
 const NODE_3D_STYLES = {
-  PRIMARY: {
+  SPOON: {
     active:
-      "bg-gradient-to-b from-sky-400 to-blue-600 border-b-[6px] border-blue-800 text-white shadow-[0_10px_20px_rgba(2,132,199,0.35),inset_0_2px_0_rgba(255,255,255,0.45)]",
-    done: "bg-gradient-to-b from-emerald-400 to-teal-600 border-b-[6px] border-teal-800 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28),inset_0_2px_0_rgba(255,255,255,0.4)]",
+      "bg-gradient-to-b from-sky-400 to-blue-600 border-b-[6px] border-blue-800 text-white shadow-[0_10px_20px_rgba(37,99,235,0.38),inset_0_2px_0_rgba(255,255,255,0.45)]",
+    done: "bg-gradient-to-b from-sky-400 to-blue-600 border-b-[6px] border-blue-800 text-white shadow-[0_6px_14px_rgba(37,99,235,0.25),inset_0_2px_0_rgba(255,255,255,0.4)]",
     locked:
-      "bg-gradient-to-b from-sky-100 to-sky-200/90 border-b-[6px] border-sky-300 text-sky-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.7)]",
-  },
-  SECONDARY: {
-    active:
-      "bg-gradient-to-b from-teal-400 to-emerald-600 border-b-[6px] border-emerald-800 text-white shadow-[0_10px_20px_rgba(16,185,129,0.35),inset_0_2px_0_rgba(255,255,255,0.45)]",
-    done: "bg-gradient-to-b from-emerald-400 to-teal-600 border-b-[6px] border-teal-800 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28),inset_0_2px_0_rgba(255,255,255,0.4)]",
-    locked:
-      "bg-gradient-to-b from-teal-100 to-emerald-200/90 border-b-[6px] border-teal-300 text-teal-800 shadow-[inset_0_2px_0_rgba(255,255,255,0.7)]",
-  },
-  TERTIARY: {
-    active:
-      "bg-gradient-to-b from-indigo-400 to-violet-600 border-b-[6px] border-violet-900 text-white shadow-[0_10px_20px_rgba(124,58,237,0.35),inset_0_2px_0_rgba(255,255,255,0.45)]",
-    done: "bg-gradient-to-b from-emerald-400 to-teal-600 border-b-[6px] border-teal-800 text-white shadow-[0_6px_14px_rgba(16,185,129,0.28),inset_0_2px_0_rgba(255,255,255,0.4)]",
-    locked:
-      "bg-gradient-to-b from-indigo-100 to-violet-200/90 border-b-[6px] border-indigo-300 text-indigo-800 shadow-[inset_0_2px_0_rgba(255,255,255,0.7)]",
+      "bg-gradient-to-b from-sky-100 to-blue-200/90 border-b-[6px] border-blue-300 text-blue-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)]",
+    pedestalActive: "bg-blue-400/70",
+    pedestalDone: "bg-blue-300/60",
+    pedestalLocked: "bg-blue-100",
+    labelColor: "text-blue-700",
   },
   BRIDGE: {
     active:
-      "bg-gradient-to-b from-amber-300 to-orange-500 border-b-[5px] border-orange-700 text-slate-950 shadow-[0_8px_18px_rgba(245,158,11,0.4),inset_0_2px_0_rgba(255,255,255,0.6)]",
-    done: "bg-gradient-to-b from-amber-300 to-amber-500 border-b-[5px] border-amber-700 text-white shadow-[0_4px_10px_rgba(245,158,11,0.25),inset_0_2px_0_rgba(255,255,255,0.45)]",
+      "bg-gradient-to-b from-amber-300 to-orange-500 border-b-[5px] border-orange-700 text-slate-950 shadow-[0_10px_20px_rgba(245,158,11,0.42),inset_0_2px_0_rgba(255,255,255,0.6)]",
+    done: "bg-gradient-to-b from-amber-400 to-orange-500 border-b-[5px] border-orange-700 text-white shadow-[0_6px_14px_rgba(245,158,11,0.28),inset_0_2px_0_rgba(255,255,255,0.45)]",
     locked:
-      "bg-gradient-to-b from-amber-100 to-amber-200/80 border-b-[5px] border-amber-300 text-amber-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.7)]",
+      "bg-gradient-to-b from-amber-100 to-amber-200/90 border-b-[5px] border-amber-300 text-amber-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)]",
+    pedestalActive: "bg-amber-400/70",
+    pedestalDone: "bg-amber-300/60",
+    pedestalLocked: "bg-amber-100",
+    labelColor: "text-amber-700",
   },
   BOSS: {
     active:
-      "bg-gradient-to-b from-fuchsia-500 via-purple-600 to-indigo-700 border-b-[7px] border-purple-950 text-white shadow-[0_12px_25px_rgba(192,38,211,0.45),inset_0_2px_0_rgba(255,255,255,0.45)]",
-    done: "bg-gradient-to-b from-amber-400 to-orange-500 border-b-[7px] border-orange-800 text-white",
+      "bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 border-b-[7px] border-purple-950 text-white shadow-[0_12px_24px_rgba(147,51,234,0.45),inset_0_2px_0_rgba(255,255,255,0.45)]",
+    done: "bg-gradient-to-b from-violet-500 to-purple-700 border-b-[7px] border-purple-950 text-white shadow-[0_6px_14px_rgba(147,51,234,0.3)]",
     locked:
-      "bg-gradient-to-b from-fuchsia-100 via-purple-100 to-amber-100 border-b-[7px] border-purple-300 text-fuchsia-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)]",
+      "bg-gradient-to-b from-violet-100 via-purple-100 to-fuchsia-100 border-b-[7px] border-purple-300 text-purple-700 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)]",
+    pedestalActive: "bg-purple-400/70",
+    pedestalDone: "bg-purple-300/60",
+    pedestalLocked: "bg-purple-100",
+    labelColor: "text-purple-700",
   },
 } as const;
 
@@ -111,15 +112,11 @@ export function LearningPathMiniCards({
     Math.round((completedSpoonsCount / HARD_MODE_UNLOCK_SPOON) * 100)
   );
 
-  const paletteKeys = ["PRIMARY", "SECONDARY", "TERTIARY"] as const;
-
   type MapNode = {
     id: string;
     kind: "SPOON" | "BRIDGE" | "BOSS";
     label: string;
     subLabel: string;
-    spoonNumber?: number;
-    paletteKey: keyof typeof NODE_3D_STYLES;
     isDone: boolean;
     isCurrent: boolean;
     href?: string;
@@ -147,14 +144,12 @@ export function LearningPathMiniCards({
     const isBridgeCurrent =
       currentFocus.type === "BRIDGE" && activeOrderIndex === spoonNum;
 
-    // 1. Spoon Node
+    // 1. Spoon Node (Always Primary Blue)
     mapNodes.push({
       id: `spoon-${spoonNum}`,
       kind: "SPOON",
       label: `${spoonNum}`,
       subLabel: `Spoon ${spoonNum}`,
-      spoonNumber: spoonNum,
-      paletteKey: paletteKeys[idx],
       isDone: spoonDone,
       isCurrent: isSpoonCurrent,
       href:
@@ -164,14 +159,12 @@ export function LearningPathMiniCards({
       yOffsetClass: waveOffsets[idx * 2],
     });
 
-    // 2. Bridge Node
+    // 2. Bridge Node (Always Accent Amber)
     mapNodes.push({
       id: `bridge-${spoonNum}`,
       kind: "BRIDGE",
       label: "⚡",
       subLabel: `Bridge ${spoonNum}`,
-      spoonNumber: spoonNum,
-      paletteKey: "BRIDGE",
       isDone: bridgeDone,
       isCurrent: isBridgeCurrent,
       href:
@@ -182,7 +175,7 @@ export function LearningPathMiniCards({
     });
   });
 
-  // 3. Finale Boss Node
+  // 3. Finale Boss Node (Always Tertiary Purple)
   const isBossCurrent = currentFocus.type === "BOSS";
   const bossLesson = lessons.find(
     (l) => l.orderIndex === unitSpoonNumbers[2]
@@ -192,7 +185,6 @@ export function LearningPathMiniCards({
     kind: "BOSS",
     label: `B${milestoneNum}`,
     subLabel: `Boss ${milestoneNum}`,
-    paletteKey: "BOSS",
     isDone: Boolean(bossLesson?.bossStage?.passed),
     isCurrent: isBossCurrent,
     href:
@@ -216,19 +208,37 @@ export function LearningPathMiniCards({
   return (
     <div className="overflow-hidden rounded-[2rem] bg-white p-6 sm:p-7 shadow-sm ring-1 ring-slate-200/70 space-y-6">
       {/* =====================================================================
-          1. TOP HEADER: UNIT MILESTONE + SPOON 30 HARD MODE UNLOCK PILL
+          1. TOP HEADER + COLOR LEGEND + HARD MODE UNLOCK PILL
           ===================================================================== */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-teal-400 to-emerald-500 text-white shadow-sm">
+          <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm">
             <Sparkles className="h-4 w-4" />
           </span>
           <div>
-            <h3 className="text-xs font-black tracking-wider text-slate-900 uppercase">
-              Unit {milestoneNum} Adventure Map
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xs font-black tracking-wider text-slate-900 uppercase">
+                Unit {milestoneNum} Adventure Map
+              </h3>
+              {/* Mini Color Legend */}
+              <div className="hidden sm:flex items-center gap-2.5 text-[10px] font-extrabold">
+                <span className="inline-flex items-center gap-1 text-blue-600">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  Spoon
+                </span>
+                <span className="inline-flex items-center gap-1 text-amber-600">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  Vocab
+                </span>
+                <span className="inline-flex items-center gap-1 text-purple-600">
+                  <span className="h-2 w-2 rounded-full bg-purple-500" />
+                  Boss
+                </span>
+              </div>
+            </div>
             <p className="text-[11px] font-semibold text-slate-400">
-              Follow the stepping stones in order to challenge Boss {milestoneNum}
+              Complete each blue Spoon &amp; amber Vocab Bridge to unlock Boss{" "}
+              {milestoneNum}
             </p>
           </div>
         </div>
@@ -237,27 +247,27 @@ export function LearningPathMiniCards({
         <div
           className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-black ring-1 transition ${
             hardModeUnlocked
-              ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white ring-orange-400 shadow-sm"
+              ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white ring-purple-400 shadow-sm"
               : "bg-slate-50 text-slate-600 ring-slate-200/80"
           }`}
-          title="Unlock Hard Mode Gauntlet (IV, V, VI) at Spoon 30!"
+          title="Unlock Hard Mode Gauntlet at Spoon 30!"
         >
           <Flame
             className={`h-3.5 w-3.5 ${
               hardModeUnlocked
-                ? "fill-amber-200 text-amber-200"
-                : "fill-orange-400 text-orange-500"
+                ? "fill-amber-300 text-amber-300"
+                : "fill-amber-400 text-amber-500"
             }`}
           />
           <span>
             {hardModeUnlocked
-              ? "Hard Mode Gauntlet Unlocked!"
+              ? "Hard Mode Unlocked!"
               : `Hard Mode: ${completedSpoonsCount}/${HARD_MODE_UNLOCK_SPOON} Spoons`}
           </span>
           {!hardModeUnlocked && (
             <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-500"
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 via-amber-400 to-purple-600"
                 style={{ width: `${hardModePct}%` }}
               />
             </div>
@@ -268,11 +278,11 @@ export function LearningPathMiniCards({
       {/* =====================================================================
           2. CANDY-CRUSH 3D STEPPING-STONE VISUAL MAP
           ===================================================================== */}
-      <div className="relative rounded-3xl bg-gradient-to-b from-sky-50/50 via-indigo-50/20 to-emerald-50/30 px-4 pt-10 pb-7 ring-1 ring-slate-100 overflow-x-auto">
+      <div className="relative rounded-3xl bg-gradient-to-b from-slate-50/90 via-sky-50/25 to-purple-50/20 px-4 pt-10 pb-7 ring-1 ring-slate-100 overflow-x-auto">
         {/* Background connecting path track */}
         <div className="pointer-events-none absolute top-[48%] right-12 left-12 h-2.5 -translate-y-1/2 rounded-full bg-slate-200/80 shadow-inner">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400 transition-all duration-700"
+            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-amber-400 to-purple-500 transition-all duration-700"
             style={{ width: `${trackProgressPct}%` }}
           />
         </div>
@@ -280,12 +290,18 @@ export function LearningPathMiniCards({
         {/* 7 Stepping-Stone 3D Buttons */}
         <div className="relative z-10 flex min-w-[540px] items-center justify-between px-2">
           {mapNodes.map((node) => {
-            const styles = NODE_3D_STYLES[node.paletteKey];
+            const styles = NODE_3D_STYLES[node.kind];
             const buttonStyle = node.isCurrent
               ? styles.active
               : node.isDone
                 ? styles.done
                 : styles.locked;
+
+            const pedestalColor = node.isCurrent
+              ? styles.pedestalActive
+              : node.isDone
+                ? styles.pedestalDone
+                : styles.pedestalLocked;
 
             const isBridge = node.kind === "BRIDGE";
             const isBoss = node.kind === "BOSS";
@@ -300,7 +316,15 @@ export function LearningPathMiniCards({
               <>
                 {/* Glow Halo behind active button */}
                 {node.isCurrent && (
-                  <span className="pointer-events-none absolute -inset-2 animate-pulse rounded-3xl bg-sky-400/25 blur-md" />
+                  <span
+                    className={`pointer-events-none absolute -inset-2 animate-pulse rounded-3xl blur-md ${
+                      isBoss
+                        ? "bg-purple-400/30"
+                        : isBridge
+                          ? "bg-amber-400/35"
+                          : "bg-blue-400/30"
+                    }`}
+                  />
                 )}
 
                 {/* 3D Tactile Candy-Crush Pillar Button */}
@@ -311,9 +335,7 @@ export function LearningPathMiniCards({
                       : ""
                   }`}
                 >
-                  {node.isDone ? (
-                    <Check className="h-6 w-6 stroke-[3]" />
-                  ) : isBoss ? (
+                  {isBoss ? (
                     <div className="flex flex-col items-center leading-none">
                       <Crown className="mb-0.5 h-4 w-4 fill-amber-300 text-amber-300" />
                       <Swords className="h-5 w-5" />
@@ -324,12 +346,16 @@ export function LearningPathMiniCards({
                     <span>{node.label}</span>
                   )}
 
-                  {/* Tiny corner lock badge for upcoming steps */}
-                  {!node.isDone && !node.isCurrent && (
+                  {/* Corner Badge: Green Check if Completed, Lock if Upcoming */}
+                  {node.isDone ? (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs ring-2 ring-white">
+                      <Check className="h-3 w-3 stroke-[3.5]" />
+                    </span>
+                  ) : !node.isCurrent ? (
                     <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-400 shadow-xs ring-1 ring-slate-200">
                       <Lock className="h-2.5 w-2.5" />
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* 3D Ground Pedestal Base Shadow */}
@@ -340,13 +366,7 @@ export function LearningPathMiniCards({
                       : isBridge
                         ? "h-2 w-9"
                         : "h-2.5 w-12"
-                  } ${
-                    node.isCurrent
-                      ? "bg-sky-300/70"
-                      : node.isDone
-                        ? "bg-emerald-300/60"
-                        : "bg-slate-200/90"
-                  }`}
+                  } ${pedestalColor}`}
                 />
 
                 {/* Node Label Below Pedestal */}
@@ -354,9 +374,7 @@ export function LearningPathMiniCards({
                   className={`mt-1.5 text-[10px] font-extrabold tracking-tight ${
                     node.isCurrent
                       ? "font-black text-slate-900"
-                      : node.isDone
-                        ? "text-emerald-700"
-                        : "text-slate-400"
+                      : styles.labelColor
                   }`}
                 >
                   {node.subLabel}
@@ -395,7 +413,7 @@ export function LearningPathMiniCards({
       </div>
 
       {/* =====================================================================
-          3. WIDE MILESTONE & "UP NEXT" BANNER
+          3. WIDE MILESTONE & "UP NEXT" BANNER (Color-Matched to Type!)
           ===================================================================== */}
       {nextLocked && (
         <UpNextWideBanner
@@ -437,14 +455,48 @@ function UpNextWideBanner({
       ? `Spoon ${lesson.orderIndex}`
       : type === "BRIDGE"
         ? `Vocab Bridge ${lesson.orderIndex}`
-        : `Milestone ${milestoneNum} Finale`;
+        : `Boss ${milestoneNum}`;
+
+  // Color-match the Up Next Banner to the exact category color:
+  // BRIDGE = Amber, SPOON = Blue, BOSS = Purple
+  const bannerStyles =
+    type === "BRIDGE"
+      ? {
+          container: "bg-amber-50/75 ring-amber-200/80",
+          iconBox:
+            "border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950",
+          label: "text-amber-700",
+          badge: "bg-amber-100 text-amber-900",
+          lockIcon: "text-amber-500",
+        }
+      : type === "BOSS"
+        ? {
+            container: "bg-purple-50/75 ring-purple-200/80",
+            iconBox:
+              "border-b-4 border-purple-900 bg-gradient-to-b from-violet-500 to-purple-700 text-white",
+            label: "text-purple-700",
+            badge: "bg-purple-100 text-purple-900",
+            lockIcon: "text-purple-500",
+          }
+        : {
+            container: "bg-sky-50/75 ring-sky-200/80",
+            iconBox:
+              "border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white",
+            label: "text-blue-700",
+            badge: "bg-sky-100 text-blue-900",
+            lockIcon: "text-blue-500",
+          };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-50/90 via-sky-50/60 to-violet-50/70 p-4 sm:px-5 ring-1 ring-amber-200/70">
+    <div
+      className={`relative overflow-hidden rounded-2xl p-4 sm:px-5 ring-1 ${bannerStyles.container}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3.5">
           {/* 3D Mini Icon Button */}
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-4 border-amber-600 bg-gradient-to-b from-amber-300 to-orange-500 text-white shadow-sm">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm ${bannerStyles.iconBox}`}
+          >
             {type === "BRIDGE" ? (
               <Zap className="h-5 w-5 fill-current" />
             ) : type === "BOSS" ? (
@@ -456,10 +508,14 @@ function UpNextWideBanner({
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-black tracking-wider text-amber-700 uppercase">
+              <span
+                className={`text-[10px] font-black tracking-wider uppercase ${bannerStyles.label}`}
+              >
                 Next on Map
               </span>
-              <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-black text-slate-700 uppercase shadow-2xs">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${bannerStyles.badge}`}
+              >
                 {badge}
               </span>
             </div>
@@ -471,7 +527,7 @@ function UpNextWideBanner({
 
         <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-slate-600 shadow-xs ring-1 ring-slate-200/80">
-            <Lock className="h-3.5 w-3.5 text-amber-500" />
+            <Lock className={`h-3.5 w-3.5 ${bannerStyles.lockIcon}`} />
             <span>Unlocks Next</span>
             <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
           </span>
@@ -483,8 +539,10 @@ function UpNextWideBanner({
 
 /* ============================================================================
    SLIM PAST SPOONS & VOCAB LIST (Placed under WordMatrixCard in Right Column!)
+   - All Spoon # Badges = Primary Blue (matches Spoon nodes on map!)
+   - All Vocab Words   = Accent Amber pills (matches Bridge nodes on map!)
+   - Magic Wand Button = Tertiary Purple
    ============================================================================ */
-// 2. Replace PastSpoonsVocabSlimList at the bottom of learning-mini-path-cards.tsx with this:
 export function PastSpoonsVocabSlimList({
   courseId,
   lessons = [],
@@ -520,20 +578,13 @@ export function PastSpoonsVocabSlimList({
       ? getLessonHref(lessonId)
       : `/foundation/${lessonId}/${courseId}`;
 
-  const pillColors = [
-    "from-sky-400 to-blue-600 border-blue-800",
-    "from-teal-400 to-emerald-600 border-emerald-800",
-    "from-indigo-400 to-violet-600 border-violet-800",
-    "from-amber-400 to-orange-500 border-orange-700",
-  ];
-
   return (
     <div className="flex flex-1 flex-col justify-between overflow-hidden rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
       {/* Header + Prev / Next Cycle Controls */}
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
-            <Wand2 className="h-3.5 w-3.5" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-100 text-blue-600">
+            <Headphones className="h-3.5 w-3.5" />
           </span>
           <h3 className="text-xs font-black tracking-wider text-slate-800 uppercase">
             Past Spoons &amp; Vocab
@@ -567,8 +618,8 @@ export function PastSpoonsVocabSlimList({
       </div>
 
       {/* 3-Item List (Sits Flush with Left Column!) */}
-      <div className="divide-y divide-slate-100 my-auto">
-        {visibleLessons.map((lesson, idx) => {
+      <div className="my-auto divide-y divide-slate-100">
+        {visibleLessons.map((lesson) => {
           const title =
             displayTitles?.get(lesson.id) ||
             lesson.title ||
@@ -580,18 +631,14 @@ export function PastSpoonsVocabSlimList({
               gloss?: string;
             }>) ?? [];
 
-          const colorIdx = (safePage * PAGE_SIZE + idx) % pillColors.length;
-
           return (
             <div
               key={lesson.id}
               className="flex items-center justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
             >
-              {/* Left: 3D Mini Number Pill + Title + Vocab Words */}
+              {/* Left: Primary Blue 3D Spoon Pill + Title + Accent Amber Vocab Tags */}
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] bg-gradient-to-b text-xs font-black text-white shadow-2xs ${pillColors[colorIdx]}`}
-                >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white shadow-2xs">
                   #{lesson.orderIndex}
                 </div>
 
@@ -600,12 +647,17 @@ export function PastSpoonsVocabSlimList({
                     {title}
                   </p>
                   {vocabItems.length > 0 ? (
-                    <p className="truncate text-[11px] font-semibold text-slate-400">
-                      {vocabItems
-                        .slice(0, 3)
-                        .map((v) => v.word)
-                        .join(" · ")}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {vocabItems.slice(0, 3).map((v, vIdx) => (
+                        <span
+                          key={vIdx}
+                          className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-0.2 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200/80"
+                        >
+                          <Zap className="h-2.5 w-2.5 fill-amber-400 text-amber-500" />
+                          {v.word}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
                     <p className="text-[11px] font-medium text-slate-400">
                       Completed Spoon
@@ -618,7 +670,7 @@ export function PastSpoonsVocabSlimList({
               <div className="flex shrink-0 items-center gap-1.5">
                 <Link
                   href={resolveLessonHref(lesson.id)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1.5 text-[11px] font-extrabold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
+                  className="inline-flex items-center gap-1 rounded-xl bg-sky-50 px-2.5 py-1.5 text-[11px] font-extrabold text-blue-700 ring-1 ring-sky-200/80 transition hover:bg-sky-100"
                   title="Replay this Spoon"
                 >
                   <RotateCcw className="h-3 w-3" />
@@ -628,7 +680,7 @@ export function PastSpoonsVocabSlimList({
                 <button
                   type="button"
                   onClick={() => onLaunchSpriteExercise?.(lesson)}
-                  className="inline-flex items-center gap-1 rounded-xl border-b-2 border-violet-800 bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2.5 py-1.5 text-[11px] font-black text-white shadow-2xs transition hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                  className="inline-flex items-center gap-1 rounded-xl border-b-2 border-purple-900 bg-gradient-to-b from-violet-500 to-purple-700 px-2.5 py-1.5 text-[11px] font-black text-white shadow-2xs transition hover:brightness-110 active:translate-y-0.5 active:border-b-0"
                   title="Spend 1 ⚡ Charge to launch a custom Sprite Exercise with this Spoon's vocab!"
                 >
                   <Wand2 className="h-3 w-3" />
