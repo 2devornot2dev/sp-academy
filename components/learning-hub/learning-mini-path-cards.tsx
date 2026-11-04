@@ -1,3 +1,4 @@
+// learning-mini-path-cards.tsx
 "use client";
 
 import Link from "next/link";
@@ -8,46 +9,29 @@ import {
   Swords,
   Zap,
   Headphones,
-  Loader2,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 
 type FocusState = LearningPath["currentFocus"];
 type Lesson = LearningPath["lessons"][number];
 
-const ACTIVE_THEMES = {
+const LOCKED_THEMES = {
   SPOON: {
-    containerReady:
-      "border-indigo-200/80 bg-white/90 hover:border-indigo-300 hover:bg-white hover:shadow-md hover:shadow-indigo-900/5",
-    containerBuilding: "cursor-wait border-indigo-100 bg-white/75",
     badge: "bg-indigo-100 text-indigo-700",
-    statusReady: "text-indigo-600",
-    statusBuilding: "text-indigo-500",
-    titleHover: "group-hover:text-indigo-600",
-    buttonHover: "group-hover:bg-indigo-600 group-hover:text-white",
-    icon: "text-indigo-300",
+    text: "text-indigo-600",
+    icon: <Headphones className="h-4 w-4 text-indigo-500" />,
   },
   BRIDGE: {
-    containerReady:
-      "border-amber-200/80 bg-white/90 hover:border-amber-400 hover:bg-white hover:shadow-md hover:shadow-amber-900/5",
-    containerBuilding: "cursor-wait border-amber-100 bg-white/75",
     badge: "bg-amber-100 text-amber-800",
-    statusReady: "text-amber-600",
-    statusBuilding: "text-amber-500",
-    titleHover: "group-hover:text-amber-600",
-    buttonHover: "group-hover:bg-amber-500 group-hover:text-white",
-    icon: "text-amber-300",
+    text: "text-amber-700",
+    icon: <Zap className="h-4 w-4 text-amber-500" />,
   },
   BOSS: {
-    containerReady:
-      "border-fuchsia-200/80 bg-white/90 hover:border-fuchsia-400 hover:bg-white hover:shadow-md hover:shadow-fuchsia-900/5",
-    containerBuilding: "cursor-wait border-fuchsia-100 bg-white/75",
     badge: "bg-fuchsia-100 text-fuchsia-700",
-    statusReady: "text-fuchsia-600",
-    statusBuilding: "text-fuchsia-500",
-    titleHover: "group-hover:text-fuchsia-600",
-    buttonHover: "group-hover:bg-fuchsia-600 group-hover:text-white",
-    icon: "text-fuchsia-300",
+    text: "text-fuchsia-600",
+    icon: <Swords className="h-4 w-4 text-fuchsia-500" />,
   },
 } as const;
 
@@ -55,12 +39,13 @@ export function LearningPathMiniCards({
   courseId,
   currentFocus,
   nextLocked,
+  lessons = [],
   getLessonHref,
-  getBossHref,
 }: {
   courseId: string;
   currentFocus: FocusState;
   nextLocked: FocusState;
+  lessons?: Lesson[];
   getLessonHref?: (lessonId: string) => string;
   getBossHref?: (bossId: string, lessonId: string) => string;
 }) {
@@ -71,192 +56,187 @@ export function LearningPathMiniCards({
       ? getLessonHref(lessonId)
       : `/foundation/${lessonId}/${courseId}`;
 
-  const resolveBossHref = (bossId: string, lessonId: string) =>
-    getBossHref
-      ? getBossHref(bossId, lessonId)
-      : `/foundation/boss/${bossId}`;
+  const activeOrderIndex = currentFocus.data.orderIndex ?? 1;
+  const milestoneNum = Math.ceil(activeOrderIndex / 3);
+  const unitStartOrder = (milestoneNum - 1) * 3 + 1;
+  const unitSpoonNumbers = [
+    unitStartOrder,
+    unitStartOrder + 1,
+    unitStartOrder + 2,
+  ];
 
-  const headerDotColor =
-    currentFocus.type === "BOSS"
-      ? "bg-fuchsia-500"
-      : currentFocus.type === "BRIDGE"
-        ? "bg-amber-500"
-        : "bg-indigo-500";
+  // Get up to 3 most recently completed lessons for quick review
+  const recentCompleted = lessons
+    .filter((l) => Boolean(l.completedAt))
+    .slice(-3)
+    .reverse();
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${headerDotColor}`} />
-          <h3 className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">
-            Current Unit Progression
-          </h3>
+    <div className="space-y-6">
+      {/* =====================================================================
+          1. UNIT MILESTONE ROADMAP (Replaces the duplicate Active Step card!)
+          ===================================================================== */}
+      <div className="rounded-3xl bg-white p-5 sm:p-6 shadow-sm ring-1 ring-slate-200/70">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+              <Sparkles className="h-3.5 w-3.5" />
+            </span>
+            <h3 className="text-xs font-extrabold tracking-wider text-slate-700 uppercase">
+              Unit {milestoneNum} Boss Roadmap
+            </h3>
+          </div>
+          <span className="text-xs font-semibold text-slate-400">
+            Complete 3 Spoons &amp; Bridges to unlock the Unit {milestoneNum} Boss
+          </span>
         </div>
-        <span className="text-xs font-semibold text-slate-400">
-          Complete current step to unlock next
-        </span>
+
+        {/* 4-Node Unit Stepper: Spoon A -> Spoon B -> Spoon C -> Boss */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {unitSpoonNumbers.map((spoonNum) => {
+            const matchedLesson = lessons.find(
+              (l) => l.orderIndex === spoonNum
+            );
+            const isFullyDone =
+              Boolean(matchedLesson?.completedAt) &&
+              Boolean(matchedLesson?.bridge?.completedAt);
+            const isCurrent = activeOrderIndex === spoonNum;
+
+            return (
+              <div
+                key={spoonNum}
+                className={`flex items-center gap-3 rounded-2xl p-3 transition-all ${
+                  isCurrent
+                    ? "bg-indigo-50/90 ring-2 ring-indigo-500/80 shadow-2xs"
+                    : isFullyDone
+                      ? "bg-emerald-50/60 ring-1 ring-emerald-200"
+                      : "bg-slate-50 ring-1 ring-slate-200/60 opacity-75"
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+                    isCurrent
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : isFullyDone
+                        ? "bg-emerald-500 text-white"
+                        : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  {isFullyDone ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    spoonNum
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Spoon {spoonNum}
+                  </p>
+                  <p className="truncate text-xs font-bold text-slate-800">
+                    {isCurrent
+                      ? currentFocus.type === "BRIDGE"
+                        ? "Vocab Bridge"
+                        : "In Progress"
+                      : isFullyDone
+                        ? "Completed"
+                        : "Locked"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Node 4: Milestone Boss */}
+          <div
+            className={`flex items-center gap-3 rounded-2xl p-3 ${
+              currentFocus.type === "BOSS"
+                ? "bg-fuchsia-50 ring-2 ring-fuchsia-500"
+                : "bg-slate-50 ring-1 ring-slate-200/60 opacity-75"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                currentFocus.type === "BOSS"
+                  ? "bg-fuchsia-600 text-white"
+                  : "bg-slate-200 text-slate-500"
+              }`}
+            >
+              <Swords className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-extrabold tracking-wider text-fuchsia-600 uppercase">
+                Milestone {milestoneNum}
+              </p>
+              <p className="truncate text-xs font-bold text-slate-800">
+                Boss Arena
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Up Next Locked Preview Row */}
+        {nextLocked && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <UpNextCompactTile
+              type={nextLocked.type}
+              lesson={nextLocked.data}
+            />
+          </div>
+        )}
       </div>
 
-      <section className="flex flex-col gap-3">
-        <ActiveStepTile
-          focus={currentFocus}
-          resolveLessonHref={resolveLessonHref}
-          resolveBossHref={resolveBossHref}
-        />
+      {/* =====================================================================
+          2. RECENTLY COMPLETED SPOONS (Quick Practice / Replay Strip)
+          ===================================================================== */}
+      {recentCompleted.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">
+              Recently Mastered • Quick Replay
+            </h3>
+            <span className="text-xs font-semibold text-slate-400">
+              Tap any past lesson to review audio
+            </span>
+          </div>
 
-        {nextLocked && (
-          <UpNextCompactTile
-            type={nextLocked.type}
-            lesson={nextLocked.data}
-          />
-        )}
-      </section>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {recentCompleted.map((lesson) => (
+              <Link
+                key={lesson.id}
+                href={resolveLessonHref(lesson.id)}
+                className="group flex items-center gap-3.5 rounded-2xl bg-white p-3 shadow-2xs ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-indigo-300"
+              >
+                <div className="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-900">
+                  {lesson.imageUrl ? (
+                    <img
+                      src={lesson.imageUrl}
+                      alt={lesson.title ?? "Lesson Image"}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
+                  ) : null}
+                  <div className="absolute top-1 left-1 rounded bg-emerald-500 px-1.5 py-0.2 text-[9px] font-black text-white">
+                    #{lesson.orderIndex}
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-black text-slate-800 group-hover:text-indigo-600">
+                    {lesson.title || `Spoon ${lesson.orderIndex}`}
+                  </p>
+                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-indigo-500">
+                    <RotateCcw className="h-3 w-3" />
+                    Replay Lesson
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-function ActiveStepTile({
-  focus,
-  resolveLessonHref,
-  resolveBossHref,
-}: {
-  focus: NonNullable<FocusState>;
-  resolveLessonHref: (id: string) => string;
-  resolveBossHref: (bossId: string, lessonId: string) => string;
-}) {
-  const { type, data: lesson } = focus;
-  const bossStage = lesson.bossStage;
-  const bossData = bossStage?.scenarioData?.boss;
-  const theme = ACTIVE_THEMES[type];
-
-  const isBuilding =
-    (type === "SPOON" && !lesson.title && !lesson.imageUrl) ||
-    (type === "BRIDGE" && !lesson.bridge) ||
-    (type === "BOSS" && (!bossStage || bossStage.status === "BUILDING"));
-
-  const href = isBuilding
-    ? "#"
-    : type === "BOSS" && bossStage
-      ? resolveBossHref(bossStage.id, lesson.id)
-      : type === "BRIDGE" && lesson.bridge
-        ? `/foundation/vocab/${lesson.bridge.id}`
-        : resolveLessonHref(lesson.id);
-
-  const thumbUrl =
-    type === "BOSS"
-      ? bossStage?.avatarUrl || bossStage?.coverUrl || lesson.imageUrl
-      : lesson.imageUrl;
-
-  const badgeLabel =
-    type === "BOSS"
-      ? `Milestone ${bossStage?.milestoneIndex ?? Math.ceil(lesson.orderIndex / 3)}`
-      : type === "BRIDGE"
-        ? `Vocab Bridge ${lesson.orderIndex}`
-        : `Spoon ${lesson.orderIndex}`;
-
-  const title = isBuilding
-    ? `Generating ${badgeLabel}...`
-    : type === "BOSS"
-      ? bossData?.name || "AI Boss Checkpoint"
-      : lesson.title || `Spoon ${lesson.orderIndex}`;
-
-  const startSpoon = Math.max(1, lesson.orderIndex - 2);
-
-  return (
-    <Link
-      href={href}
-      onClick={(e) => {
-        if (isBuilding) e.preventDefault();
-      }}
-      className={`group relative flex overflow-hidden rounded-2xl border shadow-sm backdrop-blur-md transition-all ${
-        isBuilding ? theme.containerBuilding : theme.containerReady
-      }`}
-    >
-      <div className="relative w-32 shrink-0 bg-slate-900 sm:w-40">
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={title}
-            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            {isBuilding ? (
-              <Loader2 className={`h-6 w-6 animate-spin ${theme.icon}`} />
-            ) : type === "BOSS" ? (
-              <Swords className={`h-6 w-6 ${theme.icon}`} />
-            ) : type === "BRIDGE" ? (
-              <Zap className={`h-6 w-6 ${theme.icon}`} />
-            ) : (
-              <Headphones className={`h-6 w-6 ${theme.icon}`} />
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 items-center gap-4 p-5">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide ${theme.badge}`}
-            >
-              {badgeLabel}
-            </span>
-            <span
-              className={`text-xs font-bold ${
-                isBuilding ? theme.statusBuilding : theme.statusReady
-              }`}
-            >
-              • {isBuilding ? "Building..." : "Active Focus"}
-            </span>
-          </div>
-
-          <h4
-            className={`mt-1.5 truncate text-base font-black text-slate-900 transition-colors ${theme.titleHover}`}
-          >
-            {title}
-          </h4>
-
-          {type === "BOSS" ? (
-            <div className="mt-1.5 flex items-center gap-2">
-              {[startSpoon, startSpoon + 1, lesson.orderIndex].map((num) => (
-                <span
-                  key={num}
-                  className="inline-flex items-center gap-0.5 text-[11px] font-bold text-slate-500"
-                >
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                  Spoon {num}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-0.5 truncate text-sm text-slate-500">
-              {isBuilding
-                ? "Preparing audio & visual assets..."
-                : "Continue active step"}
-            </p>
-          )}
-        </div>
-
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition ${theme.buttonHover}`}
-        >
-          {isBuilding ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <ArrowRight className="h-5 w-5" />
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-const LOCKED_THEMES = {
-  SPOON: "text-indigo-500/80",
-  BRIDGE: "text-amber-600/80",
-  BOSS: "text-fuchsia-500/80",
-} as const;
 
 function UpNextCompactTile({
   type,
@@ -265,12 +245,14 @@ function UpNextCompactTile({
   type: "SPOON" | "BRIDGE" | "BOSS";
   lesson: Lesson;
 }) {
+  const theme = LOCKED_THEMES[type];
+
   const title =
     type === "SPOON"
       ? lesson.title || `Spoon ${lesson.orderIndex}`
       : type === "BRIDGE"
         ? lesson.title
-          ? `Review: ${lesson.title}`
+          ? `Vocab Bridge: ${lesson.title}`
           : `Vocab Checkpoint ${lesson.orderIndex}`
         : lesson.bossStage?.scenarioData?.boss?.name ||
           `Milestone ${Math.ceil(lesson.orderIndex / 3)} Boss`;
@@ -280,47 +262,36 @@ function UpNextCompactTile({
       ? `Spoon ${lesson.orderIndex}`
       : type === "BRIDGE"
         ? `Vocab Bridge ${lesson.orderIndex}`
-        : `Boss Checkpoint`;
-
-  const thumbUrl =
-    type === "BOSS"
-      ? lesson.bossStage?.avatarUrl ||
-        lesson.bossStage?.coverUrl ||
-        lesson.imageUrl
-      : lesson.imageUrl;
+        : `Boss Stage`;
 
   return (
-    <div className="flex overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-200/45">
-      <div className="relative w-24 shrink-0 bg-slate-200 sm:w-28">
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={lesson.imageAlt ?? ""}
-            className="absolute inset-0 h-full w-full object-cover opacity-60 saturate-[0.2]"
-          />
-        ) : null}
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/35">
-          <Lock className="h-5 w-5 text-white/90" />
+    <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-2xs ring-1 ring-slate-200">
+          <Lock className="h-4 w-4 text-slate-400" />
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+              Up Next
+            </span>
+            <span
+              className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase ${theme.badge}`}
+            >
+              {badge}
+            </span>
+          </div>
+          <h4 className="mt-0.5 truncate text-sm font-bold text-slate-700">
+            {title}
+          </h4>
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center p-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-extrabold uppercase tracking-wider ${LOCKED_THEMES[type]}`}
-            >
-              Locked • {badge}
-            </span>
-          </div>
-          <h4 className="mt-0.5 truncate text-sm font-bold text-slate-600">
-            {title}
-          </h4>
-          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-400">
-            Unlocks automatically after current step
-          </p>
-        </div>
-      </div>
+      <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-slate-400 ring-1 ring-slate-200/70">
+        Unlocks Next
+        <ArrowRight className="h-3 w-3" />
+      </span>
     </div>
   );
 }

@@ -122,28 +122,56 @@ model SpriteExercise {
   @@index([spriteProfileId, createdAt(sort: Desc)])
 }
 
+enum SpoonBookCategory {
+  SPOON_ORIGINALS   // Official series starring Q-to, Billy from The Trap, Momentum Man
+  STANDALONE        // Random / one-off graded readers
+  USER_CUSTOM       // User-generated avatar books (createUserBookAvatar)
+}
+
+model BookCharacter {
+  id          String      @id @default(cuid())
+  slug        String      @unique // "q-to" | "billy-the-trap" | "momentum-man"
+  name        String      // "Q-to" | "Billy" | "Momentum Man"
+  seriesTitle String?     // "Chronicles of Pluto" | "The Trap" | "Momentum Universe"
+  avatarUrl   String      // Canonical Cloudinary reference image
+  description String      // Canonical prompt description for Nano Banana consistency!
+  accentColor String?     // e.g. "violet" | "amber" | "sky"
+
+  books       SpoonBook[]
+  createdAt   DateTime    @default(now())
+}
+
 model SpoonBook {
-  id                 String   @id @default(cuid())
-  slug               String   @unique // e.g. "the-midnight-ticket"
+  id                 String            @id @default(cuid())
+  slug               String            @unique
+  
+  // 🟢 NEW: Categorization & Series Ordering
+  category           SpoonBookCategory @default(SPOON_ORIGINALS)
+  episodeNumber      Int?              // e.g. Episode 1, 2, 3 for a character's series!
+  
+  // 🟢 NEW: Optional link to canonical BookCharacter (Q-to, Billy, Momentum Man)
+  characterId        String?
+  character          BookCharacter?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  // Kept on SpoonBook so existing code & custom user books still work seamlessly!
   characterName      String
-  characterAvatarUrl String   // Cloudinary reference avatar URL
-  levelBand          String   @default("beginner")
-  genre              String   @default("story")
+  characterAvatarUrl String
+  levelBand          String            @default("beginner")
+  genre              String            @default("story")
 
   coverImageS3Key    String
   introVideoS3Key    String?
-
-  // S3 keys for the 5 shared page illustrations: ["books/.../page_1.png", ...]
   pageImageS3Keys    String[]
-
-  // Keyed by locale ("fr-FR", "es-ES", "en-US") -> { title, synopsis, pages: [...] }
   translations       Json
 
-  isPublished        Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  isPublished        Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   progress           UserBookProgress[]
+
+  @@index([category, levelBand])
+  @@index([characterId])
 }
 
 model UserBookProgress {

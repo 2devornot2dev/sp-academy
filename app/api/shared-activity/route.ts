@@ -37,7 +37,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const [rawBosses, rawSpoons, rawExercises, rawAchievements] =
+    const [rawBosses, rawSpoons, rawExercises, rawAchievements, rawBooks] =
       await Promise.all([
         prisma.foundationBossStage
           .findMany({
@@ -124,20 +124,53 @@ export async function GET() {
             take: 15,
           })
           .catch(() => []),
+
+        // 🟢 NEW: Fetch Completed Books
+        prisma.userBookProgress
+          .findMany({
+            where: { completedAt: { not: null } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  firstName: true,
+                  username: true,
+                  image: true,
+                },
+              },
+              spoonBook: {
+                select: {
+                  slug: true,
+                  characterName: true,
+                  coverImageS3Key: true,
+                  translations: true,
+                },
+              },
+            },
+            orderBy: { completedAt: "desc" },
+            take: 15,
+          })
+          .catch(() => []),
       ]);
 
     const defeatedBosses = Array.isArray(rawBosses) ? rawBosses : [];
     const completedSpoons = Array.isArray(rawSpoons) ? rawSpoons : [];
     const completedExercises = Array.isArray(rawExercises) ? rawExercises : [];
-    const unlockedAchievements = Array.isArray(rawAchievements)
-      ? rawAchievements
-      : [];
+    const unlockedAchievements = Array.isArray(rawAchievements) ? rawAchievements : [];
+    const completedBooks = Array.isArray(rawBooks) ? rawBooks : [];
 
-    // Sign S3 Spoon images in 1 batch
+    // Sign S3 Spoon Images AND Book Cover Images in 1 batch
     const s3KeysToSign: string[] = [];
     for (const spoon of completedSpoons) {
       const imgKey = (spoon.visualContent as any)?.imageS3Key;
       if (imgKey && typeof imgKey === "string") s3KeysToSign.push(imgKey);
+    }
+    for (const bookProgress of completedBooks) {
+      const coverKey = bookProgress.spoonBook?.coverImageS3Key;
+      if (coverKey && typeof coverKey === "string" && !coverKey.startsWith("http")) {
+        s3KeysToSign.push(coverKey);
+      }
     }
 
     const signedUrls =
@@ -150,6 +183,7 @@ export async function GET() {
       ...completedSpoons.map((s) => s.id),
       ...completedExercises.map((e) => e.id),
       ...unlockedAchievements.map((a) => a.id),
+      ...completedBooks.map((b) => b.id), // 🟢 Include Book IDs for likes
     ];
 
     const [userLikes, likeCounts] = await Promise.all([
@@ -188,6 +222,7 @@ export async function GET() {
 
     const items: FeedActivityItem[] = [];
 
+    // Map Bosses
     for (const boss of defeatedBosses) {
       const resObj = (boss.results as any) || {};
       const heartsLeft = resObj.chancesRemaining;
@@ -213,6 +248,7 @@ export async function GET() {
       });
     }
 
+    // Map Spoons
     for (const spoon of completedSpoons) {
       const imgKey = (spoon.visualContent as any)?.imageS3Key;
       const handoff = (spoon.lessonHandoff as any) || {};
@@ -233,6 +269,7 @@ export async function GET() {
       });
     }
 
+    // Map Exercises
     for (const ex of completedExercises) {
       const u = ex.spriteProfile?.user;
       const spriteName = ex.spriteProfile?.sprite?.name || "Vox";
@@ -253,6 +290,7 @@ export async function GET() {
       });
     }
 
+    // Map Achievements
     for (const ach of unlockedAchievements) {
       if (!ach.achievement) continue;
       items.push({
@@ -272,6 +310,42 @@ export async function GET() {
       });
     }
 
+    // 🟢 NEW: Map Completed Books
+    for (const bookProgress of completedBooks) {
+      const coverKey = bookProgress.spoonBook?.coverImageS3Key;
+      let coverUrl = null;
+      if (coverKey) {
+        coverUrl = coverKey.startsWith("http")
+          ? coverKey
+          : (signedUrls as any)[coverKey] ?? null;
+      }
+
+      // Safely extract localized title from JSON, fallback to slug
+      const translations = (bookProgress.spoonBook?.translations || {}) as any;
+      const activeLangData = translations[bookProgress.targetLanguage];
+      const title =
+        activeLangData?.title ||
+        bookProgress.spoonBook?.slug ||
+        "An Interactive Story";
+
+      items.push({
+        id: bookProgress.id,
+        type: "BookCompleted",
+        createdAt: new Date(bookProgress.completedAt || bookProgress.updatedAt).toISOString(),
+        user: formatUser(bookProgress.user),
+        badge: `📖 Story Completed`,
+        title: `Finished reading "${title}"`,
+        subtitle: `Starring ${bookProgress.spoonBook?.characterName}`,
+        detail: `Read in ${bookProgress.targetLanguage.split("-")[0].toUpperCase()}`,
+        language: bookProgress.targetLanguage,
+        score: bookProgress.quizScore ?? null,
+        imageUrl: coverUrl,
+        liked: likedSet.has(bookProgress.id),
+        likes: countMap.get(bookProgress.id) || 0,
+      });
+    }
+
+    // Sort all activities by date
     items.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

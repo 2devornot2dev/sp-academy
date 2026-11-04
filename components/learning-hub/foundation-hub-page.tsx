@@ -238,10 +238,11 @@ const getLessonHref = (lessonId: string) =>
               />
             )}
 
-            <LearningPathMiniCards
+           <LearningPathMiniCards
               courseId={courseId}
               currentFocus={currentFocus}
               nextLocked={nextLocked}
+              lessons={lessons} // 👈 Add this prop so the Unit Roadmap & Replay strip have the lesson history!
               getLessonHref={getLessonHref}
               getBossHref={getBossHref}
             />

@@ -1,27 +1,39 @@
-// app/books/[bookId]/page.tsx
+// app/books/[slug]/page.tsx
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { BookReaderClient } from "@/components/books/book-reader-client";
 import type { SpoonBookWebhookPayload } from "@/lib/schema/book-schema";
+import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 
 interface BookReaderPageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug?: string; bookId?: string }>;
 }
 
-function resolveS3Key(key?: string | null) {
+async function resolveS3Key(key?: string | null): Promise<string | undefined> {
   if (!key) return undefined;
   if (key.startsWith("http")) return key;
-  const baseUrl = process.env.NEXT_PUBLIC_S3_BASE_URL || "";
-  return baseUrl ? `${baseUrl.replace(/\/$/, "")}/${key}` : key;
+  try {
+    const signed = await getPresignedImageUrl(key);
+    return signed || undefined;
+  } catch (err) {
+    console.error("Failed to presign S3 key:", key, err);
+    return undefined;
+  }
 }
 
 export default async function BookReaderPage({ params }: BookReaderPageProps) {
-  const { slug } = await params;
+  const resolvedParams = await params;
+  const identifier = resolvedParams.slug || resolvedParams.bookId;
+  if (!identifier) notFound();
+
   const user = await requireUser();
 
-  const book = await prisma.spoonBook.findUnique({
-    where: { slug },
+  // Supports lookup by either slug OR id depending on your folder route [slug] vs [bookId]
+  const book = await prisma.spoonBook.findFirst({
+    where: {
+      OR: [{ slug: identifier }, { id: identifier }],
+    },
     include: {
       progress: {
         where: { userId: user.id },
@@ -50,26 +62,41 @@ export default async function BookReaderPage({ params }: BookReaderPageProps) {
     ? (progress.completedCheckpoints as number[])
     : [];
 
-  // Build mediaUrls map from S3 keys
+  // 1. Collect all unique S3 audio keys across all translations
   const translations =
     (book.translations as SpoonBookWebhookPayload["translations"]) || {};
-  const sentenceAudioUrls: Record<string, string> = {};
+  const audioKeysToSign = new Set<string>();
 
   for (const trans of Object.values(translations)) {
     for (const page of trans.pages || []) {
       for (const sent of page.sentences || []) {
-        if (sent.audioS3Key) {
-          const url = resolveS3Key(sent.audioS3Key);
-          if (url) sentenceAudioUrls[sent.audioS3Key] = url;
-        }
+        if (sent.audioS3Key) audioKeysToSign.add(sent.audioS3Key);
       }
       for (const defn of page.definitions || []) {
-        if (defn.audioS3Key) {
-          const url = resolveS3Key(defn.audioS3Key);
-          if (url) sentenceAudioUrls[defn.audioS3Key] = url;
-        }
+        if (defn.audioS3Key) audioKeysToSign.add(defn.audioS3Key);
       }
     }
+  }
+
+  // 2. Presign cover, intro video, all page images, and all audio keys in parallel!
+  const [coverImageUrl, introVideoUrl, pageImageUrls, signedAudioEntries] =
+    await Promise.all([
+      resolveS3Key(book.coverImageS3Key),
+      resolveS3Key(book.introVideoS3Key),
+      Promise.all(
+        book.pageImageS3Keys.map(async (k) => (await resolveS3Key(k)) || k)
+      ),
+      Promise.all(
+        Array.from(audioKeysToSign).map(async (key) => {
+          const url = await resolveS3Key(key);
+          return [key, url] as const;
+        })
+      ),
+    ]);
+
+  const sentenceAudioUrls: Record<string, string> = {};
+  for (const [key, url] of signedAudioEntries) {
+    if (url) sentenceAudioUrls[key] = url;
   }
 
   return (
@@ -86,11 +113,9 @@ export default async function BookReaderPage({ params }: BookReaderPageProps) {
         pageImageS3Keys: book.pageImageS3Keys,
         translations,
         mediaUrls: {
-          coverImageUrl: resolveS3Key(book.coverImageS3Key),
-          introVideoUrl: resolveS3Key(book.introVideoS3Key),
-          pageImageUrls: book.pageImageS3Keys.map(
-            (k) => resolveS3Key(k) || k
-          ),
+          coverImageUrl,
+          introVideoUrl,
+          pageImageUrls,
           sentenceAudioUrls,
         },
       }}

@@ -1,3 +1,4 @@
+// primary-hero-card.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,6 +11,8 @@ import {
   Quote,
   Swords,
   Zap,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 import { vocabWordCount } from "./utils";
@@ -19,7 +22,7 @@ type Lesson = LearningPath["lessons"][number];
 const BOSS_THEMES = [
   {
     name: "neon-fuchsia",
-    scrim: "from-slate-950 via-slate-950/85 to-fuchsia-950/55",
+    scrim: "from-slate-950 via-slate-950/80 to-fuchsia-950/40",
     glow: "radial-gradient(circle at 85% 20%, rgba(217, 70, 239, 0.28), transparent 60%)",
     badge: "border-fuchsia-400/35 bg-fuchsia-500/20 text-fuchsia-200",
     icon: "text-fuchsia-300",
@@ -30,7 +33,7 @@ const BOSS_THEMES = [
   },
   {
     name: "cyber-emerald",
-    scrim: "from-slate-950 via-slate-950/85 to-teal-950/60",
+    scrim: "from-slate-950 via-slate-950/80 to-teal-950/40",
     glow: "radial-gradient(circle at 85% 20%, rgba(16, 185, 129, 0.28), transparent 60%)",
     badge: "border-emerald-400/35 bg-emerald-500/20 text-emerald-200",
     icon: "text-emerald-300",
@@ -40,30 +43,8 @@ const BOSS_THEMES = [
       "from-emerald-500 to-teal-600 shadow-emerald-500/30 hover:from-emerald-400 hover:to-teal-500",
   },
   {
-    name: "crimson-velvet",
-    scrim: "from-slate-950 via-slate-950/85 to-rose-950/60",
-    glow: "radial-gradient(circle at 85% 20%, rgba(244, 63, 94, 0.28), transparent 60%)",
-    badge: "border-rose-400/35 bg-rose-500/20 text-rose-200",
-    icon: "text-rose-300",
-    accentText: "text-rose-300",
-    avatarBorder: "border-rose-400/75 shadow-rose-500/30",
-    button:
-      "from-rose-500 to-orange-600 shadow-rose-500/30 hover:from-rose-400 hover:to-orange-500",
-  },
-  {
-    name: "imperial-gold",
-    scrim: "from-slate-950 via-slate-950/85 to-amber-950/55",
-    glow: "radial-gradient(circle at 85% 20%, rgba(245, 158, 11, 0.26), transparent 60%)",
-    badge: "border-amber-400/35 bg-amber-500/20 text-amber-200",
-    icon: "text-amber-300",
-    accentText: "text-amber-300",
-    avatarBorder: "border-amber-400/75 shadow-amber-500/30",
-    button:
-      "from-amber-500 to-rose-600 shadow-amber-500/30 hover:from-amber-400 hover:to-rose-500",
-  },
-  {
     name: "electric-cyan",
-    scrim: "from-slate-950 via-slate-950/85 to-cyan-950/60",
+    scrim: "from-slate-950 via-slate-950/80 to-cyan-950/40",
     glow: "radial-gradient(circle at 85% 20%, rgba(6, 182, 212, 0.28), transparent 60%)",
     badge: "border-cyan-400/35 bg-cyan-500/20 text-cyan-200",
     icon: "text-cyan-300",
@@ -71,17 +52,6 @@ const BOSS_THEMES = [
     avatarBorder: "border-cyan-400/75 shadow-cyan-500/30",
     button:
       "from-cyan-500 to-blue-600 shadow-cyan-500/30 hover:from-cyan-400 hover:to-blue-500",
-  },
-  {
-    name: "royal-violet",
-    scrim: "from-slate-950 via-slate-950/85 to-violet-950/60",
-    glow: "radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.30), transparent 60%)",
-    badge: "border-violet-400/35 bg-violet-500/20 text-violet-200",
-    icon: "text-violet-300",
-    accentText: "text-violet-300",
-    avatarBorder: "border-violet-400/75 shadow-violet-500/30",
-    button:
-      "from-violet-500 to-fuchsia-600 shadow-violet-500/30 hover:from-violet-400 hover:to-fuchsia-500",
   },
 ] as const;
 
@@ -118,7 +88,7 @@ export function PrimaryHeroCard({
 
   if (!path) {
     return (
-      <div className="rounded-3xl bg-white/80 p-8 backdrop-blur-md">
+      <div className="rounded-3xl bg-white/80 p-8 shadow-sm backdrop-blur-md">
         <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
           Getting Started
         </span>
@@ -132,7 +102,7 @@ export function PrimaryHeroCard({
     );
   }
 
-  // 1. WAITING ON SPOON, VOCAB, OR BOSS GENERATION (Check FIRST so unbaked lessons never show empty UI)
+  // 1. WAITING ON GENERATION
   if (waitingOnSpoon || waitingOnVocab || waitingOnBoss) {
     const spoonNum =
       nextLesson?.orderIndex ??
@@ -143,7 +113,7 @@ export function PrimaryHeroCard({
     return (
       <div className="relative overflow-hidden rounded-3xl bg-slate-950 p-7 text-white shadow-xl sm:p-8">
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-fuchsia-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-teal-500/15 blur-3xl" />
 
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/20 px-3.5 py-1 text-xs font-extrabold tracking-wide text-indigo-200 uppercase">
@@ -215,7 +185,7 @@ export function PrimaryHeroCard({
           <img
             src={coverUrl}
             alt={bossName}
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
           />
         )}
 
@@ -226,12 +196,11 @@ export function PrimaryHeroCard({
           className="pointer-events-none absolute inset-0 transition-all duration-700"
           style={{ background: theme.glow }}
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/40" />
 
         <div className="relative z-10 p-7 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-xs font-extrabold tracking-wide uppercase backdrop-blur-md transition-colors duration-500 ${theme.badge}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-xs font-extrabold tracking-wide uppercase backdrop-blur-md ${theme.badge}`}
             >
               <Swords className={`h-3.5 w-3.5 ${theme.icon}`} />
               Milestone {milestoneNum} Boss Stage
@@ -255,7 +224,7 @@ export function PrimaryHeroCard({
             {avatarUrl && (
               <div className="relative shrink-0">
                 <div
-                  className={`h-24 w-24 overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-lg transition-all duration-500 sm:h-28 sm:w-28 ${theme.avatarBorder}`}
+                  className={`h-24 w-24 overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-lg sm:h-28 sm:w-28 ${theme.avatarBorder}`}
                 >
                   <img
                     src={avatarUrl}
@@ -278,14 +247,14 @@ export function PrimaryHeroCard({
               <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {bossName}
               </h2>
-              <p className="max-w-2xl text-sm leading-relaxed text-slate-300 line-clamp-2">
+              <p className="max-w-2xl text-sm leading-relaxed text-slate-200 line-clamp-2">
                 {bossPersona}
               </p>
             </div>
           </div>
 
           {boss?.introMessage && (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur-md">
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-md">
               <div className="flex items-start gap-3">
                 <Quote
                   className={`mt-0.5 h-4 w-4 shrink-0 rotate-180 ${theme.icon}`}
@@ -316,7 +285,7 @@ export function PrimaryHeroCard({
     );
   }
 
-// 3. VOCAB BRIDGE READY — Full-bleed Scene Image + Warm Amber/Daylight Overlay
+  // 3. VOCAB BRIDGE READY
   if (vocabDue?.bridge) {
     const isMilestoneLesson = vocabDue.orderIndex % 3 === 0;
     const unlockTargetText = isMilestoneLesson
@@ -330,131 +299,152 @@ export function PrimaryHeroCard({
       }>) ?? [];
 
     return (
-      <div className="group relative overflow-hidden rounded-3xl border border-amber-300/80 bg-amber-50 text-slate-900 shadow-xl shadow-amber-950/5">
-        {/* Full-bleed Lesson Scene Image in the background (matches Spoon & Boss cards) */}
-        {vocabDue.imageUrl && (
-          <img
-            src={vocabDue.imageUrl}
-            alt={vocabDue.imageAlt ?? ""}
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35 transition-transform duration-700 group-hover:scale-105"
-          />
-        )}
+      <div className="group relative overflow-hidden rounded-3xl border border-amber-200/90 bg-white text-slate-900 shadow-xl">
+        <div className="grid grid-cols-1 md:grid-cols-12">
+          {/* Left Content */}
+          <div className="flex flex-col justify-between p-7 sm:p-8 md:col-span-7">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1 text-xs font-extrabold tracking-wide text-amber-900 uppercase">
+                  <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
+                  Vocab Bridge {vocabDue.orderIndex}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                  🔓 Unlocks {unlockTargetText}
+                </span>
+              </div>
 
-        {/* Warm Daylight / Amber-Orange Scrim Overlay (Opposite of the dark Spoon/Boss overlay) */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white via-amber-50/92 to-orange-100/70" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-amber-100/60 via-transparent to-white/50" />
+              <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                Review: {vocabDue.title}
+              </h3>
+              <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-600">
+                Master the {vocabWordCount(vocabDue.bridge.vocabMoment)} core
+                expressions from Spoon {vocabDue.orderIndex} to unlock{" "}
+                <span className="font-extrabold text-amber-700">
+                  {unlockTargetText}
+                </span>
+                .
+              </p>
 
-        <div className="relative z-10 flex flex-col justify-between p-7 sm:p-8">
-          <div>
-            {/* Top Status Pills (Matches Spoon & Boss Card Header) */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/60 bg-amber-500/15 px-3.5 py-1 text-xs font-extrabold tracking-wide text-amber-900 uppercase backdrop-blur-md">
-                <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
-                Vocab Bridge {vocabDue.orderIndex} Ready
-              </span>
-
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/60 bg-white/85 px-3 py-1 text-xs font-bold text-amber-900 shadow-2xs backdrop-blur-md">
-                🔓 Unlocks {unlockTargetText}
-              </span>
+              {words.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {words.slice(0, 5).map((w, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50/90 ring-1 ring-amber-200/80 px-3 py-1 text-xs font-extrabold text-slate-900"
+                    >
+                      <span className="text-amber-700">{w.word}</span>
+                      {w.gloss && (
+                        <span className="font-semibold text-slate-500">
+                          • {w.gloss}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Title & Subtitle */}
-            <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-              Vocab Bridge {vocabDue.orderIndex}: {vocabDue.title}
-            </h3>
-            <p className="mt-1.5 max-w-xl text-sm font-medium leading-relaxed text-slate-600">
-              Solidify the {vocabWordCount(vocabDue.bridge.vocabMoment)} key
-              scene words from Spoon {vocabDue.orderIndex} to unlock{" "}
-              <span className="font-extrabold text-amber-900">
-                {unlockTargetText}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-5">
+              <span className="text-xs font-bold text-slate-500">
+                ⚡ ~3 min interactive recall
               </span>
-              .
-            </p>
-
-            {/* Word Pills */}
-            {words.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {words.map((w, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/80 bg-white/95 px-3.5 py-1.5 text-xs font-extrabold text-slate-900 shadow-2xs backdrop-blur-md"
-                  >
-                    <span className="text-amber-700">{w.word}</span>
-                    {w.gloss && (
-                      <span className="font-semibold text-slate-400">
-                        • {w.gloss}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
+              <Link
+                href={`/foundation/vocab/${vocabDue.bridge.id}`}
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                Start Bridge {vocabDue.orderIndex}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
-          {/* Bottom Action Bar (Matches Spoon & Boss Card Footer) */}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-amber-300/50 pt-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-900/80">
-              <Zap className="h-4 w-4 text-amber-600" />
-              <span>Interactive Scene Checkpoint • ~3 mins</span>
-            </div>
-
-            <Link
-              href={`/foundation/vocab/${vocabDue.bridge.id}`}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3 text-sm font-extrabold text-white shadow-lg shadow-amber-500/25 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-95"
-            >
-              Start Vocab Bridge {vocabDue.orderIndex}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          {/* Right Clear Scene Artwork */}
+          <div className="relative min-h-[220px] overflow-hidden bg-slate-900 md:col-span-5">
+            {vocabDue.imageUrl && (
+              <img
+                src={vocabDue.imageUrl}
+                alt={vocabDue.title ?? "Vocab Image"}
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            )}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-white/20 md:to-transparent" />
           </div>
         </div>
       </div>
     );
   }
 
-  // 4. NEXT SPOON READY
+  // 4. NEXT SPOON READY — Split Cinema Hero so the Scene Artwork Shines!
   if (nextLesson) {
-    return (
-      <div className="group relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-lg">
-        {nextLesson.imageUrl && (
-          <img
-            src={nextLesson.imageUrl}
-            alt={nextLesson.imageAlt ?? ""}
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35 transition-transform duration-700 group-hover:scale-105"
-          />
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-indigo-950/40" />
+    const milestoneNum = Math.ceil(nextLesson.orderIndex / 3);
+    const stepInMilestone = ((nextLesson.orderIndex - 1) % 3) + 1; // 1, 2, or 3
 
-        <div className="relative z-10 flex flex-col justify-between p-7 sm:p-8">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-500/25 px-3 py-1 text-xs font-extrabold text-indigo-200 uppercase backdrop-blur-md">
+    return (
+      <div className="group relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl ring-1 ring-white/10">
+        {/* Right-aligned Bright Artwork with Smooth Left Gradient Blend */}
+        {nextLesson.imageUrl && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-[58%] overflow-hidden">
+            <img
+              src={nextLesson.imageUrl}
+              alt={nextLesson.imageAlt ?? nextLesson.title ?? "Lesson Image"}
+              className="h-full w-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-105"
+            />
+            {/* Smooth blend into the dark left text column */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/70 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/30" />
+          </div>
+        )}
+
+        <div className="relative z-10 flex flex-col justify-between p-7 sm:p-9">
+          <div className="max-w-xl">
+            {/* Top Status & Session Duration Pills */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3.5 py-1 text-xs font-extrabold tracking-wide text-emerald-300 uppercase backdrop-blur-md">
                 <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
                 Spoon {nextLesson.orderIndex} Ready
               </span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-200 backdrop-blur-md">
-                ⏱️ 5–7 min session
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-200 backdrop-blur-md">
+                <Clock className="h-3.5 w-3.5 text-sky-300" />
+                5–7 min session
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-200 backdrop-blur-md">
+                <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
+                Unit {milestoneNum} • Part {stepInMilestone} of 3
               </span>
             </div>
 
-            <h3 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
+            {/* Lesson Title & Description */}
+            <h2 className="mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
               Spoon {nextLesson.orderIndex}: {nextLesson.title}
-            </h3>
-            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-300">
+            </h2>
+            <p className="mt-2.5 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">
               Master essential speech patterns, native pronunciation, and
               interactive listening drills in this bite-sized audio lesson.
             </p>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-              <Headphones className="h-4 w-4 text-indigo-400" />
-              <span>Interactive Audio Lesson</span>
+          {/* Bottom Bar: Feature Tags + Primary Start CTA */}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-300">
+              <span className="inline-flex items-center gap-1.5">
+                <Headphones className="h-4 w-4 text-sky-400" />
+                Interactive Audio Lesson
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Mic className="h-4 w-4 text-emerald-400" />
+                Live Speech Coaching
+              </span>
             </div>
+
             <Link
               href={getLessonHref(nextLesson.id)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500 px-7 py-3 text-sm font-extrabold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-400 active:scale-95"
+              className="inline-flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-400 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-sky-500/25 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
             >
-              Start Spoon {nextLesson.orderIndex}
+              <span>Start Spoon {nextLesson.orderIndex}</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
