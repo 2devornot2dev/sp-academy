@@ -14,7 +14,6 @@ import {
   Zap,
   Orbit,
   Layers,
-  Clock,
   RotateCcw,
 } from "lucide-react";
 
@@ -43,7 +42,6 @@ interface SeriesCategory {
   seriesTitle: string;
   tagline: string;
   matchCharacter: string | null; // null = All
-  gradient: string;
   badgeBg: string;
   icon: React.ReactNode;
   avatarUrl?: string;
@@ -56,9 +54,8 @@ const SPOON_SERIES_CATEGORIES: SeriesCategory[] = [
     seriesTitle: "Complete Spoon Catalog",
     tagline: "Every interactive story & series",
     matchCharacter: null,
-    gradient: "from-sky-500 to-emerald-500",
     badgeBg: "bg-sky-50 text-sky-700",
-    icon: <Layers className="h-5 w-5 text-sky-500" />,
+    icon: <Layers className="h-4 w-4 text-sky-500" />,
   },
   {
     id: "q-to",
@@ -66,9 +63,8 @@ const SPOON_SERIES_CATEGORIES: SeriesCategory[] = [
     seriesTitle: "Chronicles of Pluto",
     tagline: "Mischievous alien baby adventures",
     matchCharacter: "q-to",
-    gradient: "from-violet-500 to-fuchsia-500",
     badgeBg: "bg-violet-50 text-violet-700",
-    icon: <Orbit className="h-5 w-5 text-violet-500" />,
+    icon: <Orbit className="h-4 w-4 text-violet-500" />,
     avatarUrl:
       "https://res.cloudinary.com/dmllgn0t7/image/upload/v1793732453/q-to.jpg",
   },
@@ -78,9 +74,8 @@ const SPOON_SERIES_CATEGORIES: SeriesCategory[] = [
     seriesTitle: "The Trap",
     tagline: "Street-smart hustles & big heart",
     matchCharacter: "billy",
-    gradient: "from-amber-500 to-orange-500",
     badgeBg: "bg-amber-50 text-amber-800",
-    icon: <Flame className="h-5 w-5 text-amber-500" />,
+    icon: <Flame className="h-4 w-4 text-amber-500" />,
   },
   {
     id: "momentum-man",
@@ -88,9 +83,8 @@ const SPOON_SERIES_CATEGORIES: SeriesCategory[] = [
     seriesTitle: "Momentum Universe",
     tagline: "High-voltage kinetic heroics",
     matchCharacter: "momentum",
-    gradient: "from-cyan-500 to-blue-600",
     badgeBg: "bg-cyan-50 text-cyan-700",
-    icon: <Zap className="h-5 w-5 text-cyan-500" />,
+    icon: <Zap className="h-4 w-4 text-cyan-500" />,
   },
 ];
 
@@ -100,8 +94,7 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // 1. Pick the Hero Book:
-  // Prioritize the most recently read in-progress book -> otherwise most recently touched -> otherwise newest book
+  // 1. Pick Hero Book (In-progress -> recently finished -> newest)
   const heroBook = useMemo(() => {
     if (!books.length) return null;
     const inProgress = books
@@ -133,14 +126,13 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
     return counts;
   }, [books]);
 
-  // 3. Filter books for the catalog table
+  // 3. Filter books for the catalog list
   const filteredBooks = useMemo(() => {
     const activeCat = SPOON_SERIES_CATEGORIES.find(
       (c) => c.id === selectedSeries
     );
 
     return books.filter((book) => {
-      // Character / Series filter
       if (activeCat?.matchCharacter) {
         if (
           !book.characterName
@@ -151,7 +143,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
         }
       }
 
-      // Level filter
       if (
         selectedLevel !== "all" &&
         book.levelBand.toLowerCase() !== selectedLevel
@@ -159,7 +150,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
         return false;
       }
 
-      // Status filter
       if (selectedStatus === "completed" && !book.isCompleted) return false;
       if (
         selectedStatus === "in-progress" &&
@@ -174,7 +164,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
         return false;
       }
 
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = book.title.toLowerCase().includes(q);
@@ -193,7 +182,7 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
   if (!books.length) {
     return (
       <div className="mx-auto mt-10 max-w-7xl px-6">
-        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl bg-white p-12 text-center shadow-sm">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl bg-white p-12 text-center shadow-xs">
           <BookOpen className="h-10 w-10 text-sky-500" />
           <h3 className="text-lg font-extrabold text-slate-800">
             Your bookshelf is empty
@@ -207,16 +196,30 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
     );
   }
 
+  const heroPct = heroBook
+    ? Math.min(
+        100,
+        Math.round(
+          (heroBook.completedCheckpointsCount / heroBook.totalPages) * 100
+        )
+      )
+    : 0;
+
   return (
-    <div className="mx-auto -mt-6 max-w-7xl space-y-10 px-6 lg:px-8 relative z-20">
+    <div className="mx-auto -mt-6 max-w-7xl space-y-8 px-6 lg:px-8 relative z-20">
       {/* =====================================================================
-          1. HERO SPOTLIGHT CARD (Continue Reading / Last Read)
+          UNIFIED HERO CARD:
+          Left: Cinema Art + Story Overlay
+          Right: Character Series Selector Dock
           ===================================================================== */}
       {heroBook && (
-        <div className="overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-200/70">
+        <div className="overflow-hidden rounded-[2.5rem] bg-white shadow-xl ring-1 ring-slate-200/80">
           <div className="grid grid-cols-1 lg:grid-cols-12">
-            {/* Left 7 Cols: True 16:9 Presigned Book Cover (or Intro Video!) */}
-            <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-900 lg:col-span-7">
+            {/* -------------------------------------------------------------
+                LEFT (7.5 COLS): 16:9 Video/Cover with all text overlaid on top
+                ------------------------------------------------------------- */}
+            <div className="relative min-h-[420px] sm:min-h-[460px] overflow-hidden bg-slate-950 lg:col-span-7 xl:col-span-8 flex flex-col justify-between p-6 sm:p-8">
+              {/* Media Background */}
               {heroBook.introVideoUrl ? (
                 <video
                   src={heroBook.introVideoUrl}
@@ -225,108 +228,94 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
                   loop
                   muted
                   playsInline
-                  className="h-full w-full object-cover"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
                 <img
                   src={heroBook.coverUrl}
                   alt={heroBook.title}
-                  className="h-full w-full object-cover"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
                 />
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 lg:bg-gradient-to-r lg:from-transparent lg:via-transparent lg:to-black/15" />
 
-              {/* Top Left Status Pill */}
-              <div className="absolute top-4 left-4 flex items-center gap-2">
+              {/* Scrim Overlay */}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/35" />
+
+              {/* Top Row: Status Tag + Character Avatar */}
+              <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1 text-[11px] font-black tracking-wide text-slate-900 uppercase shadow-md backdrop-blur-md">
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                   {!heroBook.isCompleted && heroBook.currentPage > 0
-                    ? "Continue Reading"
+                    ? `Continue • Page ${heroBook.currentPage}`
                     : heroBook.isCompleted
                       ? "Last Completed Story"
                       : "Featured Story"}
                 </span>
-              </div>
 
-              {/* Bottom Left Character Badge */}
-              <div className="absolute bottom-4 left-4 flex items-center gap-2.5 rounded-full bg-slate-950/75 py-1.5 pr-4 pl-1.5 text-white backdrop-blur-md">
-                <img
-                  src={heroBook.characterAvatarUrl}
-                  alt={heroBook.characterName}
-                  className="h-7 w-7 rounded-full object-cover ring-2 ring-emerald-400"
-                />
-                <span className="text-xs font-bold">
-                  Starring {heroBook.characterName}
-                </span>
-              </div>
-            </div>
-
-            {/* Right 5 Cols: Story Details, Progress & Primary CTA */}
-            <div className="flex flex-col justify-between p-6 sm:p-8 lg:col-span-5">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black tracking-wide text-sky-800 uppercase">
-                    {heroBook.levelBand}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600 capitalize">
-                    {heroBook.genre}
-                  </span>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                    {heroBook.totalPages} Pages
+                <div className="flex items-center gap-2 rounded-full bg-slate-950/70 py-1 pr-3 pl-1 text-white backdrop-blur-md">
+                  <img
+                    src={heroBook.characterAvatarUrl}
+                    alt={heroBook.characterName}
+                    className="h-6 w-6 rounded-full object-cover ring-2 ring-emerald-400"
+                  />
+                  <span className="text-xs font-bold">
+                    {heroBook.characterName}
                   </span>
                 </div>
-
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                  {heroBook.title}
-                </h2>
-
-                <p className="text-sm leading-relaxed text-slate-600">
-                  {heroBook.synopsis}
-                </p>
               </div>
 
-              <div className="mt-6 space-y-4 pt-4 border-t border-slate-100">
-                {/* Progress Bar */}
+              {/* Bottom Overlaid Metadata, Progress, and Action CTA */}
+              <div className="relative z-10 space-y-4 pt-16 text-white">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-extrabold text-slate-600">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Sparkles className="h-4 w-4 text-amber-500" />
-                      {heroBook.completedCheckpointsCount} of{" "}
-                      {heroBook.totalPages} Checkpoints Solved
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-emerald-400 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-slate-950 uppercase">
+                      {heroBook.levelBand}
                     </span>
-                    <span className="text-sky-600">
-                      {Math.round(
-                        (heroBook.completedCheckpointsCount /
-                          heroBook.totalPages) *
-                          100
-                      )}
-                      %
+                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold text-white capitalize backdrop-blur-md">
+                      {heroBook.genre}
+                    </span>
+                    <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">
+                      {heroBook.totalPages} Pages
                     </span>
                   </div>
 
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight drop-shadow-md">
+                    {heroBook.title}
+                  </h2>
+
+                  <p className="line-clamp-2 max-w-xl text-xs sm:text-sm text-slate-200 drop-shadow-xs">
+                    {heroBook.synopsis}
+                  </p>
+                </div>
+
+                {/* Progress bar on top of image */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                      {heroBook.completedCheckpointsCount} of{" "}
+                      {heroBook.totalPages} Checkpoints Solved
+                    </span>
+                    <span className="text-emerald-400 font-extrabold">
+                      {heroPct}%
+                    </span>
+                  </div>
+
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/20 backdrop-blur-md">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400 transition-all duration-500"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.round(
-                            (heroBook.completedCheckpointsCount /
-                              heroBook.totalPages) *
-                              100
-                          )
-                        )}%`,
-                      }}
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-500"
+                      style={{ width: `${heroPct}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-1">
-                  <div className="flex items-center gap-1.5">
+                {/* Bottom Row: Language Pills + Play CTA */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex items-center gap-1">
                     {heroBook.availableLanguages.map((lang) => (
                       <span
                         key={lang}
-                        className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600 uppercase"
+                        className="rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider backdrop-blur-md"
                       >
                         {lang.split("-")[0]}
                       </span>
@@ -335,7 +324,7 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
 
                   <Link
                     href={`/books/${heroBook.slug}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 px-7 py-3.5 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400 px-6 py-3 text-xs sm:text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <Play className="h-4 w-4 fill-current" />
                     <span>
@@ -349,88 +338,100 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
                 </div>
               </div>
             </div>
+
+            {/* -------------------------------------------------------------
+                RIGHT (4.5 COLS): Character Series Collection Dock
+                ------------------------------------------------------------- */}
+            <div className="flex flex-col justify-between p-6 sm:p-7 bg-slate-50/60 lg:col-span-5 xl:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-100">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">
+                      Character Series
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Select a series to filter catalog
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-[11px] font-black text-slate-700">
+                    {books.length} Total
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {SPOON_SERIES_CATEGORIES.map((cat) => {
+                    const isSelected = selectedSeries === cat.id;
+                    const count = seriesCounts[cat.id] ?? 0;
+
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedSeries(cat.id)}
+                        className={`group flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-all ${
+                          isSelected
+                            ? "bg-white shadow-md ring-2 ring-sky-500 scale-[1.01]"
+                            : "bg-white/80 hover:bg-white shadow-2xs ring-1 ring-slate-200/70"
+                        }`}
+                      >
+                        {cat.avatarUrl ? (
+                          <img
+                            src={cat.avatarUrl}
+                            alt={cat.name}
+                            className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-2xs"
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${cat.badgeBg}`}
+                          >
+                            {cat.icon}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="truncate text-xs font-black text-slate-900">
+                              {cat.name}
+                            </p>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.2 text-[10px] font-bold ${
+                                isSelected
+                                  ? "bg-sky-500 text-white"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </div>
+                          <p className="truncate text-[11px] font-bold text-sky-600">
+                            {cat.seriesTitle}
+                          </p>
+                          <p className="truncate text-[10px] text-slate-400">
+                            {cat.tagline}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bottom Quick Reset Helper */}
+              <div className="pt-4 mt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Active Filter:</span>
+                <span className="font-bold text-slate-700 capitalize">
+                  {selectedSeries} Series
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* =====================================================================
-          2. SPOON UNIVERSE SERIES / CHARACTER SELECTOR
+          2. INTERACTIVE STORY CATALOG TABLE & FILTERS
           ===================================================================== */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-black text-slate-900">
-              Choose a Character Series
-            </h3>
-            <p className="text-xs font-medium text-slate-500">
-              Filter stories by your favorite Spoon Universe character
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-          {SPOON_SERIES_CATEGORIES.map((cat) => {
-            const isSelected = selectedSeries === cat.id;
-            const count = seriesCounts[cat.id] ?? 0;
-
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedSeries(cat.id)}
-                className={`group relative flex items-center gap-3.5 rounded-2xl p-4 text-left transition-all ${
-                  isSelected
-                    ? "bg-white shadow-lg ring-2 ring-sky-500 scale-[1.01]"
-                    : "bg-white/80 hover:bg-white shadow-xs ring-1 ring-slate-200/70"
-                }`}
-              >
-                {/* Avatar or Series Icon */}
-                {cat.avatarUrl ? (
-                  <img
-                    src={cat.avatarUrl}
-                    alt={cat.name}
-                    className="h-12 w-12 shrink-0 rounded-2xl object-cover shadow-xs"
-                  />
-                ) : (
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${cat.badgeBg}`}
-                  >
-                    {cat.icon}
-                  </div>
-                )}
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="truncate text-sm font-black text-slate-900">
-                      {cat.name}
-                    </p>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
-                        isSelected
-                          ? "bg-sky-500 text-white"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {count} {count === 1 ? "Book" : "Books"}
-                    </span>
-                  </div>
-                  <p className="truncate text-[11px] font-bold text-sky-600">
-                    {cat.seriesTitle}
-                  </p>
-                  <p className="truncate text-[11px] text-slate-400">
-                    {cat.tagline}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* =====================================================================
-          3. INTERACTIVE STORY CATALOG TABLE & FILTERS
-          ===================================================================== */}
-      <section className="overflow-hidden rounded-[2rem] bg-white shadow-md ring-1 ring-slate-200/70">
+      <section className="overflow-hidden rounded-[2.5rem] bg-white shadow-md ring-1 ring-slate-200/70">
         {/* Filter Toolbar */}
         <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           {/* Search Input */}
@@ -527,9 +528,9 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
                   href={`/books/${book.slug}`}
                   className="group flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 transition hover:bg-sky-50/40"
                 >
-                  {/* Left: 16:9 Real Cover Thumbnail + Title & Synopsis */}
+                  {/* Left: 16:9 Cover Thumbnail + Title & Synopsis */}
                   <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <div className="relative aspect-[16/10] w-28 sm:w-36 shrink-0 overflow-hidden rounded-2xl bg-slate-200 shadow-xs">
+                    <div className="relative aspect-[16/10] w-28 sm:w-36 shrink-0 overflow-hidden rounded-2xl bg-slate-200 shadow-2xs">
                       <img
                         src={book.coverUrl}
                         alt={book.title}
@@ -575,7 +576,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
 
                   {/* Right: Checkpoints Progress + Languages + CTA Pill */}
                   <div className="flex items-center justify-between gap-6 sm:justify-end shrink-0">
-                    {/* Progress Column */}
                     <div className="w-32 space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
                         <span>
@@ -607,7 +607,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
                       </div>
                     </div>
 
-                    {/* Languages */}
                     <div className="hidden md:flex items-center gap-1">
                       {book.availableLanguages.map((lang) => (
                         <span
@@ -619,7 +618,6 @@ export function BookshelfClient({ books }: { books: BookshelfItem[] }) {
                       ))}
                     </div>
 
-                    {/* Action Button */}
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black transition ${
                         book.isCompleted
