@@ -14,8 +14,11 @@ import {
   Crown,
   Wand2,
   Flame,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
+import { useState } from "react";
 
 type FocusState = LearningPath["currentFocus"];
 type Lesson = LearningPath["lessons"][number];
@@ -481,6 +484,7 @@ function UpNextWideBanner({
 /* ============================================================================
    SLIM PAST SPOONS & VOCAB LIST (Placed under WordMatrixCard in Right Column!)
    ============================================================================ */
+// 2. Replace PastSpoonsVocabSlimList at the bottom of learning-mini-path-cards.tsx with this:
 export function PastSpoonsVocabSlimList({
   courseId,
   lessons = [],
@@ -494,12 +498,22 @@ export function PastSpoonsVocabSlimList({
   displayTitles?: Map<string, string>;
   onLaunchSpriteExercise?: (lesson: Lesson) => void;
 }) {
-  const recentCompleted = lessons
+  const PAGE_SIZE = 3;
+  const [page, setPage] = useState(0);
+
+  const allCompleted = lessons
     .filter((l) => Boolean(l.completedAt))
-    .slice(-4)
+    .slice()
     .reverse();
 
-  if (recentCompleted.length === 0) return null;
+  if (allCompleted.length === 0) return null;
+
+  const totalPages = Math.max(1, Math.ceil(allCompleted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const visibleLessons = allCompleted.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE
+  );
 
   const resolveLessonHref = (lessonId: string) =>
     getLessonHref
@@ -514,8 +528,9 @@ export function PastSpoonsVocabSlimList({
   ];
 
   return (
-    <div className="overflow-hidden rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-      <div className="mb-3.5 flex items-center justify-between">
+    <div className="flex flex-1 flex-col justify-between overflow-hidden rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+      {/* Header + Prev / Next Cycle Controls */}
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
             <Wand2 className="h-3.5 w-3.5" />
@@ -524,13 +539,36 @@ export function PastSpoonsVocabSlimList({
             Past Spoons &amp; Vocab
           </h3>
         </div>
-        <span className="text-[10px] font-bold text-slate-400">
-          Replay or Remix
-        </span>
+
+        {/* Cycle Controls */}
+        <div className="flex items-center gap-1.5">
+          <span className="mr-1 text-[10px] font-bold text-slate-400">
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={safePage === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Newer Spoons"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={safePage >= totalPages - 1}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Older Spoons"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div className="divide-y divide-slate-100">
-        {recentCompleted.map((lesson, idx) => {
+      {/* 3-Item List (Sits Flush with Left Column!) */}
+      <div className="divide-y divide-slate-100 my-auto">
+        {visibleLessons.map((lesson, idx) => {
           const title =
             displayTitles?.get(lesson.id) ||
             lesson.title ||
@@ -542,17 +580,17 @@ export function PastSpoonsVocabSlimList({
               gloss?: string;
             }>) ?? [];
 
+          const colorIdx = (safePage * PAGE_SIZE + idx) % pillColors.length;
+
           return (
             <div
               key={lesson.id}
-              className="flex items-center justify-between gap-3 py-3 first:pt-1 last:pb-1"
+              className="flex items-center justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
             >
               {/* Left: 3D Mini Number Pill + Title + Vocab Words */}
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] bg-gradient-to-b text-xs font-black text-white shadow-2xs ${
-                    pillColors[idx % pillColors.length]
-                  }`}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] bg-gradient-to-b text-xs font-black text-white shadow-2xs ${pillColors[colorIdx]}`}
                 >
                   #{lesson.orderIndex}
                 </div>

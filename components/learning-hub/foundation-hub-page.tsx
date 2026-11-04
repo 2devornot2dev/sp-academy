@@ -225,7 +225,7 @@ export default function FoundationHubPage({
       />
 
       <main className="relative z-20 mx-auto -mt-12 max-w-7xl px-6 pb-20 lg:px-8">
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
           {/* LEFT / MAIN COLUMN */}
           <div className="flex flex-col gap-7 lg:col-span-8">
             {waitingOnSpoon && generationData ? (
