@@ -14,7 +14,8 @@ export async function handleSpriteNotificationGeneration(
       where: { id: task.id },
       data: {
         status: "FAILED",
-        result: JSON.stringify(body),
+        // 🔴 FIX 1: Pass the body directly, do NOT use JSON.stringify
+        result: body, 
       },
     });
     return NextResponse.json({ ok: false, error: body.error }, { status: 200 });
@@ -43,7 +44,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: body.targetBody || "",
           nativeAudioUrl: body.nativeAudioUrl ?? null,
           targetAudioUrl: body.targetAudioUrl ?? null,
-          videoUrl: body.videoUrl ?? null, // 🟢 Add video fallback mapping
+          videoUrl: body.videoUrl ?? null,
           action: body.action ?? null,
         },
       ];
@@ -74,7 +75,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: post.targetBody || "",
           nativeAudioUrl: post.nativeAudioUrl ?? null,
           targetAudioUrl: post.targetAudioUrl ?? null,
-          videoUrl: post.videoUrl ?? null, // 🟢 Save to DB!
+          videoUrl: post.videoUrl ?? null, 
           action: post.action ?? null,
         },
         create: {
@@ -90,7 +91,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: post.targetBody || "",
           nativeAudioUrl: post.nativeAudioUrl ?? null,
           targetAudioUrl: post.targetAudioUrl ?? null,
-          videoUrl: post.videoUrl ?? null, // 🟢 Save to DB!
+          videoUrl: post.videoUrl ?? null, 
           action: post.action ?? null,
         },
       });
@@ -99,12 +100,13 @@ export async function handleSpriteNotificationGeneration(
       where: { id: task.id },
       data: {
         status: "COMPLETED",
-        result: JSON.stringify(body),
+        // 🔴 FIX 2: Pass the body directly, do NOT use JSON.stringify
+        result: body,
       },
     }),
   ]);
 
-  // 4. 🟢 Broadcast to the user via Pusher so the Sprite notification pops immediately!
+  // 4. Broadcast to the user via Pusher
   const userId = meta.userId;
   const firstPost = validPosts[0];
   if (userId && firstPost) {
@@ -118,7 +120,7 @@ export async function handleSpriteNotificationGeneration(
         targetBody: firstPost.targetBody || "",
         nativeAudioUrl: firstPost.nativeAudioUrl ?? null,
         targetAudioUrl: firstPost.targetAudioUrl ?? null,
-        videoUrl: firstPost.videoUrl ?? null, // 🟢 Pass video S3 key to Frontend!
+        videoUrl: firstPost.videoUrl ?? null, 
         action: firstPost.action ?? null,
       });
     } catch (err) {
