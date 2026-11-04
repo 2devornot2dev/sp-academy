@@ -1,13 +1,19 @@
 // components/foundation/boss/boss-foundation-freestyle.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   ArrowRight,
   Heart,
   RotateCcw,
   Zap,
   Loader2,
+  Play,
   Volume2,
   VolumeX,
   Sparkles,
@@ -68,7 +74,9 @@ export default function BossFoundationFreestyle({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [isVideoMuted, setIsVideoMuted] = useState(true);
+  const hasPlayedRef = useRef(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoFinished, setVideoFinished] = useState(false);
 
   const showThinking = isAiProcessing && !isRecording;
@@ -92,6 +100,37 @@ export default function BossFoundationFreestyle({
       videoRef.current.pause();
     }
   }, [hasStartedExercises]);
+
+  // Click anywhere on the video: play (unmuted) / pause / replay
+  const handleVideoClick = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused || video.ended) {
+      // Browsers only allow sound when playback starts inside a user click, so unmute
+      // on the element itself right here (not via state, which updates a render later).
+      // After the first play, respect whatever mute choice the user makes.
+      if (!hasPlayedRef.current) {
+        video.muted = false;
+        setIsVideoMuted(false);
+        hasPlayedRef.current = true;
+      }
+      if (video.ended) video.currentTime = 0;
+      video.play().catch((error) => {
+        console.warn("Intro video could not play:", error);
+      });
+    } else {
+      video.pause();
+    }
+  };
+
+  const toggleVideoMute = (event: ReactMouseEvent) => {
+    event.stopPropagation(); // don't also play/pause the video
+    const video = videoRef.current;
+    const next = !isVideoMuted;
+    if (video) video.muted = next;
+    setIsVideoMuted(next);
+  };
 
   return (
     <div className="relative mx-auto flex h-[calc(100vh-2rem)] max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-xl">
@@ -187,25 +226,51 @@ export default function BossFoundationFreestyle({
           <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-8">
             {/* ===============================================================
                 BOSS INTRO VIDEO CUTSCENE (Shown before exercises begin!)
+                Click to play with sound. Plays once (no loop).
                 =============================================================== */}
             {introVideoUrl && !hasStartedExercises && (
-              <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-indigo-500/20 bg-slate-950 shadow-xl animate-in fade-in zoom-in-95 duration-300">
-                <div className="relative aspect-[16/9] w-full">
+              <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl shadow-xl animate-in fade-in zoom-in-95 duration-300">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={
+                    isVideoPlaying ? "Pause intro video" : "Play intro video"
+                  }
+                  onClick={handleVideoClick}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleVideoClick();
+                    }
+                  }}
+                  className="relative aspect-[16/9] w-full cursor-pointer"
+                >
                   <video
                     ref={videoRef}
                     src={introVideoUrl}
                     poster={coverImageUrl}
-                    autoPlay
-                    loop
-                    muted={isVideoMuted}
+                    preload="metadata"
                     playsInline
-                    onEnded={() => setVideoFinished(true)}
+                    onPlay={() => setIsVideoPlaying(true)}
+                    onPause={() => setIsVideoPlaying(false)}
+                    onEnded={() => {
+                      setIsVideoPlaying(false);
+                      setVideoFinished(true);
+                    }}
                     className="h-full w-full object-cover"
                   />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25" />
+
+                  {/* Play button, only while paused / finished */}
+                  {!isVideoPlaying && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                        <Play className="ml-1 h-7 w-7 fill-indigo-600 text-indigo-600" />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Top Left Cutscene Pill */}
-                  <div className="absolute top-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-300 backdrop-blur-md">
+                  <div className="pointer-events-none absolute top-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-300 backdrop-blur-md">
                     <Sparkles className="h-3.5 w-3.5" />
                     <span>{boss?.name || "Boss"} Intro</span>
                   </div>
@@ -213,7 +278,7 @@ export default function BossFoundationFreestyle({
                   {/* Top Right Mute/Unmute Toggle */}
                   <button
                     type="button"
-                    onClick={() => setIsVideoMuted((prev) => !prev)}
+                    onClick={toggleVideoMute}
                     className="absolute top-3.5 right-3.5 rounded-full bg-slate-950/75 p-2 text-white transition hover:bg-slate-900 backdrop-blur-md"
                     title={isVideoMuted ? "Unmute video" : "Mute video"}
                   >

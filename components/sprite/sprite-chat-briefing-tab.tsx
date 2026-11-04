@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/complete-sprite-exercise";
 import { SpriteExerciseArcade } from "./sprite-exercise-arcade";
 import type { ChatContextData } from "./sprite-chat-utils";
+import { useSpriteNotifications } from "./use-sprite-notifications";
 
 interface SpriteChatBriefingTabProps {
   spriteName: string;
@@ -44,8 +45,15 @@ export function SpriteChatBriefingTab({
   const [isPlayingArcade, setIsPlayingArcade] = useState(false);
 
   // Dismiss states for Briefing cards
-  const [hideObjectiveCard, setHideObjectiveCard] = useState(false);
-  const [hideArcadeCard, setHideArcadeCard] = useState(false);
+  // const [hideObjectiveCard, setHideObjectiveCard] = useState(false);
+  // const [hideArcadeCard, setHideArcadeCard] = useState(false);
+
+  const { loaded, isCardDismissed, dismissCard } =
+    useSpriteNotifications(userId);
+  const objectiveKey = `objective:${aiBrain.currentLessonTitle}`;
+  const arcadeKey = `arcade:${aiBrain.currentLessonTitle}`;
+  const hideObjectiveCard = !loaded || isCardDismissed(objectiveKey);
+  const hideArcadeCard = !loaded || isCardDismissed(arcadeKey);
 
   const refreshExercise = useCallback(async () => {
     if (!userId) return;
@@ -134,7 +142,7 @@ export function SpriteChatBriefingTab({
             </span>
             <button
               type="button"
-              onClick={() => setHideObjectiveCard(true)}
+              onClick={() => dismissCard(objectiveKey)}
               className="rounded-lg p-1 -mr-1 -mt-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
               title="Hide objective card"
             >
@@ -164,7 +172,7 @@ export function SpriteChatBriefingTab({
           {/* Top-Right Close / Hide Button */}
           <button
             type="button"
-            onClick={() => setHideArcadeCard(true)}
+            onClick={() => dismissCard(arcadeKey)}
             className="absolute top-3.5 right-3.5 rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition"
             title="Hide exercise card"
           >

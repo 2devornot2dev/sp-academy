@@ -4,6 +4,12 @@ enum Gender {
   N
 }
 
+enum SpriteNotificationKind {
+  BOSS_BUILD_FAILED
+  EXERCISE_BUILD_FAILED
+  INFO
+}
+
 // 1. STATIC CATALOG: Vox and Vivi
 model Sprite {
   id        String   @id @default(cuid())
@@ -14,6 +20,34 @@ model Sprite {
   persona   String?
 
   profiles SpriteProfile[]
+}
+
+// One row per "problem the sprite wants to tell the user about".
+model SpriteNotification {
+  id              String                 @id @default(cuid())
+  spriteProfileId String
+  kind            SpriteNotificationKind
+
+  // Stable identity of "the same problem", e.g. "boss-build:<bossStageId>".
+  // Retrying the same thing updates this row instead of stacking new cards.
+  dedupeKey String
+
+  title   String?
+  body    String  @db.Text // "Something interrupted Boss Stage while building..."
+  detail  String? @db.Text // raw error log, shown under the "Error Log" dropdown
+  payload Json? // { taskId, bossStageId, stage }
+
+  readAt      DateTime?
+  dismissedAt DateTime? // the user clicked X
+  resolvedAt  DateTime? // the problem went away (retry started or succeeded)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile SpriteProfile @relation(fields: [spriteProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([spriteProfileId, dedupeKey])
+  @@index([spriteProfileId, dismissedAt, resolvedAt])
 }
 
 // 2. USER'S SELECTION: Links User -> Sprite + their chosen Voice IDs
@@ -40,8 +74,11 @@ model SpriteProfile {
   sprite Sprite @relation(fields: [spriteId], references: [id])
 
   // 🟢 NEW: Saved Chat Sessions
-  sessions        SpriteSession[]
-  spriteExercises SpriteExercise[]
+  sessions            SpriteSession[]
+  spriteExercises     SpriteExercise[]
+  spriteNotifications SpriteNotification[]
+
+  dismissedCards String[]
 }
 
 model SpriteSession {
@@ -78,7 +115,7 @@ model SpriteNode {
   targetVoiceId  String // "fr-FR-boy-01"
   orderIndex     Int // 1=Spoon1, 2=Spoon2, 3=Spoon3, 4=Boss1
 
-  videoUrl       String?
+  videoUrl String?
 
   header         String // "Spoon 1 Ready 🥄"
   nativeBody     String  @db.Text
@@ -123,73 +160,73 @@ model SpriteExercise {
 }
 
 enum SpoonBookCategory {
-  SPOON_ORIGINALS   // Official series starring Q-to, Billy from The Trap, Momentum Man
-  STANDALONE        // Random / one-off graded readers
-  USER_CUSTOM       // User-generated avatar books (createUserBookAvatar)
+  SPOON_ORIGINALS // Official series starring Q-to, Billy from The Trap, Momentum Man
+  STANDALONE // Random / one-off graded readers
+  USER_CUSTOM // User-generated avatar books (createUserBookAvatar)
 }
 
 model BookCharacter {
-  id          String      @id @default(cuid())
-  slug        String      @unique // "q-to" | "billy-the-trap" | "momentum-man"
-  name        String      // "Q-to" | "Billy" | "Momentum Man"
-  seriesTitle String?     // "Chronicles of Pluto" | "The Trap" | "Momentum Universe"
-  avatarUrl   String      // Canonical Cloudinary reference image
-  description String      // Canonical prompt description for Nano Banana consistency!
-  accentColor String?     // e.g. "violet" | "amber" | "sky"
+  id          String  @id @default(cuid())
+  slug        String  @unique // "q-to" | "billy-the-trap" | "momentum-man"
+  name        String // "Q-to" | "Billy" | "Momentum Man"
+  seriesTitle String? // "Chronicles of Pluto" | "The Trap" | "Momentum Universe"
+  avatarUrl   String // Canonical Cloudinary reference image
+  description String // Canonical prompt description for Nano Banana consistency!
+  accentColor String? // e.g. "violet" | "amber" | "sky"
 
-  books       SpoonBook[]
-  createdAt   DateTime    @default(now())
+  books     SpoonBook[]
+  createdAt DateTime    @default(now())
 }
 
 model SpoonBook {
-  id                 String            @id @default(cuid())
-  slug               String            @unique
-  
+  id   String @id @default(cuid())
+  slug String @unique
+
   // 🟢 NEW: Categorization & Series Ordering
-  category           SpoonBookCategory @default(SPOON_ORIGINALS)
-  episodeNumber      Int?              // e.g. Episode 1, 2, 3 for a character's series!
-  
+  category      SpoonBookCategory @default(SPOON_ORIGINALS)
+  episodeNumber Int? // e.g. Episode 1, 2, 3 for a character's series!
+
   // 🟢 NEW: Optional link to canonical BookCharacter (Q-to, Billy, Momentum Man)
-  characterId        String?
-  character          BookCharacter?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  characterId String?
+  character   BookCharacter? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 
   // Kept on SpoonBook so existing code & custom user books still work seamlessly!
   characterName      String
   characterAvatarUrl String
-  levelBand          String            @default("beginner")
-  genre              String            @default("story")
+  levelBand          String @default("beginner")
+  genre              String @default("story")
 
-  coverImageS3Key    String
-  introVideoS3Key    String?
-  pageImageS3Keys    String[]
-  translations       Json
+  coverImageS3Key String
+  introVideoS3Key String?
+  pageImageS3Keys String[]
+  translations    Json
 
-  isPublished        Boolean           @default(true)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  progress           UserBookProgress[]
+  progress UserBookProgress[]
 
   @@index([category, levelBand])
   @@index([characterId])
 }
 
 model UserBookProgress {
-  id                   String    @id @default(cuid())
-  userId               String
-  spoonBookId          String
-  targetLanguage       String    // "fr-FR" | "es-ES" | "en-US"
+  id             String @id @default(cuid())
+  userId         String
+  spoonBookId    String
+  targetLanguage String // "fr-FR" | "es-ES" | "en-US"
 
   currentPage          Int       @default(1) // 1..5
   completedCheckpoints Json      @default("[]") // e.g. [1, 2, 3]
-  quizScore            Int?      // 0..100
+  quizScore            Int? // 0..100
   completedAt          DateTime?
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  spoonBook            SpoonBook @relation(fields: [spoonBookId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spoonBook SpoonBook @relation(fields: [spoonBookId], references: [id], onDelete: Cascade)
 
   @@unique([userId, spoonBookId, targetLanguage])
 }
@@ -282,19 +319,19 @@ model BillingInformation {
 }
 
 model AccountSettings {
-  id                        String          @id @default(cuid())
-  user                      User            @relation(fields: [userId], references: [id])
-  userId                    String          @unique
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String @unique
 
-  dailyEmails               Boolean?        @default(true)
-  weeklyEmails              Boolean?        @default(true)
-  promotionEmails           Boolean?        @default(true)
-  shareReadingLogs          Boolean         @default(false)
-  shareConversationActivity Boolean         @default(false)
-  shareAchievements         Boolean         @default(false)
-  shareLessonsAndCourses    Boolean         @default(false)
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
+  dailyEmails               Boolean? @default(true)
+  weeklyEmails              Boolean? @default(true)
+  promotionEmails           Boolean? @default(true)
+  shareReadingLogs          Boolean  @default(false)
+  shareConversationActivity Boolean  @default(false)
+  shareAchievements         Boolean  @default(false)
+  shareLessonsAndCourses    Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }
 
 model Teacher {
