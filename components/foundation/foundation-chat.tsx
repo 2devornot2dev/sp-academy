@@ -15,7 +15,7 @@ import {
   Lightbulb,
   Timer,
   Mic,
-  CheckCircle2,
+  Check,
   Target,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +23,6 @@ import { FoundationFreestyleChatBubble } from "./foundation-freestye-chat-bubble
 import { useMatrix } from "@/context/matrix-context";
 import { toast } from "sonner";
 
-// Helper to normalize accents/case when matching spoken transcript against requiredChunks
 const normalizeText = (s: string) =>
   s
     .normalize("NFD")
@@ -53,7 +52,7 @@ function LiveKitChatInner({
     mood: string;
     label?: string;
   } | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(300); // 5-minute sprint
+  const [secondsLeft, setSecondsLeft] = useState(300);
   const [isEnding, setIsEnding] = useState(false);
 
   const sessionStartRef = useRef(Date.now());
@@ -70,7 +69,6 @@ function LiveKitChatInner({
     requiredChunks.length > 0 &&
     completedChunks.size === requiredChunks.length;
 
-  // 1. 5-Minute Sprint Countdown Timer
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -86,12 +84,10 @@ function LiveKitChatInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. Receive Azure Pronunciation Scores, Agent Text & Emoji Reactions over "spoon-meta"
   useDataChannel("spoon-meta", (msg) => {
     try {
       const payload = JSON.parse(new TextDecoder().decode(msg.payload));
 
-      // A. Visual Reaction Tool from src/tools.py
       if (payload.type === "AI_REACTION") {
         setActiveReaction({
           id: Date.now(),
@@ -103,7 +99,6 @@ function LiveKitChatInner({
         return;
       }
 
-      // B. Assistant Turn Text from @session.on("conversation_item_added")
       if (payload.type === "AGENT_TURN") {
         setMessages((prev) => [
           ...prev,
@@ -117,12 +112,10 @@ function LiveKitChatInner({
         return;
       }
 
-      // C. User Turn + Azure Pronunciation Scores from src/azure_pronunciation.py
       if (payload.type === "TURN_META" && payload.role === "user") {
         const spokenText = payload.originalText || "";
         const pron = payload.pronunciation;
 
-        // Check if the user hit any of the Mission's requiredChunks!
         const normSpoken = normalizeText(spokenText);
         if (normSpoken && requiredChunks.length > 0) {
           requiredChunks.forEach((chunk) => {
@@ -138,7 +131,6 @@ function LiveKitChatInner({
           });
         }
 
-        // Feed per-word accuracy directly into WordMatrix!
         if (pron?.words?.length) {
           pron.words.forEach((w: any) => {
             if (!w.word) return;
@@ -174,7 +166,6 @@ function LiveKitChatInner({
     }
   });
 
-  // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, agentState, activeReaction]);
@@ -213,46 +204,46 @@ function LiveKitChatInner({
   const secs = String(secondsLeft % 60).padStart(2, "0");
 
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="flex flex-1 flex-col justify-between gap-3.5">
       <RoomAudioRenderer />
 
-      {/* 1. TOP BAR: Mission Hint + 5-Min Sprint Timer */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+      {/* 1. TOP BAR: Mission Hint + 3D Sprint Timer */}
+      <div className="flex shrink-0 flex-col justify-between gap-3 rounded-2xl bg-sky-50/80 p-3.5 ring-1 ring-sky-200/80 sm:flex-row sm:items-center">
         {nativeSentence || starterHintTarget ? (
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0">
-              <Lightbulb size={20} className="text-indigo-400" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white">
+              <Lightbulb size={18} />
             </div>
             <div>
-              <h4 className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">
+              <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
                 Mission Hint
               </h4>
-              <p className="text-slate-200 font-medium text-sm md:text-base">
+              <p className="text-xs sm:text-sm font-bold text-slate-700">
                 Try saying:{" "}
-                <span className="text-white font-bold">
-                  "{starterHintTarget || nativeSentence}"
+                <span className="font-black text-slate-900">
+                  &ldquo;{starterHintTarget || nativeSentence}&rdquo;
                 </span>
               </p>
             </div>
           </div>
         ) : (
-          <div className="text-sm font-bold text-indigo-300">
+          <div className="text-sm font-black text-blue-700">
             Speak naturally in {session?.targetLanguage}
           </div>
         )}
 
-        <div className="flex items-center gap-2 self-end sm:self-center rounded-full bg-slate-900 border border-slate-700 px-3.5 py-1.5 text-xs font-extrabold text-teal-400">
-          <Timer size={14} />
+        <div className="inline-flex items-center gap-1.5 self-end sm:self-center rounded-xl border-b-2 border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-800 shadow-2xs">
+          <Timer size={14} className="text-blue-600" />
           <span>
             {mins}:{secs}
           </span>
         </div>
       </div>
 
-      {/* 2. MISSION TARGET CHUNKS CHECKLIST */}
+      {/* 2. 3D TARGET PHRASES CHECKLIST */}
       {requiredChunks.length > 0 && (
-        <div className="shrink-0 flex flex-wrap items-center gap-2 px-4 py-3 rounded-2xl bg-slate-900/90 border border-slate-800">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mr-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 ring-1 ring-slate-200/80">
+          <span className="mr-1 text-[10px] font-black tracking-wider text-slate-400 uppercase">
             Target Phrases ({completedChunks.size}/{requiredChunks.length}):
           </span>
           {requiredChunks.map((chunk) => {
@@ -260,16 +251,16 @@ function LiveKitChatInner({
             return (
               <span
                 key={chunk}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold transition-all duration-300 ${
+                className={`inline-flex items-center gap-1.5 rounded-xl border-b-2 px-3 py-1 text-xs font-black transition-all duration-300 ${
                   hit
-                    ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-300 scale-105 shadow-sm shadow-emerald-950"
-                    : "bg-slate-800 border-slate-700 text-slate-300"
+                    ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white scale-105 shadow-xs"
+                    : "border-amber-300 bg-amber-50 text-amber-900"
                 }`}
               >
                 {hit ? (
-                  <CheckCircle2 size={13} className="text-emerald-400" />
+                  <Check size={12} strokeWidth={3.5} />
                 ) : (
-                  <Target size={13} className="text-indigo-400" />
+                  <Target size={12} className="text-amber-600" />
                 )}
                 <span>{chunk}</span>
               </span>
@@ -278,31 +269,30 @@ function LiveKitChatInner({
         </div>
       )}
 
-      {/* 3. CHAT AREA */}
-      <div className="relative h-[440px] overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-inner">
-        {/* FLOATING AI EMOJI REACTION POPUP */}
+      {/* 3. CLEAN LIGHT CHAT STREAM */}
+      <div className="relative h-[380px] overflow-hidden rounded-3xl border-2 border-slate-200/80 bg-slate-50/60 shadow-inner">
         {activeReaction && (
           <div
             key={activeReaction.id}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-30 animate-in zoom-in-75 fade-in slide-in-from-top-4 duration-300 flex items-center gap-2.5 rounded-full border border-indigo-400/40 bg-indigo-950/95 px-5 py-2 shadow-2xl backdrop-blur-md"
+            className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full border-2 border-b-4 border-indigo-300 bg-white px-5 py-2 shadow-xl animate-in zoom-in-75 fade-in slide-in-from-top-4 duration-300"
           >
-            <span className="text-2xl animate-bounce">
+            <span className="animate-bounce text-2xl">
               {activeReaction.emoji}
             </span>
-            <span className="text-xs font-black tracking-wider text-indigo-200 uppercase">
+            <span className="text-xs font-black tracking-wider text-indigo-700 uppercase">
               {activeReaction.label || activeReaction.mood}
             </span>
           </div>
         )}
 
         <ScrollArea className="h-full">
-          <div className="space-y-6 p-6 sm:p-8">
+          <div className="space-y-5 p-5 sm:p-7">
             {messages.length === 0 && (
-              <div className="flex min-h-[200px] flex-col items-center justify-center text-center opacity-70">
-                <p className="text-sm font-medium text-slate-300">
+              <div className="flex min-h-[200px] flex-col items-center justify-center text-center">
+                <p className="text-sm font-bold text-slate-400">
                   {agentState === "connecting"
                     ? "Connecting to live voice channel..."
-                    : "Microphone is live! Just start speaking naturally."}
+                    : "Microphone is live! Start speaking naturally."}
                 </p>
               </div>
             )}
@@ -329,52 +319,55 @@ function LiveKitChatInner({
         </ScrollArea>
       </div>
 
-      {/* 4. BOTTOM LIVE STATUS & ACTION BAR */}
-      <div className="shrink-0 flex flex-col md:flex-row gap-4 h-auto md:h-[72px]">
-        <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl md:rounded-3xl bg-slate-900 border border-slate-800 px-6 py-4">
+      {/* 4. BOTTOM LIVE STATUS & 3D ACTION BAR */}
+      <div className="flex shrink-0 flex-col gap-3 md:flex-row">
+        <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-slate-50 px-5 py-3.5 ring-1 ring-slate-200/80">
           <div className="flex items-center gap-3">
             <span
-              className={`h-3.5 w-3.5 rounded-full ${
+              className={`h-3 w-3 rounded-full ${
                 agentState === "listening"
-                  ? "bg-emerald-400 animate-ping"
+                  ? "animate-ping bg-emerald-500"
                   : agentState === "speaking"
-                    ? "bg-indigo-400 animate-pulse"
+                    ? "animate-pulse bg-blue-500"
                     : "bg-amber-400"
               }`}
             />
-            <span className="text-sm font-extrabold text-white">
+            <span className="text-xs sm:text-sm font-black text-slate-800">
               {agentState === "listening"
                 ? "Listening (Speak anytime)..."
                 : agentState === "speaking"
-                  ? "AI Speaking..."
+                  ? "Partner Speaking..."
                   : "Connecting voice..."}
             </span>
           </div>
 
           <TrackToggle
             source={Track.Source.Microphone}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition"
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-100"
           >
-            <Mic size={14} />
+            <Mic size={14} className="text-blue-600" />
             Toggle Mic
           </TrackToggle>
         </div>
 
         <button
+          type="button"
           onClick={handleFinishSession}
           disabled={isEnding}
-          className={`w-full md:w-auto h-[72px] px-8 font-extrabold rounded-2xl md:rounded-3xl text-lg shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 ${
+          className={`inline-flex w-full md:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-8 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
             allChunksCompleted
-              ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50"
-              : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/50"
+              ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
+              : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25"
           }`}
         >
-          {isEnding
-            ? "Saving..."
-            : allChunksCompleted
-              ? "Mission Complete!"
-              : "End Simulation"}{" "}
-          <ArrowRight size={20} />
+          <span>
+            {isEnding
+              ? "Saving..."
+              : allChunksCompleted
+                ? "Mission Complete!"
+                : "Finish Mission"}
+          </span>
+          <ArrowRight size={18} />
         </button>
       </div>
     </div>

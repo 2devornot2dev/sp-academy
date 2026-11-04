@@ -13,6 +13,7 @@ import {
   Target,
   Award,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 
 import { IntroStep } from "./intro-step";
@@ -31,16 +32,50 @@ import { completeLesson } from "@/app/actions/complete-lesson";
 import type { UserFoundation } from "@/app/(dashboard)/foundation/actions/get-foundation-user";
 import { triggerMilestoneBossAndNextSpoon } from "@/lib/foundation/trigger-milestone-boss";
 
-// 8 Production Steps (Language Setup removed)
 const STEPS_CONFIG = [
-  { id: 1, title: "Mission Briefing", icon: Flag },
-  { id: 2, title: "Scene Context", icon: ImageIcon },
-  { id: 3, title: "Grammar & Meaning", icon: BookOpen },
-  { id: 4, title: "Pronunciation Lab", icon: Mic },
-  { id: 5, title: "Listening Focus", icon: Headphones },
-  { id: 6, title: "Knowledge Check", icon: PenTool },
-  { id: 7, title: "Final Mission", icon: Target },
-  { id: 8, title: "Mission Debrief", icon: Award },
+  { id: 1, title: "Mission Briefing", subtitle: "Coach intro", icon: Flag },
+  {
+    id: 2,
+    title: "Scene Context",
+    subtitle: "Visual dialogue",
+    icon: ImageIcon,
+  },
+  {
+    id: 3,
+    title: "Grammar & Meaning",
+    subtitle: "Pattern breakdown",
+    icon: BookOpen,
+  },
+  {
+    id: 4,
+    title: "Pronunciation Lab",
+    subtitle: "Sound mastery",
+    icon: Mic,
+  },
+  {
+    id: 5,
+    title: "Listening Focus",
+    subtitle: "Audio rebuild",
+    icon: Headphones,
+  },
+  {
+    id: 6,
+    title: "Knowledge Check",
+    subtitle: "4-part quiz",
+    icon: PenTool,
+  },
+  {
+    id: 7,
+    title: "Final Mission",
+    subtitle: "Live roleplay",
+    icon: Target,
+  },
+  {
+    id: 8,
+    title: "Mission Debrief",
+    subtitle: "Complete Spoon",
+    icon: Award,
+  },
 ];
 
 interface FoundationContentProps {
@@ -48,17 +83,17 @@ interface FoundationContentProps {
 }
 
 function FoundationContent({ foundation }: FoundationContentProps) {
-  // Start directly at Step 1: Mission Briefing
   const [step, setStep] = useState(1);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const { syncCart } = useMatrix();
   const router = useRouter();
 
-  // Extract core properties from real DB record
   const userId = foundation.userId;
   const courseId = foundation.foundationCourseId;
   const currentSpoon = foundation.orderIndex;
   const nextLessonNumber = currentSpoon + 1;
+  const milestoneNum = Math.ceil(currentSpoon / 3);
 
   const targetLang = foundation.course.targetLanguage || "fr-FR";
   const nativeLang = foundation.course.nativeLanguage || "en-US";
@@ -74,7 +109,6 @@ function FoundationContent({ foundation }: FoundationContentProps) {
     (foundation as any).user?.name?.split(" ")[0] ||
     "Learner";
 
-  // Profile data payload for queuing the subsequent Spoon
   const profileData = {
     userId,
     firstName: userFirstName,
@@ -89,7 +123,6 @@ function FoundationContent({ foundation }: FoundationContentProps) {
     isOnboarding: false,
   };
 
-  // Sync matrix cart to DB before changing steps
   const handleNext = (nextStepIndex: number) => {
     syncCart(userId, targetLang);
     setStep(nextStepIndex);
@@ -151,45 +184,49 @@ function FoundationContent({ foundation }: FoundationContentProps) {
             targetLang={targetLang}
             userId={userId}
             onFinish={async (feedback) => {
-              await syncCart(userId, targetLang);
+              if (isFinishing) return;
+              setIsFinishing(true);
+              try {
+                await syncCart(userId, targetLang);
 
-              // 1. Mark current Spoon completed
-              await completeLesson({
-                courseId,
-                orderIndex: currentSpoon,
-                feedback,
-              });
-
-              // 2A. Normal Spoon (1, 2, 4, 5...): Queue next Spoon while user does current Vocab Bridge
-              if (currentSpoon % 3 !== 0) {
-                const res = await invokeEduBuilder({
-                  ...profileData,
-                  spoon: currentSpoon + 1,
-                  isOnboarding: false,
-                  foundationCourseId: courseId,
-                  previous_lessons: [{ ...lessonHandoff, feedback }],
+                await completeLesson({
+                  courseId,
+                  orderIndex: currentSpoon,
+                  feedback,
                 });
 
-                if (!res.ok) {
-                  console.error("Failed to queue next spoon:", res.error);
-                }
-              }
-              // 2B. Milestone Boundary Spoon (3, 6, 9...): Queue Boss Stage + Boss Sprite + Pre-bake Next Spoon (4, 7, 10...)
-              // while user does Vocab Bridge 3!
-              else {
-                await triggerMilestoneBossAndNextSpoon({
-                  userId,
-                  courseId,
-                  milestoneIndex: currentSpoon / 3,
-                  prebakeNextSpoon: true,
-                }).catch((err) =>
-                  console.error("Failed to trigger milestone boss & next spoon:", err)
-                );
-              }
+                if (currentSpoon % 3 !== 0) {
+                  const res = await invokeEduBuilder({
+                    ...profileData,
+                    spoon: currentSpoon + 1,
+                    isOnboarding: false,
+                    foundationCourseId: courseId,
+                    previous_lessons: [{ ...lessonHandoff, feedback }],
+                  });
 
-              // 3. Return user to the hub
-              router.push("/learning-hub");
-              router.refresh();
+                  if (!res.ok) {
+                    console.error("Failed to queue next spoon:", res.error);
+                  }
+                } else {
+                  await triggerMilestoneBossAndNextSpoon({
+                    userId,
+                    courseId,
+                    milestoneIndex: currentSpoon / 3,
+                    prebakeNextSpoon: true,
+                  }).catch((err) =>
+                    console.error(
+                      "Failed to trigger milestone boss & next spoon:",
+                      err
+                    )
+                  );
+                }
+
+                router.push("/learning-hub");
+                router.refresh();
+              } catch (err) {
+                console.error("Error completing Spoon:", err);
+                setIsFinishing(false);
+              }
             }}
           />
         );
@@ -200,24 +237,45 @@ function FoundationContent({ foundation }: FoundationContentProps) {
     }
   };
 
+  const progressPct = Math.round(
+    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100
+  );
+
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 p-4 md:flex-row md:gap-8 md:p-8">
-        {/* LEFT SIDEBAR: STEPPER TRACKER */}
-        <div className="h-fit w-full shrink-0 rounded-4xl border border-gray-100 bg-white p-6 shadow-xs md:w-72 md:p-8 lg:w-80">
-          <div className="mb-10">
-            <p className="mb-2 text-xs font-bold tracking-widest text-blue-600 uppercase">
-              Course • Spoon {currentSpoon}
-            </p>
-            <h2 className="text-2xl font-extrabold leading-tight text-gray-900">
+        {/* =================================================================
+            LEFT SIDEBAR: 3D PRIMARY BLUE SPOON STEPPER CARD
+            ================================================================= */}
+        <div className="flex h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200/80 md:w-72 md:p-7 lg:w-80">
+          <div>
+            {/* Primary Blue 3D Spoon Badge (Distinct from Vocab Bridge's Amber!) */}
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3 py-1 text-[11px] font-black tracking-wide text-white uppercase shadow-2xs">
+              <Headphones className="h-3.5 w-3.5" />
+              <span>
+                Unit {milestoneNum} • Spoon {currentSpoon}
+              </span>
+            </div>
+
+            <h2 className="text-2xl font-black tracking-tight text-slate-900">
               {lessonHandoff?.theme || foundation.title || "Core Lesson"}
             </h2>
+            <p className="mt-1 text-xs font-semibold text-slate-400">
+              Master all 8 stages to unlock Vocab Bridge {currentSpoon}
+            </p>
           </div>
 
-          <div className="relative">
-            <div className="absolute top-4 bottom-4 left-[19px] w-[2px] rounded-full bg-gray-100" />
+          {/* 3D 8-Node Vertical Track */}
+          <div className="relative my-6">
+            {/* Background Connecting Track Line */}
+            <div className="absolute top-5 bottom-5 left-[19px] w-1 rounded-full bg-slate-100">
+              <div
+                className="w-full rounded-full bg-gradient-to-b from-emerald-400 to-blue-500 transition-all duration-500"
+                style={{ height: `${progressPct}%` }}
+              />
+            </div>
 
-            <div className="relative z-10 flex flex-col gap-6">
+            <div className="relative z-10 flex flex-col gap-2.5">
               {STEPS_CONFIG.map((s) => {
                 const isCompleted = step > s.id;
                 const isActive = step === s.id;
@@ -226,44 +284,86 @@ function FoundationContent({ foundation }: FoundationContentProps) {
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center gap-4 transition-all duration-300"
+                    className={`flex items-center gap-3 rounded-2xl p-1.5 transition-all duration-300 ${
+                      isActive
+                        ? "bg-sky-50/90 ring-1 ring-sky-200/90 shadow-2xs"
+                        : ""
+                    }`}
                   >
+                    {/* 3D Tactile Squircle Node */}
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full border-2 bg-white transition-colors duration-300 ${
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black transition-all duration-300 ${
                         isCompleted
-                          ? "border-green-500 text-green-500"
+                          ? "border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
                           : isActive
-                            ? "border-blue-600 text-blue-600 shadow-xs ring-4 ring-blue-50"
-                            : "border-gray-300 text-gray-500"
+                            ? "scale-105 border-b-[4px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md shadow-blue-500/25"
+                            : "border-b-[3px] border-slate-300 bg-slate-100 text-slate-400"
                       }`}
                     >
                       {isCompleted ? (
-                        <Check size={18} strokeWidth={3} />
+                        <Check size={16} strokeWidth={3.5} />
                       ) : (
-                        <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                        <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
                       )}
                     </div>
 
-                    <div
-                      className={`text-sm transition-colors duration-300 ${
-                        isActive
-                          ? "font-bold text-gray-900"
-                          : isCompleted
-                            ? "font-semibold text-gray-700"
-                            : "font-semibold text-gray-600"
-                      }`}
-                    >
-                      {s.title}
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`truncate text-xs sm:text-sm font-black ${
+                          isActive
+                            ? "text-slate-900"
+                            : isCompleted
+                              ? "text-emerald-700"
+                              : "text-slate-400"
+                        }`}
+                      >
+                        {s.title}
+                      </p>
+                      <p
+                        className={`truncate text-[10px] font-semibold ${
+                          isActive ? "text-blue-600" : "text-slate-400"
+                        }`}
+                      >
+                        {isCompleted
+                          ? "Completed ✓"
+                          : isActive
+                            ? s.subtitle
+                            : "Locked"}
+                      </p>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
+
+          {/* Bottom Progress Bar */}
+          <div className="space-y-1.5 border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-500">
+              <span>Stage {step} of 8</span>
+              <span className="text-blue-600">{progressPct}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all duration-500"
+                style={{ width: `${Math.max(8, progressPct)}%` }}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* RIGHT SIDE: INTERACTIVE CONTENT CARD */}
-        <div className="flex min-h-[600px] flex-1 flex-col overflow-hidden rounded-4xl bg-white shadow-xs">
+        {/* =================================================================
+            RIGHT SIDE: MAIN INTERACTIVE STAGE CARD
+            ================================================================= */}
+        <div className="relative flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200/80">
+          {isFinishing && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/85 backdrop-blur-xs">
+              <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+              <p className="mt-3 text-sm font-black text-slate-800">
+                Completing Spoon {currentSpoon} &amp; unlocking Vocab Bridge...
+              </p>
+            </div>
+          )}
           {renderStep()}
         </div>
       </div>
@@ -271,7 +371,6 @@ function FoundationContent({ foundation }: FoundationContentProps) {
   );
 }
 
-// Main Wrapper receiving real data from Page Server Component
 export function FoundationWrapperProd({
   foundation,
 }: {
@@ -282,21 +381,22 @@ export function FoundationWrapperProd({
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 p-6 text-center">
         <h2 className="text-2xl font-bold text-slate-800">Lesson not found</h2>
         <p className="text-sm text-slate-500">
-          This lesson might not exist or doesn't belong to your account.
+          This lesson might not exist or doesn&apos;t belong to your account.
         </p>
       </div>
     );
   }
 
-  // Handle lesson still generating in the background
   if (foundation.status === "BUILDING") {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 p-6 text-center">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-        <h2 className="text-2xl font-bold text-slate-800">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-lg">
+          <Sparkles className="h-7 w-7 animate-spin" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900">
           Spoon {foundation.orderIndex} is still baking...
         </h2>
-        <p className="max-w-md text-sm text-slate-500">
+        <p className="max-w-md text-sm font-medium text-slate-500">
           Our language engine is assembling your exercises and audio cues. This
           usually takes a minute or two.
         </p>

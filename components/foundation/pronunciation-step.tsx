@@ -18,27 +18,29 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  Lock,
   X,
 } from "lucide-react";
 
 type WordResult = { score: number; omitted: boolean };
 type VoicePhase = "waiting" | "speaking" | "wrapping_up";
 
-// Green = good, orange = needs work, red = retry
+const PASSING_SCORE = 60;
+const MAX_REQUIRED_ATTEMPTS = 2;
+
 const tone = (score: number, omitted: boolean) => {
-  if (omitted || score < 60) return "text-red-600 bg-red-50";
-  if (score < 80) return "text-orange-500 bg-orange-50";
-  return "text-green-600 bg-green-50";
+  if (omitted || score < 60)
+    return "text-rose-700 bg-rose-100/90 ring-1 ring-rose-300";
+  if (score < 80)
+    return "text-amber-800 bg-amber-100/90 ring-1 ring-amber-300";
+  return "text-emerald-800 bg-emerald-100/90 ring-1 ring-emerald-300";
 };
 
-/**
- * Clean 60fps live microphone waveform using Web Audio API.
- * Detects 3 phases:
- *  - "waiting": user hasn't spoken yet
- *  - "speaking": user is actively speaking
- *  - "wrapping_up": user spoke and just paused (Azure is detecting end-of-speech silence)
- */
-function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) => void }) {
+function LiveWaveform({
+  onPhaseChange,
+}: {
+  onPhaseChange?: (phase: VoicePhase) => void;
+}) {
   const BAR_COUNT = 28;
   const barRefs = useRef<(HTMLDivElement | null)[]>([]);
   const hasSpokenRef = useRef(false);
@@ -74,7 +76,9 @@ function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) =
         }
 
         const AudioContextClass =
-          window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext })
+            .webkitAudioContext;
         audioCtx = new AudioContextClass();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
@@ -89,7 +93,6 @@ function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) =
         const updateWaveform = () => {
           analyser.getByteFrequencyData(dataArray);
 
-          // Calculate average energy in vocal range
           let sum = 0;
           const vocalBins = Math.min(20, dataArray.length);
           for (let i = 1; i < vocalBins; i++) {
@@ -107,12 +110,10 @@ function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) =
             if (!silenceStartRef.current) {
               silenceStartRef.current = now;
             } else if (now - silenceStartRef.current > 400) {
-              // User has finished speaking and paused for 400ms
               setPhase("wrapping_up");
             }
           }
 
-          // Mirror bars from the center outward
           for (let i = 0; i < half; i++) {
             const value = dataArray[i + 1] ?? 0;
             const normalized = Math.min(1, value / 200);
@@ -156,7 +157,10 @@ function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) =
   }, [onPhaseChange]);
 
   return (
-    <div className="flex h-12 items-center justify-center gap-1 px-4" aria-hidden="true">
+    <div
+      className="flex h-12 items-center justify-center gap-1 px-4"
+      aria-hidden="true"
+    >
       {Array.from({ length: BAR_COUNT }).map((_, i) => (
         <div
           key={i}
@@ -171,10 +175,29 @@ function LiveWaveform({ onPhaseChange }: { onPhaseChange?: (phase: VoicePhase) =
   );
 }
 
-export function PronunciationStep({ data, onNext }: { data: any; onNext: () => void }) {
+export function PronunciationStep({
+  data,
+  onNext,
+}: {
+  data: any;
+  onNext: () => void;
+}) {
   const { speak, isPlaying: isPlayingTTS, stop: stopTTS } = useSpeak();
-  const { playWord, isPlaying: isPlayingWord, stopAudio: stopWordAudio, targetLang: contextLang } = useWordAudio();
-  const { status, isRecording, score, error, assessSpeech, cancelAssessment, reset } = usePronunciation();
+  const {
+    playWord,
+    isPlaying: isPlayingWord,
+    stopAudio: stopWordAudio,
+    targetLang: contextLang,
+  } = useWordAudio();
+  const {
+    status,
+    isRecording,
+    score,
+    error,
+    assessSpeech,
+    cancelAssessment,
+    reset,
+  } = usePronunciation();
 
   const { trackInteraction } = useMatrix();
   const trackedSeen = useRef<Set<string>>(new Set());
@@ -182,12 +205,13 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
   const lastTrackedScore = useRef<unknown>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  // Which text the current score belongs to, so a score never lands on the wrong word
   const [assessedText, setAssessedText] = useState<string | null>(null);
   const [voicePhase, setVoicePhase] = useState<VoicePhase>("waiting");
+  const [stepAttempts, setStepAttempts] = useState<number>(0);
 
   const isListening = status === "listening";
   const isAnalyzing = status === "analyzing";
+  const isBusy = isListening || isAnalyzing || isRecording;
 
   const targetLang = contextLang || data.targetLang || "fr-FR";
 
@@ -195,22 +219,28 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
   const totalSteps = breakdown.length + 1;
   const isFullSentenceStep = currentIndex === breakdown.length;
 
-  const currentText = isFullSentenceStep ? data.referenceText : breakdown[currentIndex]?.text || "";
-  const currentPhonetic = isFullSentenceStep ? null : breakdown[currentIndex]?.phonetic;
-  const currentHint = isFullSentenceStep ? "Put it all together!" : breakdown[currentIndex]?.hint;
+  const currentText = isFullSentenceStep
+    ? data.referenceText
+    : breakdown[currentIndex]?.text || "";
+  const currentPhonetic = isFullSentenceStep
+    ? null
+    : breakdown[currentIndex]?.phonetic;
+  const currentHint = isFullSentenceStep
+    ? "Put it all together!"
+    : breakdown[currentIndex]?.hint;
 
-  const activeFocusSound = data.focusSounds?.find((fs: any) => fs.positions?.includes(currentIndex));
+  const activeFocusSound = data.focusSounds?.find((fs: any) =>
+    fs.positions?.includes(currentIndex)
+  );
   const isAudioActive = isFullSentenceStep ? isPlayingTTS : isPlayingWord;
 
   const tokens: string[] = (currentText ?? "").split(/\s+/).filter(Boolean);
   const scoreIsForThisStep = !!score && assessedText === currentText;
 
-  // Reset voice phase when listening ends
   useEffect(() => {
     if (!isListening) setVoicePhase("waiting");
   }, [isListening]);
 
-  // word -> result, straight from Azure
   const wordResults = useMemo(() => {
     const map = new Map<string, WordResult>();
     if (!score) return map;
@@ -223,15 +253,18 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
     return map;
   }, [score]);
 
-  // Falls back to the overall score if Azure merged/split a word
   const resultFor = (token: string): WordResult | null => {
     if (!score) return null;
     const key = cleanWord(token);
     if (!key) return null;
-    return wordResults.get(key) ?? { score: score.pronunciationScore, omitted: false };
+    return (
+      wordResults.get(key) ?? {
+        score: score.pronunciationScore,
+        omitted: false,
+      }
+    );
   };
 
-  // 1. SEEN: each word on screen counts once (the full sentence reuses words already seen)
   useEffect(() => {
     tokens.forEach((t) => {
       const key = cleanWord(t);
@@ -243,11 +276,11 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentText]);
 
-  // 2. SPOKEN: each word saves its OWN score, only for the text it was recorded for
   useEffect(() => {
     if (!score || score === lastTrackedScore.current) return;
     if (assessedText !== currentText) return;
     lastTrackedScore.current = score;
+    setStepAttempts((prev) => prev + 1);
 
     tokens.forEach((t) => {
       const key = cleanWord(t);
@@ -274,6 +307,7 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
     reset();
     setAssessedText(null);
     setVoicePhase("waiting");
+    setStepAttempts(0);
     stopAllAudio();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
@@ -284,12 +318,11 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
   }, []);
 
   const handleStartRecording = async () => {
-    if (status !== "idle") return;
+    if (isBusy) return;
 
     stopAllAudio();
 
     if (!currentText || !targetLang) {
-      console.error("Missing text or targetLang:", { currentText, targetLang });
       return;
     }
 
@@ -298,7 +331,7 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
   };
 
   const handlePlayAudio = async () => {
-    if (isRecording) return;
+    if (isBusy) return;
 
     if (isAudioActive) {
       stopAllAudio();
@@ -307,7 +340,6 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
 
     stopAllAudio();
 
-    // 3. HEARD: first listen per word
     tokens.forEach((t) => {
       const key = cleanWord(t);
       if (key && !trackedHeard.current.has(key)) {
@@ -332,18 +364,37 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
     }
   };
 
+  const overallScore =
+    scoreIsForThisStep && score ? Math.round(score.pronunciationScore) : null;
+  const hasPassedStep =
+    overallScore !== null && overallScore >= PASSING_SCORE;
+  const canContinue =
+    hasPassedStep || stepAttempts >= MAX_REQUIRED_ATTEMPTS;
+
   const ScoreBar = ({ label, value }: { label: string; value: number }) => (
     <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-        <span className="text-gray-500">{label}</span>
-        <span className={value >= 80 ? "text-green-600" : value >= 60 ? "text-yellow-600" : "text-red-600"}>
+      <div className="flex justify-between text-xs font-black tracking-wider uppercase">
+        <span className="text-slate-500">{label}</span>
+        <span
+          className={
+            value >= 80
+              ? "text-emerald-600"
+              : value >= 60
+                ? "text-amber-600"
+                : "text-rose-600"
+          }
+        >
           {Math.round(value)}%
         </span>
       </div>
-      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
         <div
-          className={`h-full rounded-full transition-all duration-1000 ease-out ${
-            value >= 80 ? "bg-green-500" : value >= 60 ? "bg-yellow-400" : "bg-red-500"
+          className={`h-full rounded-full transition-all duration-700 ease-out ${
+            value >= 80
+              ? "bg-emerald-500"
+              : value >= 60
+                ? "bg-amber-400"
+                : "bg-rose-500"
           }`}
           style={{ width: `${value}%` }}
         />
@@ -352,55 +403,74 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
   );
 
   return (
-    <div className="flex flex-col h-full p-8 animate-in fade-in duration-500 overflow-y-auto">
-      {/* Header & Progress */}
-      <div className="mb-10 text-center">
-        <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-6">Pronunciation Lab</h2>
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+      {/* 1. Header & Segmented Progress */}
+      <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <div>
+          <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">
+            {isFullSentenceStep
+              ? "Final Step • Full Sentence"
+              : `Chunk ${currentIndex + 1} of ${totalSteps - 1}`}
+          </span>
+          <h2 className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Pronunciation Lab
+          </h2>
+        </div>
 
-        <div className="flex items-center justify-center gap-2 mb-2">
+        <div className="flex items-center gap-2">
           {Array.from({ length: totalSteps }).map((_, idx) => (
             <div
               key={idx}
               className={`h-2.5 rounded-full transition-all duration-300 ${
                 idx === currentIndex
-                  ? "w-8 bg-blue-600"
+                  ? "w-9 bg-gradient-to-r from-sky-400 to-blue-600"
                   : idx < currentIndex
-                  ? "w-2.5 bg-green-500"
-                  : "w-2.5 bg-gray-200"
+                    ? "w-5 bg-emerald-500"
+                    : "w-5 bg-slate-200"
               }`}
             />
           ))}
         </div>
-        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-          {isFullSentenceStep ? "Final Step: Full Sentence" : `Part ${currentIndex + 1} of ${totalSteps - 1}`}
-        </p>
       </div>
 
-      {/* Target Flashcard */}
+      {/* 2. 3D Target Flashcard Stage */}
       <div
-        className={`mb-8 p-10 bg-white rounded-3xl border shadow-xs text-center relative overflow-hidden transition-all duration-300 ${
+        className={`relative mb-6 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 ${
           isListening
-            ? "border-indigo-300 ring-4 ring-indigo-500/10"
+            ? "border-indigo-500 ring-4 ring-indigo-500/10"
             : isAnalyzing
-            ? "border-amber-200 bg-amber-50/10"
-            : "border-gray-200"
+              ? "border-amber-400 bg-amber-50/10"
+              : hasPassedStep
+                ? "border-emerald-500 shadow-lg shadow-emerald-500/10"
+                : scoreIsForThisStep
+                  ? "border-amber-400"
+                  : "border-slate-200 shadow-sm"
         }`}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-50 opacity-40 pointer-events-none">
-          <Mic size={160} />
+        <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70">
+          <Mic size={150} />
         </div>
 
-        {/* Each word colored by its own score after recording */}
-        <p className="relative z-10 mb-4 flex flex-wrap justify-center gap-x-2 gap-y-2 text-4xl md:text-5xl font-bold leading-snug tracking-tight text-gray-900">
+        <p className="relative z-10 mb-3 flex flex-wrap justify-center gap-x-2.5 gap-y-2 text-3xl sm:text-5xl font-black leading-snug tracking-tight text-slate-900">
           {tokens.map((token, i) => {
             const r = scoreIsForThisStep ? resultFor(token) : null;
-            if (!r) return <span key={i}>{token}</span>;
             return (
               <span
                 key={i}
-                title={r.omitted ? "Skipped" : `${Math.round(r.score)}%`}
-                className={`rounded-xl px-2 transition-colors ${tone(r.score, r.omitted)} ${
-                  r.omitted ? "line-through decoration-2" : ""
+                onClick={() => !isBusy && playWord(token, "m")}
+                title={
+                  r
+                    ? r.omitted
+                      ? "Skipped — tap to hear"
+                      : `${Math.round(r.score)}% — tap to hear`
+                    : "Tap to hear"
+                }
+                className={`cursor-pointer rounded-xl px-2.5 py-1 transition-all hover:scale-105 ${
+                  r
+                    ? `${tone(r.score, r.omitted)} ${
+                        r.omitted ? "line-through decoration-2" : ""
+                      }`
+                    : "hover:bg-sky-50 hover:text-blue-600"
                 }`}
               >
                 {token}
@@ -410,173 +480,210 @@ export function PronunciationStep({ data, onNext }: { data: any; onNext: () => v
         </p>
 
         {currentPhonetic && (
-          <p className="text-lg font-mono text-gray-400 relative z-10 mb-6">/{currentPhonetic}/</p>
+          <p className="relative z-10 mb-5 font-mono text-base sm:text-lg font-bold text-slate-400">
+            /{currentPhonetic}/
+          </p>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-3 relative z-10">
+        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2.5">
           {activeFocusSound && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-50 text-purple-700 text-sm font-bold border border-purple-200">
-              <Ear size={16} /> Focus: {activeFocusSound.sound}
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-1.5 text-xs sm:text-sm font-black text-purple-700">
+              <Ear size={15} /> Focus: {activeFocusSound.sound}
             </div>
           )}
           {currentHint && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-bold border border-blue-100">
-              <Activity size={16} /> {currentHint}
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-1.5 text-xs sm:text-sm font-bold text-blue-800">
+              <Activity size={15} /> {currentHint}
             </div>
           )}
         </div>
       </div>
 
-      {/* Interactive Recorder & State Dock */}
-      <div className="mb-8 flex flex-col items-center">
-        {/* 1. IDLE STATE: Listen & Start Speaking Buttons */}
-        {status === "idle" && (
-          <div className="w-full flex flex-col items-center gap-2.5">
-            <div className="flex flex-col sm:flex-row gap-4 w-full">
+      {/* 3. Interactive 3D Recorder & Listen Controls */}
+      <div className="mb-6 flex flex-col items-center">
+        {!isListening && !isAnalyzing && (
+          <div className="flex w-full max-w-2xl flex-col items-center gap-2.5">
+            <div className="flex w-full flex-col gap-3.5 sm:flex-row">
+              {/* 3D Listen Button */}
               <button
+                type="button"
                 onClick={handlePlayAudio}
-                disabled={isRecording}
-                className={`flex-1 py-5 px-6 font-bold rounded-2xl flex items-center justify-center gap-3 transition-all border shadow-xs text-lg disabled:opacity-50 ${
+                disabled={isBusy}
+                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 px-6 py-4 text-base font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${
                   isAudioActive
-                    ? "bg-blue-50 border-blue-200 text-blue-700 ring-4 ring-blue-50"
-                    : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300"
+                    ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md"
+                    : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:border-sky-400 hover:bg-sky-50/40"
                 }`}
               >
-                {isAudioActive ? <Square size={24} className="fill-current" /> : <Volume2 size={24} />}
-                {isAudioActive ? "Stop" : "Listen"}
+                {isAudioActive ? (
+                  <Square size={20} className="fill-current" />
+                ) : (
+                  <Volume2 size={22} className="text-blue-600" />
+                )}
+                <span>{isAudioActive ? "Stop Audio" : "1. Listen"}</span>
               </button>
 
+              {/* 3D Speak / Retry Button */}
               <button
+                type="button"
                 onClick={handleStartRecording}
-                className="flex-1 py-5 px-6 font-bold rounded-2xl flex items-center justify-center gap-3 transition-all border shadow-xs text-lg bg-gray-900 hover:bg-black border-gray-900 text-white active:scale-[0.98]"
+                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                  scoreIsForThisStep && !hasPassedStep
+                    ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25"
+                    : scoreIsForThisStep
+                      ? "border-slate-700 bg-gradient-to-b from-slate-700 to-slate-900"
+                      : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25"
+                }`}
               >
-                {scoreIsForThisStep ? (
+                {scoreIsForThisStep || error ? (
                   <>
-                    <RotateCcw size={22} />
-                    Try Again
+                    <RotateCcw size={20} />
+                    <span>
+                      {hasPassedStep ? "Practice Again" : "Try Again"}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <Mic size={24} />
-                    Start Speaking
+                    <Mic size={22} />
+                    <span>2. Start Speaking</span>
                   </>
                 )}
               </button>
             </div>
 
-            <p className="text-xs text-gray-400 font-medium text-center">
-              Recording stops and analyzes automatically when you finish speaking
+            <p className="text-center text-xs font-semibold text-slate-400">
+              Recording stops and scores automatically as soon as you pause
             </p>
           </div>
         )}
 
-        {/* 2. LISTENING STATE: Live Waveform + Automatic End Guidance */}
+        {/* LISTENING WAVEFORM */}
         {isListening && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-2xl border border-indigo-200 bg-indigo-50/50 px-6 py-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-indigo-200 bg-indigo-50/60 px-6 py-5 animate-in fade-in zoom-in-95 duration-200">
             <LiveWaveform onPhaseChange={setVoicePhase} />
 
-            <div className="mt-3 flex items-center gap-2 text-sm font-bold">
+            <div className="mt-3 flex items-center gap-2 text-sm font-extrabold">
               {voicePhase === "waiting" && (
                 <>
-                  <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse" />
-                  <span className="text-indigo-800">
-                    {isFullSentenceStep ? "Speak the sentence clearly now..." : "Say the word clearly now..."}
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-indigo-500" />
+                  <span className="text-indigo-900">
+                    {isFullSentenceStep
+                      ? "Speak the sentence clearly now..."
+                      : "Say the chunk clearly now..."}
                   </span>
                 </>
               )}
 
               {voicePhase === "speaking" && (
                 <>
-                  <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-ping" />
-                  <span className="text-green-700">Hearing you — pause when you're done</span>
+                  <span className="h-2.5 w-2.5 animate-ping rounded-full bg-emerald-500" />
+                  <span className="text-emerald-700">
+                    Hearing you — pause when you&apos;re done
+                  </span>
                 </>
               )}
 
               {voicePhase === "wrapping_up" && (
                 <>
-                  <Sparkles size={16} className="text-indigo-600 animate-spin" />
-                  <span className="text-indigo-700">Got it! Starting analysis automatically...</span>
+                  <Sparkles
+                    size={16}
+                    className="animate-spin text-indigo-600"
+                  />
+                  <span className="text-indigo-700">
+                    Got it! Scoring your pronunciation...
+                  </span>
                 </>
               )}
             </div>
 
-            <p className="mt-1 text-xs text-indigo-600/80 text-center">
-              {voicePhase === "wrapping_up"
-                ? "Hold still for a moment while we wrap up your audio"
-                : "No need to press stop — analysis starts automatically after you finish"}
-            </p>
-
-            {/* Secondary Cancel button so users don't mistakenly click it to 'submit' */}
             <button
+              type="button"
               onClick={cancelAssessment}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-200/60 hover:text-gray-700 transition-colors"
+              className="mt-3 inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold text-slate-500 hover:bg-slate-200/60 hover:text-slate-800"
             >
               <X size={14} /> Cancel
             </button>
           </div>
         )}
 
-        {/* 3. ANALYZING STATE: Clear Feedback while Azure scores */}
+        {/* ANALYZING */}
         {isAnalyzing && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-2xl border border-amber-200 bg-amber-50/60 px-6 py-6 text-center animate-in fade-in duration-200">
-            <Loader2 size={30} className="mb-2.5 animate-spin text-amber-600" />
-            <p className="font-bold text-gray-900 text-base">Analyzing your pronunciation...</p>
-            <p className="text-xs text-gray-500 mt-1">Grading accuracy, fluency, and syllable stress</p>
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-amber-200 bg-amber-50/60 px-6 py-6 text-center animate-in fade-in duration-200">
+            <Loader2 size={30} className="mb-2 animate-spin text-amber-600" />
+            <p className="text-base font-extrabold text-slate-900">
+              Analyzing your pronunciation...
+            </p>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">
+              Grading accuracy, fluency, and syllable stress
+            </p>
           </div>
         )}
       </div>
 
-      {/* Azure Error Display */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-start gap-3">
-          <AlertCircle className="shrink-0 mt-0.5" size={20} />
-          <p className="font-medium">{error}</p>
+      {/* Error Banner */}
+      {error && !isBusy && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="shrink-0" size={18} />
+            <p>{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartRecording}
+            className="shrink-0 rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-black text-white hover:bg-rose-700"
+          >
+            Retry Mic
+          </button>
         </div>
       )}
 
-      {/* Azure Results Display */}
-      {scoreIsForThisStep && score && status === "idle" && (
-        <div className="mb-8 p-6 bg-white rounded-2xl border border-gray-200 shadow-xs animate-in slide-in-from-bottom-4">
-          <div className="flex justify-between items-center mb-6">
+      {/* 4. Score Breakdown Card */}
+      {scoreIsForThisStep && score && !isBusy && (
+        <div className="mb-6 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 animate-in slide-in-from-bottom-3">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Activity className="text-blue-500" size={24} />
-              <h3 className="font-extrabold text-gray-900 text-lg">Analysis</h3>
+              <Activity className="text-blue-600" size={20} />
+              <h3 className="text-sm font-black text-slate-900 uppercase">
+                Voice Telemetry
+              </h3>
             </div>
-            {score.pronunciationScore >= 80 && (
-              <span className="flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-bold">
-                <CheckCircle2 size={16} /> Great job!
+            {hasPassedStep ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+                <CheckCircle2 size={14} /> Great job!
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
+                Aim for {PASSING_SCORE}%+ (Attempt {stepAttempts}/
+                {MAX_REQUIRED_ATTEMPTS})
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-5">
-            <ScoreBar label="Pronunciation" value={score.pronunciationScore} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <ScoreBar label="Overall" value={score.pronunciationScore} />
             <ScoreBar label="Accuracy" value={score.accuracyScore} />
             <ScoreBar label="Fluency" value={score.fluencyScore} />
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-4 border-t border-gray-100 pt-4 text-sm font-semibold text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-green-500" /> 80%+ Great
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-orange-400" /> 60–79% Getting there
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-red-500" /> Under 60% or skipped
-            </span>
           </div>
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="mt-auto pt-6 flex justify-end border-t border-gray-100">
+      {/* 5. Footer Navigation */}
+      <div className="mt-auto flex justify-end border-t border-slate-100 pt-5">
         <button
+          type="button"
           onClick={handleNextWord}
-          disabled={isRecording}
-          className="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-md shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+          disabled={isBusy || !canContinue}
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
+            !isBusy && canContinue
+              ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+              : "cursor-not-allowed bg-slate-200/80 text-slate-400"
+          }`}
         >
-          {isFullSentenceStep ? "Finish Practice" : "Next Word"} <ArrowRight size={20} />
+          {!canContinue && <Lock size={16} />}
+          <span>
+            {isFullSentenceStep ? "Next: Listening Focus" : "Next Chunk"}
+          </span>
+          <ArrowRight size={18} />
         </button>
       </div>
     </div>

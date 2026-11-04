@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Volume2, Loader2, ArrowRight, CheckCircle2, Play } from "lucide-react";
+import {
+  Volume2,
+  Loader2,
+  ArrowRight,
+  Check,
+  Play,
+  Lock,
+  Sparkles,
+} from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { useSpeak } from "@/hooks/use-speak";
 import { useWordAudio } from "@/context/word-audio-context";
@@ -14,10 +22,8 @@ export function GrammarStep({
   data: any;
   onNext: () => void;
 }) {
-  // Main sentence TTS
   const { speak, isLoading: isSentenceLoading } = useSpeak();
 
-  // Word-level native audio from context
   const {
     playWord,
     activeWord,
@@ -25,21 +31,17 @@ export function GrammarStep({
     targetLang,
   } = useWordAudio();
 
-  // Matrix Tracking
   const { trackInteraction } = useMatrix();
   const hasTrackedSeen = useRef(false);
 
-  // Engagement Tracking States
   const [hasPlayedSentence, setHasPlayedSentence] = useState(false);
   const [heardWords, setHeardWords] = useState<Set<string>>(new Set());
 
-  // Extract unique words so duplicates don't break the counter or double-track
   const uniqueWords = useMemo(() => {
     if (!data?.words) return [];
     return Array.from(new Set(data.words.map((w: any) => w.word))) as string[];
   }, [data?.words]);
 
-  // 1. Track "seen" for all unique words on load (Only Once!)
   useEffect(() => {
     if (!hasTrackedSeen.current && uniqueWords.length > 0) {
       uniqueWords.forEach((word) => {
@@ -57,68 +59,69 @@ export function GrammarStep({
   const handleWordClick = (word: string) => {
     playWord(word, "m");
 
-    // 2. Track "heard" only the first time they click it
     if (!heardWords.has(word)) {
       trackInteraction(word, { heard: 1 });
       setHeardWords((prev) => new Set(prev).add(word));
     }
   };
 
-  // 3. Ensure they listened to the sentence AND every unique word
   const allWordsHeard = heardWords.size === uniqueWords.length;
   const isNextEnabled = hasPlayedSentence && allWordsHeard;
 
   return (
-    <div className="flex flex-col h-full p-8 animate-in fade-in duration-500 overflow-y-auto">
-      <div className="mb-8 shrink-0">
-        <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2">
-          Grammar & Meaning
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+      {/* 1. Header */}
+      <div className="mb-6 shrink-0">
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+          Grammar &amp; Meaning
         </h2>
-        <p className="text-gray-500 text-lg">
-          Listen to the full sentence first, then tap each word below to unlock the next step.
+        <p className="mt-1 text-sm sm:text-base font-medium text-slate-500">
+          Listen to the full sentence first, then tap each word tile below to
+          unlock the next stage.
         </p>
       </div>
 
-      {/* STEP 1: Target Sentence Display */}
-      <div className="mb-8 shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+      {/* 2. STEP 1: 3D Full Sentence Audio Card */}
+      <div className="mb-7 shrink-0">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase">
             Step 1 • Full Sentence Audio
           </h3>
           <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[11px] font-black ${
               hasPlayedSentence
-                ? "bg-green-100 text-green-700"
-                : "bg-blue-100 text-blue-700 animate-pulse"
+                ? "bg-emerald-100 text-emerald-800"
+                : "animate-pulse bg-sky-100 text-blue-700"
             }`}
           >
             {hasPlayedSentence ? (
               <>
-                <CheckCircle2 size={13} /> Played
+                <Check size={12} strokeWidth={3.5} /> Played
               </>
             ) : (
-              "1 Required • Tap Card Below"
+              "Tap Card Below"
             )}
           </span>
         </div>
 
         <button
+          type="button"
           onClick={handlePlaySentence}
           disabled={isSentenceLoading}
-          className={`group w-full p-6 md:p-8 rounded-2xl border-2 text-left transition-all relative overflow-hidden cursor-pointer ${
+          className={`group relative w-full overflow-hidden rounded-3xl border-2 border-b-[6px] p-6 sm:p-7 text-left transition-all duration-150 focus:outline-none ${
             hasPlayedSentence
-              ? "bg-white border-green-300 shadow-xs hover:border-green-400"
-              : "bg-linear-to-br from-blue-50 via-indigo-50/80 to-blue-50 border-blue-400 shadow-md ring-4 ring-blue-100 hover:shadow-lg hover:border-blue-500"
+              ? "border-emerald-500 bg-gradient-to-b from-emerald-50/50 via-white to-white shadow-md hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2"
+              : "border-sky-400 bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/50 shadow-lg shadow-blue-500/10 hover:-translate-y-0.5 hover:border-blue-500 active:translate-y-0.5 active:border-b-2"
           }`}
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="mb-2.5 flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[10px] font-black tracking-wider uppercase ${
                     hasPlayedSentence
-                      ? "bg-green-100 text-green-700"
-                      : "bg-blue-600 text-white shadow-xs"
+                      ? "bg-emerald-500 text-white"
+                      : "bg-blue-600 text-white"
                   }`}
                 >
                   {isSentenceLoading ? (
@@ -128,60 +131,60 @@ export function GrammarStep({
                     </>
                   ) : hasPlayedSentence ? (
                     <>
-                      <CheckCircle2 size={13} />
-                      Sentence Played (Tap to Replay)
+                      <Check size={12} strokeWidth={3.5} />
+                      Sentence Heard • Tap to Replay
                     </>
                   ) : (
                     <>
-                      <Volume2 size={13} />
+                      <Volume2 size={12} />
                       Tap Here to Listen First
                     </>
                   )}
                 </span>
               </div>
 
-              <p className="text-3xl md:text-4xl font-extrabold text-blue-950 mb-2">
+              <p className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
                 {data.targetSentence}
               </p>
-              <p className="text-lg text-blue-900/70 font-medium">
+              <p className="mt-1 text-base sm:text-lg font-semibold text-slate-500">
                 {data.nativeSentence}
               </p>
             </div>
 
-            {/* Prominent Big Play Button */}
+            {/* 3D Play / Replay Button */}
             <div
-              className={`flex items-center gap-2.5 px-5 py-3.5 rounded-2xl font-bold text-sm shrink-0 transition-all ${
+              className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-5 py-3.5 text-sm font-black transition-all ${
                 hasPlayedSentence
-                  ? "bg-green-50 text-green-700 border border-green-200 group-hover:bg-green-100"
-                  : "bg-blue-600 text-white shadow-lg shadow-blue-600/25 group-hover:bg-blue-700 group-hover:scale-105"
+                  ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-sm"
+                  : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md shadow-blue-500/25 group-hover:scale-105"
               }`}
             >
               {isSentenceLoading ? (
-                <Loader2 className="animate-spin" size={20} />
+                <Loader2 className="animate-spin" size={18} />
               ) : hasPlayedSentence ? (
                 <>
-                  <Volume2 size={20} />
+                  <Volume2 size={18} />
                   <span>Replay</span>
                 </>
               ) : (
                 <>
-                  <Play size={18} className="fill-current" />
+                  <Play size={16} className="fill-current" />
                   <span>Play Sentence</span>
                 </>
               )}
             </div>
           </div>
 
-          {/* Highlight Group */}
+          {/* Highlight Group Chunks */}
           {data.highlightGroup && data.highlightGroup.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-4 mt-5 border-t border-blue-200/60">
-              <span className="text-sm font-semibold text-blue-800 flex items-center mr-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-4">
+              <span className="mr-1 text-xs font-black tracking-wider text-slate-400 uppercase">
                 Key Chunks:
               </span>
               {data.highlightGroup.map((chunk: string, idx: number) => (
                 <span
                   key={idx}
-                  className="bg-white/90 text-blue-900 px-3 py-1 rounded-md text-sm font-bold shadow-xs border border-blue-100"
+                  className="rounded-xl bg-amber-50 px-3 py-1 text-xs font-black text-amber-900 ring-1 ring-amber-200/80"
                 >
                   {chunk}
                 </span>
@@ -191,25 +194,25 @@ export function GrammarStep({
         </button>
       </div>
 
-      {/* STEP 2: Word-by-Word Breakdown List */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+      {/* 3. STEP 2: 3D Word-by-Word Breakdown List */}
+      <div className="mb-6 flex-1">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h3 className="text-[11px] font-black tracking-widest text-slate-400 uppercase">
             Step 2 • Word-by-Word Breakdown
           </h3>
           <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-[11px] font-black ${
               allWordsHeard
-                ? "bg-green-100 text-green-700"
-                : "bg-blue-100 text-blue-700"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-sky-100 text-blue-700"
             }`}
           >
-            {allWordsHeard && <CheckCircle2 size={13} />}
-            {heardWords.size} / {uniqueWords.length} Words Played
+            {allWordsHeard && <Check size={12} strokeWidth={3.5} />}
+            {heardWords.size} / {uniqueWords.length} Words Heard
           </span>
         </div>
 
-        <ScrollArea className="h-[280px]">
+        <ScrollArea className="h-[260px]">
           <div className="grid grid-cols-1 gap-3 pr-3 pb-2 md:grid-cols-2">
             {data.words.map((wordObj: any, idx: number) => {
               const isThisWordPlaying =
@@ -219,53 +222,47 @@ export function GrammarStep({
               return (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => handleWordClick(wordObj.word)}
                   disabled={isWordPlaying}
-                  className={`group flex items-center gap-3 rounded-xl border p-3 text-left shadow-xs transition-all cursor-pointer ${
+                  className={`group flex items-center gap-3.5 rounded-2xl border-2 border-b-[4px] p-3.5 text-left transition-all duration-150 ${
                     isThisWordPlaying
-                      ? "border-blue-500 bg-blue-50"
+                      ? "-translate-y-0.5 border-blue-600 bg-sky-50 shadow-md"
                       : hasBeenHeard
-                        ? "border-green-200 bg-green-50/30 hover:border-green-300"
-                        : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50"
+                        ? "border-emerald-400 bg-emerald-50/30 hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2"
+                        : "border-slate-200 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
                   }`}
                 >
+                  {/* 3D Mini Speaker Badge */}
                   <div
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] transition-all ${
                       isThisWordPlaying
-                        ? "bg-blue-600 text-white"
+                        ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
                         : hasBeenHeard
-                          ? "bg-green-100 text-green-600"
-                          : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"
+                          ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                          : "border-sky-200 bg-sky-50 text-blue-600 group-hover:border-blue-800 group-hover:bg-gradient-to-b group-hover:from-sky-400 group-hover:to-blue-600 group-hover:text-white"
                     }`}
                   >
                     {isThisWordPlaying ? (
                       <Loader2 className="animate-spin" size={14} />
                     ) : hasBeenHeard ? (
-                      <CheckCircle2 size={14} />
+                      <Check size={14} strokeWidth={3.5} />
                     ) : (
                       <Volume2 size={14} />
                     )}
                   </div>
 
-                  <div className="flex flex-col">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-1.5">
-                      <span
-                        className={`font-bold transition-colors ${
-                          isThisWordPlaying
-                            ? "text-blue-900"
-                            : hasBeenHeard
-                              ? "text-green-900"
-                              : "text-gray-900 group-hover:text-blue-700"
-                        }`}
-                      >
+                      <span className="text-base font-black text-slate-900">
                         {wordObj.word}
                       </span>
-                      <span className="text-sm text-gray-400">
+                      <span className="text-xs font-bold text-slate-400">
                         = {wordObj.gloss}
                       </span>
                     </div>
 
-                    <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                    <span className="mt-0.5 block text-[10px] font-extrabold tracking-widest text-blue-600/80 uppercase">
                       {wordObj.role}
                     </span>
                   </div>
@@ -276,52 +273,55 @@ export function GrammarStep({
         </ScrollArea>
       </div>
 
-      {/* Footer with explicit requirement pills */}
-      <div className="mt-auto pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+      {/* 4. Footer with Checklist Pills + 3D Next Button */}
+      <div className="mt-auto flex shrink-0 flex-col items-center justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handlePlaySentence}
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold ring-1 transition-all ${
               hasPlayedSentence
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-blue-50 text-blue-700 border border-blue-300 hover:bg-blue-100"
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "bg-sky-50 text-blue-700 ring-sky-200 hover:bg-sky-100"
             }`}
           >
             {hasPlayedSentence ? (
-              <CheckCircle2 size={14} />
+              <Check size={13} strokeWidth={3.5} />
             ) : (
-              <Volume2 size={14} />
+              <Volume2 size={13} />
             )}
-            1. Play Full Sentence
+            1. Play Sentence
           </button>
 
           <span
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold ring-1 ${
               allWordsHeard
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-gray-100 text-gray-600 border border-gray-200"
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "bg-slate-100 text-slate-600 ring-slate-200"
             }`}
           >
             {allWordsHeard ? (
-              <CheckCircle2 size={14} />
+              <Check size={13} strokeWidth={3.5} />
             ) : (
-              <Volume2 size={14} />
+              <Sparkles size={13} />
             )}
-            2. Play All Words ({heardWords.size}/{uniqueWords.length})
+            2. Tap All Words ({heardWords.size}/{uniqueWords.length})
           </span>
         </div>
 
         <button
+          type="button"
           onClick={onNext}
           disabled={!isNextEnabled}
-          className={`w-full sm:w-auto px-8 py-4 font-bold rounded-xl text-lg transition-all flex items-center justify-center gap-2 ${
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
             isNextEnabled
-              ? "bg-gray-900 hover:bg-black text-white shadow-md active:scale-95"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+              : "cursor-not-allowed bg-slate-200/80 text-slate-400"
           }`}
         >
-          Next: Pronunciation Lab <ArrowRight size={20} />
+          {!isNextEnabled && <Lock size={16} />}
+          <span>Next: Pronunciation Lab</span>
+          <ArrowRight size={18} />
         </button>
       </div>
     </div>
