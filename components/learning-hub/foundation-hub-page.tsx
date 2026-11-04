@@ -16,10 +16,8 @@ import { generateDisplayTitles } from "@/lib/utils";
 import { DashboardHeader } from "./dashboard-header";
 import { PrimaryHeroCard } from "./primary-hero-card";
 import { GenerationCycleCard } from "./generation-cycle-card";
-import {
-  LearningPathMiniCards,
-  PastSpoonsVocabSlimList,
-} from "./learning-mini-path-cards";
+import { LearningPathMiniCards } from "./learning-mini-path-cards";
+import { PastActivitySlimList } from "./past-activity-slim-list";
 import { WordMatrixCard } from "./word-matrix-card";
 
 import { SpriteChat } from "@/components/sprite/sprite-chat";
@@ -215,6 +213,9 @@ export default function FoundationHubPage({
     setLiveTask,
   ]);
 
+  const activeOrderIndex =
+    currentFocus?.data.orderIndex ?? completedLessonsCount + 1;
+
   return (
     <div className="min-h-screen bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100">
       <DashboardHeader
@@ -227,7 +228,7 @@ export default function FoundationHubPage({
       <main className="relative z-20 mx-auto -mt-12 max-w-7xl px-6 pb-20 lg:px-8">
         <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
           {/* LEFT / MAIN COLUMN */}
-          <div className="flex flex-col gap-7 lg:col-span-8">
+          <div className="flex flex-col justify-between gap-7 lg:col-span-8">
             {waitingOnSpoon && generationData ? (
               <GenerationCycleCard data={generationData} />
             ) : (
@@ -256,7 +257,7 @@ export default function FoundationHubPage({
             />
           </div>
 
-          {/* RIGHT PANEL: Word Matrix + Slim Past Spoons & Vocab Remix List */}
+          {/* RIGHT PANEL: Word Matrix + Dedicated Past Activity Slim List */}
           <div className="flex flex-col gap-6 lg:col-span-4">
             <WordMatrixCard
               totalWordsLearned={totalWordsLearned}
@@ -265,14 +266,16 @@ export default function FoundationHubPage({
               isLocked={completedLessonsCount === 0}
             />
 
-            <PastSpoonsVocabSlimList
+            <PastActivitySlimList
               courseId={courseId}
               lessons={lessons}
+              activeOrderIndex={activeOrderIndex}
               getLessonHref={getLessonHref}
+              getVocabHref={getVocabHref}
+              getBossHref={getBossHref}
               displayTitles={displayTitles}
-              onLaunchSpriteExercise={(lesson) => {
-                // Ready to wire into your Sprite Exercise / ⚡ Charge modal!
-                console.log("Launch Sprite Exercise for Spoon:", lesson.id);
+              onLaunchSpriteExercise={(item) => {
+                console.log("Launch Sprite Exercise for:", item);
               }}
             />
           </div>

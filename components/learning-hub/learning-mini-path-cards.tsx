@@ -1,7 +1,6 @@
 // learning-mini-path-cards.tsx
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   Lock,
@@ -10,13 +9,9 @@ import {
   Swords,
   Zap,
   Headphones,
-  RotateCcw,
   Sparkles,
   Crown,
-  Wand2,
   Flame,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 
@@ -457,8 +452,6 @@ function UpNextWideBanner({
         ? `Vocab Bridge ${lesson.orderIndex}`
         : `Boss ${milestoneNum}`;
 
-  // Color-match the Up Next Banner to the exact category color:
-  // BRIDGE = Amber, SPOON = Blue, BOSS = Purple
   const bannerStyles =
     type === "BRIDGE"
       ? {
@@ -532,164 +525,6 @@ function UpNextWideBanner({
             <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
           </span>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================================
-   SLIM PAST SPOONS & VOCAB LIST (Placed under WordMatrixCard in Right Column!)
-   - All Spoon # Badges = Primary Blue (matches Spoon nodes on map!)
-   - All Vocab Words   = Accent Amber pills (matches Bridge nodes on map!)
-   - Magic Wand Button = Tertiary Purple
-   ============================================================================ */
-export function PastSpoonsVocabSlimList({
-  courseId,
-  lessons = [],
-  getLessonHref,
-  displayTitles,
-  onLaunchSpriteExercise,
-}: {
-  courseId: string;
-  lessons: Lesson[];
-  getLessonHref?: (lessonId: string) => string;
-  displayTitles?: Map<string, string>;
-  onLaunchSpriteExercise?: (lesson: Lesson) => void;
-}) {
-  const PAGE_SIZE = 3;
-  const [page, setPage] = useState(0);
-
-  const allCompleted = lessons
-    .filter((l) => Boolean(l.completedAt))
-    .slice()
-    .reverse();
-
-  if (allCompleted.length === 0) return null;
-
-  const totalPages = Math.max(1, Math.ceil(allCompleted.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const visibleLessons = allCompleted.slice(
-    safePage * PAGE_SIZE,
-    safePage * PAGE_SIZE + PAGE_SIZE
-  );
-
-  const resolveLessonHref = (lessonId: string) =>
-    getLessonHref
-      ? getLessonHref(lessonId)
-      : `/foundation/${lessonId}/${courseId}`;
-
-  return (
-    <div className="flex flex-1 flex-col justify-between overflow-hidden rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-      {/* Header + Prev / Next Cycle Controls */}
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-100 text-blue-600">
-            <Headphones className="h-3.5 w-3.5" />
-          </span>
-          <h3 className="text-xs font-black tracking-wider text-slate-800 uppercase">
-            Past Spoons &amp; Vocab
-          </h3>
-        </div>
-
-        {/* Cycle Controls */}
-        <div className="flex items-center gap-1.5">
-          <span className="mr-1 text-[10px] font-bold text-slate-400">
-            {safePage + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={safePage === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Newer Spoons"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            disabled={safePage >= totalPages - 1}
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Older Spoons"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* 3-Item List (Sits Flush with Left Column!) */}
-      <div className="my-auto divide-y divide-slate-100">
-        {visibleLessons.map((lesson) => {
-          const title =
-            displayTitles?.get(lesson.id) ||
-            lesson.title ||
-            `Spoon ${lesson.orderIndex}`;
-
-          const vocabItems =
-            (lesson.bridge?.vocabMoment as Array<{
-              word: string;
-              gloss?: string;
-            }>) ?? [];
-
-          return (
-            <div
-              key={lesson.id}
-              className="flex items-center justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
-            >
-              {/* Left: Primary Blue 3D Spoon Pill + Title + Accent Amber Vocab Tags */}
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white shadow-2xs">
-                  #{lesson.orderIndex}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-slate-800">
-                    {title}
-                  </p>
-                  {vocabItems.length > 0 ? (
-                    <div className="mt-1 flex flex-wrap items-center gap-1">
-                      {vocabItems.slice(0, 3).map((v, vIdx) => (
-                        <span
-                          key={vIdx}
-                          className="inline-flex items-center gap-0.5 rounded-md bg-amber-50 px-1.5 py-0.2 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200/80"
-                        >
-                          <Zap className="h-2.5 w-2.5 fill-amber-400 text-amber-500" />
-                          {v.word}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] font-medium text-slate-400">
-                      Completed Spoon
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: [Retry] + [Magic Wand / ⚡ Charge Sprite Exercise] */}
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Link
-                  href={resolveLessonHref(lesson.id)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-sky-50 px-2.5 py-1.5 text-[11px] font-extrabold text-blue-700 ring-1 ring-sky-200/80 transition hover:bg-sky-100"
-                  title="Replay this Spoon"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Retry</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => onLaunchSpriteExercise?.(lesson)}
-                  className="inline-flex items-center gap-1 rounded-xl border-b-2 border-purple-900 bg-gradient-to-b from-violet-500 to-purple-700 px-2.5 py-1.5 text-[11px] font-black text-white shadow-2xs transition hover:brightness-110 active:translate-y-0.5 active:border-b-0"
-                  title="Spend 1 ⚡ Charge to launch a custom Sprite Exercise with this Spoon's vocab!"
-                >
-                  <Wand2 className="h-3 w-3" />
-                  <Zap className="h-2.5 w-2.5 fill-amber-300 text-amber-300" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
