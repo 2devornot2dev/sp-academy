@@ -227,6 +227,62 @@
   }
 }
 
+/* app/globals.css */
+
+@layer components {
+  /* Base 3D Tactile Button Physics */
+  .btn-3d {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 px-6 py-3.5 font-black transition-all duration-150 select-none focus:outline-none;
+    @apply shadow-[0_6px_16px_rgba(15,23,42,0.12),inset_0_2px_0_rgba(255,255,255,0.35)];
+    @apply hover:-translate-y-0.5 hover:brightness-105;
+    @apply active:translate-y-0.5 active:border-b-0 active:shadow-none;
+    @apply disabled:pointer-events-none disabled: translate-y-0 disabled:border-b-0 disabled:bg-slate-200/80 disabled:from-transparent disabled:to-transparent disabled:text-slate-400 disabled:shadow-none;
+  }
+
+  /* 1. Primary Blue (Spoons / Main Actions) */
+  .btn-3d-primary {
+    @apply border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/25;
+  }
+
+  /* 2. Secondary Emerald (Success / Complete / Start) */
+  .btn-3d-emerald {
+    @apply border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-emerald-500/25;
+  }
+
+  /* 3. Accent Amber (Vocab Bridge / Unlock) */
+  .btn-3d-amber {
+    @apply border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/25;
+  }
+
+  /* 4. Tertiary Purple / Indigo (Boss / Word Matrix / Sprite Magic) */
+  .btn-3d-purple {
+    @apply border-purple-900 bg-gradient-to-b from-violet-500 to-purple-700 text-white shadow-purple-500/25;
+  }
+
+  .btn-3d-indigo {
+    @apply border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-700 text-white shadow-indigo-500/25;
+  }
+
+  /* 5. Neutral / White 3D Button (Previous / Secondary / Retry) */
+  .btn-3d-white {
+    @apply border-slate-300 bg-gradient-to-b from-white to-slate-100 text-slate-700 ring-1 ring-slate-200/80 hover:text-slate-900;
+  }
+
+  /* 6. Danger / Rose 3D Button */
+  .btn-3d-rose {
+    @apply border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-rose-500/25;
+  }
+
+  /* Size Modifiers (Optional) */
+  .btn-3d-sm {
+    @apply rounded-xl border-b-[3px] px-3.5 py-2 text-xs;
+  }
+
+  .btn-3d-lg {
+    @apply rounded-2xl border-b-4 px-10 py-4 text-base sm:text-lg;
+  }
+}
+
 .w-md-editor {
   width: 100% !important;
 }
