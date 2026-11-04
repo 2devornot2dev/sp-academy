@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 import type { UserGenerationData } from "@/lib/upstash";
@@ -10,7 +10,6 @@ import {
   getBridgeSpriteOrderIndex,
   getBossSpriteOrderIndex,
 } from "@/lib/foundation/tools";
-import { vocabWordCount } from "./utils";
 
 import { DashboardHeader } from "./dashboard-header";
 import { PrimaryHeroCard } from "./primary-hero-card";
@@ -19,6 +18,7 @@ import { LearningPathMiniCards } from "./learning-mini-path-cards";
 import { WordMatrixCard } from "./word-matrix-card";
 
 import { SpriteChat } from "@/components/sprite/sprite-chat";
+import { vocabWordCount, generateDisplayTitles } from "@/lib/utils";
 
 type Props = {
   path: LearningPath | null;
@@ -37,6 +37,8 @@ export default function FoundationHubPage({
   const lessons = path?.lessons ?? [];
   const courseId = path?.courseId ?? (path as any)?.id ?? "default";
   const user = path?.user;
+  const displayTitles = useMemo(() => generateDisplayTitles(lessons), [lessons]);
+
 
   // --- ENGINE STATE ---
   const currentFocus = path?.currentFocus ?? null;
@@ -235,6 +237,7 @@ const getLessonHref = (lessonId: string) =>
                 waitingOnBoss={waitingOnBoss}
                 getLessonHref={getLessonHref}
                 getBossHref={getBossHref}
+                displayTitles={displayTitles}
               />
             )}
 
@@ -245,6 +248,7 @@ const getLessonHref = (lessonId: string) =>
               lessons={lessons} // 👈 Add this prop so the Unit Roadmap & Replay strip have the lesson history!
               getLessonHref={getLessonHref}
               getBossHref={getBossHref}
+              displayTitles={displayTitles}
             />
           </div>
 

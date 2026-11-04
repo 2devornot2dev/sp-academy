@@ -41,6 +41,7 @@ export function LearningPathMiniCards({
   nextLocked,
   lessons = [],
   getLessonHref,
+  displayTitles,
 }: {
   courseId: string;
   currentFocus: FocusState;
@@ -48,6 +49,7 @@ export function LearningPathMiniCards({
   lessons?: Lesson[];
   getLessonHref?: (lessonId: string) => string;
   getBossHref?: (bossId: string, lessonId: string) => string;
+  displayTitles?: Map<string, string>;
 }) {
   if (!currentFocus) return null;
 
@@ -74,7 +76,7 @@ export function LearningPathMiniCards({
   return (
     <div className="space-y-6">
       {/* =====================================================================
-          1. UNIT MILESTONE ROADMAP (Replaces the duplicate Active Step card!)
+          1. UNIT MILESTONE ROADMAP
           ===================================================================== */}
       <div className="rounded-3xl bg-white p-5 sm:p-6 shadow-sm ring-1 ring-slate-200/70">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -181,13 +183,14 @@ export function LearningPathMiniCards({
             <UpNextCompactTile
               type={nextLocked.type}
               lesson={nextLocked.data}
+              displayTitles={displayTitles}
             />
           </div>
         )}
       </div>
 
       {/* =====================================================================
-          2. RECENTLY COMPLETED SPOONS (Quick Practice / Replay Strip)
+          2. RECENTLY COMPLETED SPOONS (With Roman Numeral Titles)
           ===================================================================== */}
       {recentCompleted.length > 0 && (
         <div className="space-y-3">
@@ -201,36 +204,43 @@ export function LearningPathMiniCards({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {recentCompleted.map((lesson) => (
-              <Link
-                key={lesson.id}
-                href={resolveLessonHref(lesson.id)}
-                className="group flex items-center gap-3.5 rounded-2xl bg-white p-3 shadow-2xs ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-indigo-300"
-              >
-                <div className="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-900">
-                  {lesson.imageUrl ? (
-                    <img
-                      src={lesson.imageUrl}
-                      alt={lesson.title ?? "Lesson Image"}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  ) : null}
-                  <div className="absolute top-1 left-1 rounded bg-emerald-500 px-1.5 py-0.2 text-[9px] font-black text-white">
-                    #{lesson.orderIndex}
-                  </div>
-                </div>
+            {recentCompleted.map((lesson) => {
+              const lessonTitle =
+                displayTitles?.get(lesson.id) ||
+                lesson.title ||
+                `Spoon ${lesson.orderIndex}`;
 
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-slate-800 group-hover:text-indigo-600">
-                    {lesson.title || `Spoon ${lesson.orderIndex}`}
-                  </p>
-                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-indigo-500">
-                    <RotateCcw className="h-3 w-3" />
-                    Replay Lesson
-                  </span>
-                </div>
-              </Link>
-            ))}
+              return (
+                <Link
+                  key={lesson.id}
+                  href={resolveLessonHref(lesson.id)}
+                  className="group flex items-center gap-3.5 rounded-2xl bg-white p-3 shadow-2xs ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-indigo-300"
+                >
+                  <div className="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-900">
+                    {lesson.imageUrl ? (
+                      <img
+                        src={lesson.imageUrl}
+                        alt={lesson.title ?? "Lesson Image"}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : null}
+                    <div className="absolute top-1 left-1 rounded bg-emerald-500 px-1.5 py-0.2 text-[9px] font-black text-white">
+                      #{lesson.orderIndex}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-black text-slate-800 group-hover:text-indigo-600">
+                      {lessonTitle}
+                    </p>
+                    <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-indigo-500">
+                      <RotateCcw className="h-3 w-3" />
+                      Replay Lesson
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
@@ -241,18 +251,22 @@ export function LearningPathMiniCards({
 function UpNextCompactTile({
   type,
   lesson,
+  displayTitles,
 }: {
   type: "SPOON" | "BRIDGE" | "BOSS";
   lesson: Lesson;
+  displayTitles?: Map<string, string>;
 }) {
   const theme = LOCKED_THEMES[type];
 
+  const formattedTitle = displayTitles?.get(lesson.id) || lesson.title;
+
   const title =
     type === "SPOON"
-      ? lesson.title || `Spoon ${lesson.orderIndex}`
+      ? formattedTitle || `Spoon ${lesson.orderIndex}`
       : type === "BRIDGE"
-        ? lesson.title
-          ? `Vocab Bridge: ${lesson.title}`
+        ? formattedTitle
+          ? `Vocab Bridge: ${formattedTitle}`
           : `Vocab Checkpoint ${lesson.orderIndex}`
         : lesson.bossStage?.scenarioData?.boss?.name ||
           `Milestone ${Math.ceil(lesson.orderIndex / 3)} Boss`;

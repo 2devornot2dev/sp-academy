@@ -15,7 +15,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
-import { vocabWordCount } from "./utils";
+import { vocabWordCount } from "@/lib/utils";
 
 type Lesson = LearningPath["lessons"][number];
 
@@ -65,6 +65,7 @@ type PrimaryHeroCardProps = {
   waitingOnBoss?: boolean;
   getLessonHref: (id: string) => string;
   getBossHref?: (bossId: string, lessonId: string) => string;
+  displayTitles?: Map<string, string>;
 };
 
 export function PrimaryHeroCard({
@@ -77,6 +78,7 @@ export function PrimaryHeroCard({
   waitingOnBoss = false,
   getLessonHref,
   getBossHref,
+  displayTitles,
 }: PrimaryHeroCardProps) {
   const [themeIndex, setThemeIndex] = useState(0);
 
@@ -110,6 +112,11 @@ export function PrimaryHeroCard({
       bossDue?.orderIndex ??
       1;
 
+    // Safely format title if lesson exists, otherwise default to Spoon {spoonNum}
+    const waitingSpoonTitle = nextLesson
+      ? displayTitles?.get(nextLesson.id) || nextLesson.title || `Spoon ${spoonNum}`
+      : `Spoon ${spoonNum}`;
+
     return (
       <div className="relative overflow-hidden rounded-3xl bg-slate-950 p-7 text-white shadow-xl sm:p-8">
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/25 blur-3xl" />
@@ -119,7 +126,7 @@ export function PrimaryHeroCard({
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/20 px-3.5 py-1 text-xs font-extrabold tracking-wide text-indigo-200 uppercase">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-300" />
             {waitingOnSpoon
-              ? `Crafting Spoon ${spoonNum}`
+              ? `Crafting ${waitingSpoonTitle}`
               : waitingOnBoss
                 ? "Building Boss Arena"
                 : `Building Vocab Bridge ${spoonNum}`}
@@ -127,7 +134,7 @@ export function PrimaryHeroCard({
 
           <h3 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
             {waitingOnSpoon
-              ? `Personalizing Spoon ${spoonNum} for you...`
+              ? `Personalizing ${waitingSpoonTitle} for you...`
               : waitingOnBoss
                 ? "Designing Your Boss Stage Scenario..."
                 : "Synthesizing Your Vocab Bridge..."}
@@ -298,6 +305,9 @@ export function PrimaryHeroCard({
         gloss?: string;
       }>) ?? [];
 
+    const bridgeTitle =
+      displayTitles?.get(vocabDue.id) || vocabDue.title || `Spoon ${vocabDue.orderIndex}`;
+
     return (
       <div className="group relative overflow-hidden rounded-3xl border border-amber-200/90 bg-white text-slate-900 shadow-xl">
         <div className="grid grid-cols-1 md:grid-cols-12">
@@ -315,7 +325,7 @@ export function PrimaryHeroCard({
               </div>
 
               <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                Review: {vocabDue.title}
+                Review: {bridgeTitle}
               </h3>
               <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-600">
                 Master the {vocabWordCount(vocabDue.bridge.vocabMoment)} core
@@ -375,10 +385,12 @@ export function PrimaryHeroCard({
     );
   }
 
-  // 4. NEXT SPOON READY — Split Cinema Hero so the Scene Artwork Shines!
+  // 4. NEXT SPOON READY
   if (nextLesson) {
     const milestoneNum = Math.ceil(nextLesson.orderIndex / 3);
     const stepInMilestone = ((nextLesson.orderIndex - 1) % 3) + 1; // 1, 2, or 3
+    const titleToDisplay =
+      displayTitles?.get(nextLesson.id) || nextLesson.title || `Spoon ${nextLesson.orderIndex}`;
 
     return (
       <div className="group relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl ring-1 ring-white/10">
@@ -387,7 +399,7 @@ export function PrimaryHeroCard({
           <div className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-[58%] overflow-hidden">
             <img
               src={nextLesson.imageUrl}
-              alt={nextLesson.imageAlt ?? nextLesson.title ?? "Lesson Image"}
+              alt={nextLesson.imageAlt ?? "Spoon Image"}
               className="h-full w-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-105"
             />
             {/* Smooth blend into the dark left text column */}
@@ -416,9 +428,9 @@ export function PrimaryHeroCard({
               </span>
             </div>
 
-            {/* Lesson Title & Description */}
+            {/* Title with Roman Numeral */}
             <h2 className="mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
-              Spoon {nextLesson.orderIndex}: {nextLesson.title}
+              Spoon {nextLesson.orderIndex}: {titleToDisplay}
             </h2>
             <p className="mt-2.5 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">
               Master essential speech patterns, native pronunciation, and

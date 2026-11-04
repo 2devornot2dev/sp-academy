@@ -142,6 +142,19 @@ export function BookWrapper({
 
   const isAudioActive = isPlayingPage || activeSentenceIdx !== null;
 
+  // Shuffle options once per page load so the correct answer isn't always first!
+  const shuffledOptions = useMemo(() => {
+    const opts = activePageContent?.checkpoint?.options;
+    if (!opts) return [];
+    
+    const shuffled = [...opts];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [activePageContent?.checkpoint]);
+
   // Stop any playing audio & cancel 60fps loop
   const stopAudio = useCallback(() => {
     sequenceCancelledRef.current = true;
@@ -954,9 +967,9 @@ export function BookWrapper({
               </div>
 
               {activePageContent.checkpoint.type === "multiple_choice" &&
-              activePageContent.checkpoint.options ? (
+              shuffledOptions.length > 0 ? (
                 <div className="space-y-2.5">
-                  {activePageContent.checkpoint.options.map((opt, i) => {
+                  {shuffledOptions.map((opt, i) => {
                     const isSelected = selectedOption?.text === opt.text;
                     const isCorrectSelection = isSelected && opt.isCorrect;
                     const isWrongSelection = isSelected && !opt.isCorrect;
