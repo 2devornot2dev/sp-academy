@@ -102,6 +102,7 @@ export default function BossFoundationClient({
   const resolvedDefaultAvatarUrl = urls[0];
   const resolvedCoverUrl = urls[1];
   const bossAvatar = resolvedDefaultAvatarUrl || FALLBACK_AVATAR;
+  const bossVideoUrl = urls[2];
 
   return (
     <div className="min-h-screen w-full animate-bg p-4 sm:p-6 flex flex-col justify-center">
