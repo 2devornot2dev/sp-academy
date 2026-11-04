@@ -385,10 +385,10 @@ export function PastActivitySlimList({
                     title={`Replay this ${styles.typeLabel}`}
                   >
                     <RotateCcw className="h-3 w-3" />
-                    <span>Retry</span>
+                    {/* <span>Retry</span> */}
                   </Link>
 
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() => onLaunchSpriteExercise?.(item)}
                     className="inline-flex items-center gap-1 rounded-xl border-b-2 border-purple-900 bg-gradient-to-b from-violet-500 to-purple-700 px-2.5 py-1.5 text-[11px] font-black text-white shadow-2xs transition hover:brightness-110 active:translate-y-0.5 active:border-b-0"
@@ -396,7 +396,7 @@ export function PastActivitySlimList({
                   >
                     <Wand2 className="h-3 w-3" />
                     <Zap className="h-2.5 w-2.5 fill-amber-300 text-amber-300" />
-                  </button>
+                  </button> */}
                 </div>
               </div>
             );
