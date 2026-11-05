@@ -571,16 +571,7 @@ export default function FreestyleSetup({
           {/* RIGHT COLUMN: original Session Preferences + personas */}
           <div className="flex flex-col lg:col-span-4 lg:min-h-0">
             <div className="flex flex-col rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-extrabold tracking-wider text-indigo-700 uppercase">
-                  <Volume2 className="h-3.5 w-3.5 text-indigo-600" /> Voice
-                  &amp; Language
-                </span>
-                <span className="text-xs font-extrabold text-emerald-600">
-                  ● Ready
-                </span>
-              </div>
-
+            
               <h3 className="mt-4 text-xl font-black text-slate-900">
                 Session Preferences
               </h3>
