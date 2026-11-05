@@ -1,5 +1,6 @@
 // components/sprite/sprite-chat.tsx
 "use client";
+import { useRouter } from "next/navigation";
 
 import {
   useCallback,
@@ -24,6 +25,7 @@ import {
   type ChatContextData,
 } from "./sprite-chat-utils";
 import type { SpriteSessionData } from "@/lib/schema/sprite-schema";
+
 
 export type { ChatContextData } from "./sprite-chat-utils";
 
@@ -52,6 +54,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     playAudioUrl, // <--- Used to play the TTS audio blob
     stopAudio, // <--- Used to stop audio when user replies or closes chat
   } = useSprite();
+  const router = useRouter();
 
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
   const [sessionsList, setSessionsList] = useState<SpriteSessionData[]>([]);
@@ -242,6 +245,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
         }
       } catch (err) {
         console.error("Failed to persist turn:", err);
+      } finally {
+        router.refresh();
       }
     },
   });
@@ -380,7 +385,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     sendWithSessionBody(`Help me practice how to use "${word}"`);
   };
 
-  const energyCount = (profile as any)?.energy ?? 1;
+  const energyCount = profile?.energy ?? 0;
+  const maxEnergy = profile?.maxEnergy ?? 3;
 
   return (
     <>
@@ -562,8 +568,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
                 currentLessonTitle={aiBrain.currentLessonTitle}
                 activeTab={activeTab}
                 sessionsCount={sessionsList.length}
-                energyCount={energyCount}
-                maxEnergy={3}
+                energyCount={Math.min(energyCount, maxEnergy)}
+                maxEnergy={maxEnergy}
                 isSnoozing={isSnoozing}
                 isSessionActive={turns.length > 0}
                 onSelectTab={setActiveTab}

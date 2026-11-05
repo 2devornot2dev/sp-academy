@@ -83,7 +83,6 @@ export async function POST(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-
   let body: any;
   try {
     body = await req.json();
@@ -104,17 +103,22 @@ export async function POST(
       ? body.sessionId.trim()
       : undefined;
 
+  // Moved out of the try block so the energy check can use them
+  const userPrompt = getLastUserText(messages);
+  const isManualStepAdvance = /^(next step|got it, next step)/i.test(
+    userPrompt.trim(),
+  );
+
   const rawSpriteName = clean(body.spriteName, "Vox");
 
-   // 1. Fetch the user's Sprite + Persona (cached or fast indexed lookup)
+  // 1. Fetch the user's Sprite + Persona (cached or fast indexed lookup)
   const userSpriteProfile = await prisma.spriteProfile.findUnique({
     where: { userId },
     include: { sprite: true },
   });
 
   const spriteName =
-    userSpriteProfile?.sprite?.name ||
-    clean(body.spriteName, "Vox");
+    userSpriteProfile?.sprite?.name || clean(body.spriteName, "Vox");
 
   const spritePersona =
     userSpriteProfile?.sprite?.persona ||
@@ -250,14 +254,24 @@ FORMAT:
 }
 `;
 
+  // 4. ENERGY: spend 1 charge atomically (free for "Next Step" clicks).
+  // Placed after all early-return validation so a failed setup never costs energy.
+  let energySpent = false;
+  if (!isManualStepAdvance) {
+    const spent = await prisma.spriteProfile.updateMany({
+      where: { userId, energy: { gt: 0 } },
+      data: { energy: { decrement: 1 } },
+    });
+    if (spent.count === 0) {
+      return NextResponse.json(
+        { error: "Out of energy", code: "NO_ENERGY" },
+        { status: 429 },
+      );
+    }
+    energySpent = true;
+  }
+
   try {
-    const userPrompt = getLastUserText(messages);
-
-    // Pre-process fast client step advances: if user clicked "Next Step" on a teach_concept step
-    const isManualStepAdvance =
-      /^next step/i.test(userPrompt.trim()) ||
-      /^got it, next step/i.test(userPrompt.trim());
-
     const result = streamText({
       model: groq(GROQ_LLM),
       instructions: systemPrompt,
@@ -372,12 +386,12 @@ FORMAT:
               title: autoTitle,
               lessonTitle: currentLessonTitle,
               turns: updatedTurns,
-              board: finalBoardToSave, // <--- NEW: saved to SpriteSession.board!
+              board: finalBoardToSave,
             },
             update: {
               title: autoTitle,
               turns: updatedTurns,
-              ...(finalBoardToSave ? { board: finalBoardToSave } : {}), // <--- NEW!
+              ...(finalBoardToSave ? { board: finalBoardToSave } : {}),
             },
           });
 
@@ -398,6 +412,15 @@ FORMAT:
       stream: toUIMessageStream({ stream: result.stream }),
     });
   } catch (error) {
+    // Refund the charge if the AI call failed before streaming started
+    if (energySpent) {
+      await prisma.spriteProfile
+        .update({
+          where: { userId },
+          data: { energy: { increment: 1 } },
+        })
+        .catch(() => {});
+    }
     console.error(`${tag} Groq chat error:`, error);
     return NextResponse.json({ error: "AI service error" }, { status: 502 });
   }

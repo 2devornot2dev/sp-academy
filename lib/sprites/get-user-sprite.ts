@@ -13,6 +13,9 @@ export const getUserSprite = cache(async (userId: string) => {
       nativeVoiceId: true,
       targetVoiceId: true,
       context: true,
+      energy:true,
+      maxEnergy: true,
+      notifications: true,
       sprite: {
         select: {
           slug: true,
