@@ -24,6 +24,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
   const greeting = getGreeting();
   const signatures = getSignatures(wordSuperlatives);
   const badges = getBadges(languageCard);
+  const profile = user?.profile
 
   const cyclePct =
     upcoming.focusType === "BOSS"
@@ -298,7 +299,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                 </span>
               </div>
 
-              <ActivityFeed />
+              <ActivityFeed profile={profile} />
             </div>
           </div>
         </div>

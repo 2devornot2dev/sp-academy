@@ -16,8 +16,11 @@ export interface FeedActivityItem {
   user: {
     id: string;
     name: string;
+    displayUsername?: string | null;
     username?: string | null;
+    email?: string | null;
     avatarUrl?: string | null;
+    image?: string | null;
   };
   badge: string;
   title: string;

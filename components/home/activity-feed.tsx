@@ -13,6 +13,8 @@ import {
   Flame,
 } from "lucide-react";
 import type { FeedActivityItem } from "@/app/api/shared-activity/route";
+import { UserProfileData } from "@/app/actions/get-home-dashboard";
+import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 
 function LikeButton({ item }: { item: FeedActivityItem }) {
   const [liked, setLiked] = useState(Boolean(item.liked));
@@ -120,12 +122,13 @@ function ActivityTypeEmblem({ item }: { item: FeedActivityItem }) {
   );
 }
 
-export default function ActivityFeed() {
+export default function ActivityFeed({ profile }: { profile: UserProfileData | null }) {
   const [activities, setActivities] = useState<FeedActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const userId = profile?.id;
 
   useEffect(() => {
-    fetch("/api/shared-activity")
+    fetch(`/api/users/${userId}/shared-activity`)
       .then((res) => (res.ok ? res.json() : { activities: [] }))
       .then((data) => {
         if (Array.isArray(data?.activities)) {
@@ -136,7 +139,7 @@ export default function ActivityFeed() {
       })
       .catch(() => setActivities([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [userId]);
 
   if (loading) {
     return (
@@ -171,6 +174,8 @@ export default function ActivityFeed() {
         const safeDate = item.createdAt ? new Date(item.createdAt) : new Date();
         const timeAgo = formatDistanceToNow(safeDate, { addSuffix: true });
         const userName = item.user?.name || "Learner";
+        const displayUsername = item.user?.displayUsername || item.user?.username || "Learner";
+        const avatarUrl = item.user?.avatarUrl || item.user?.image || "";
 
         return (
           <div
@@ -180,10 +185,15 @@ export default function ActivityFeed() {
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-teal-500 text-[10px] font-black text-white">
-                  {userName[0]?.toUpperCase() || "S"}
+                  <Avatar>
+                    <AvatarImage src={avatarUrl} alt={displayUsername} />
+                    <AvatarFallback>
+                      {displayUsername[0]?.toUpperCase() || "L"}
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 <span className="text-xs font-extrabold text-slate-800 truncate">
-                  {userName}
+                  {displayUsername}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 shrink-0">
                   · {timeAgo}

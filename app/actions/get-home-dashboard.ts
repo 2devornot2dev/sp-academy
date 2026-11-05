@@ -10,6 +10,15 @@ export interface WordSuperlative {
   count: number;
   subLabel: string;
 }
+export interface UserProfileData {
+  id: string;
+  email: string;
+  image: string | null;
+  avatarUrl: string | null;
+  username: string | null;
+  firstName: string | null;
+  displayUsername: string | null;
+}
 
 export interface HomeDashboardData {
   user: {
@@ -17,6 +26,7 @@ export interface HomeDashboardData {
     firstName: string;
     name: string;
     avatarUrl: string | null;
+    profile: UserProfileData | null;
   };
   languageCard: {
     courseId: string;
@@ -90,42 +100,56 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   const user = await requireUser();
   if (!user) return null;
 
-  const [course, bossStages, spriteProfile, langProfiles] = await Promise.all([
-    prisma.foundationCourse.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      include: {
-        lessons: {
-          orderBy: { orderIndex: "asc" },
-          include: { foundationBridge: true },
+  const [course, bossStages, spriteProfile, langProfiles, userProfile] =
+    await Promise.all([
+      prisma.foundationCourse.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        include: {
+          lessons: {
+            orderBy: { orderIndex: "asc" },
+            include: { foundationBridge: true },
+          },
         },
-      },
-    }),
-    prisma.foundationBossStage.findMany({
-      where: { userId: user.id },
-      orderBy: { milestoneIndex: "asc" },
-    }),
-    prisma.spriteProfile.findUnique({
-      where: { userId: user.id },
-      include: { sprite: true },
-    }),
-    prisma.languageProfile.findMany({
-      where: { userId: user.id },
-      include: {
-        wordStats: {
-          where: { seenCount: { gt: 0 } },
+      }),
+      prisma.foundationBossStage.findMany({
+        where: { userId: user.id },
+        orderBy: { milestoneIndex: "asc" },
+      }),
+      prisma.spriteProfile.findUnique({
+        where: { userId: user.id },
+        include: { sprite: true },
+      }),
+      prisma.languageProfile.findMany({
+        where: { userId: user.id },
+        include: {
+          wordStats: {
+            where: { seenCount: { gt: 0 } },
+          },
         },
-      },
-    }),
-  ]);
+      }),
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: {
+          id: true,
+          email: true,
+          image: true,
+          avatarUrl: true,
+          username: true,
+          firstName: true,
+          displayUsername: true,
+        },
+      }),
+    ]);
 
   const lessons = course?.lessons ?? [];
   const completedLessons = lessons.filter(
-    (l) => l.status === "COMPLETED" || Boolean(l.completedAt)
+    (l) => l.status === "COMPLETED" || Boolean(l.completedAt),
   );
   const spoonsCompleted = completedLessons.length;
   const bridgesCompleted = lessons.filter(
-    (l) => l.foundationBridge && Boolean((l.foundationBridge as any).completedAt)
+    (l) =>
+      l.foundationBridge && Boolean((l.foundationBridge as any).completedAt),
   ).length;
   const bossesDefeated = bossStages.filter((b) => Boolean(b.passed)).length;
 
@@ -134,27 +158,27 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   const totalWordsBanked = allWords.length;
 
   const spokenWords = allWords.filter(
-    (w) => (w.spokenAttempts ?? 0) > 0 && w.avgSpokenScore != null
+    (w) => (w.spokenAttempts ?? 0) > 0 && w.avgSpokenScore != null,
   );
   const spokenResonanceAvg =
     spokenWords.length > 0
       ? Math.round(
           spokenWords.reduce((acc, w) => acc + (w.avgSpokenScore || 0), 0) /
-            spokenWords.length
+            spokenWords.length,
         )
       : 0;
 
- // Guarantee 4 DISTINCT words across Most Seen, Most Tapped, Most Spoken, Most Heard
+  // Guarantee 4 DISTINCT words across Most Seen, Most Tapped, Most Spoken, Most Heard
   const usedWords = new Set<string>();
 
   const pickTopUnique = (
     list: any[],
     scoreFn: (w: any) => number,
-    subFn: (w: any, val: number) => string
+    subFn: (w: any, val: number) => string,
   ): WordSuperlative | null => {
     if (list.length === 0) return null;
     const candidates = list.filter(
-      (w) => w?.word && !usedWords.has(String(w.word).toLowerCase())
+      (w) => w?.word && !usedWords.has(String(w.word).toLowerCase()),
     );
     const pool = candidates.length > 0 ? candidates : list;
     const sorted = [...pool].sort((a, b) => scoreFn(b) - scoreFn(a));
@@ -177,25 +201,25 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
     (w, v) =>
       `${v}x${
         w.avgSpokenScore != null ? ` · ${Math.round(w.avgSpokenScore)}%` : ""
-      }`
+      }`,
   );
 
   const mostTapped = pickTopUnique(
     allWords,
     (w) => Number(w.tappedCorrect ?? 0) + Number(w.tappedWrong ?? 0),
-    (w, v) => `${v} taps (${w.tappedCorrect ?? v} hit)`
+    (w, v) => `${v} taps (${w.tappedCorrect ?? v} hit)`,
   );
 
   const mostHeard = pickTopUnique(
     allWords,
     (w) => Number(w.heardCount ?? w.seenCount ?? 0),
-    (_, v) => `Heard ${v}x`
+    (_, v) => `Heard ${v}x`,
   );
 
   const mostSeen = pickTopUnique(
     allWords,
     (w) => Number(w.seenCount ?? 0),
-    (_, v) => `Seen ${v}x`
+    (_, v) => `Seen ${v}x`,
   );
 
   // Determine Slim Upcoming Focus
@@ -204,18 +228,17 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   const spoonsInCurrentCycle = spoonsCompleted % 3;
 
   const lessonWithBridgeDue = completedLessons.find(
-    (l) => l.foundationBridge && !(l.foundationBridge as any).completedAt
+    (l) => l.foundationBridge && !(l.foundationBridge as any).completedAt,
   );
   const activeBossDue = bossStages.find(
-    (b) => b.milestoneIndex === currentMilestone && !b.passed
+    (b) => b.milestoneIndex === currentMilestone && !b.passed,
   );
   const nextSpoonLesson =
     lessons.find((l) => l.status !== "COMPLETED" && !l.completedAt) ??
     lessons[lessons.length - 1];
 
   let focusType: "SPOON" | "BRIDGE" | "BOSS" = "SPOON";
-  let upcomingTitle =
-    nextSpoonLesson?.title || `Spoon ${spoonsCompleted + 1}`;
+  let upcomingTitle = nextSpoonLesson?.title || `Spoon ${spoonsCompleted + 1}`;
   let upcomingHref = nextSpoonLesson
     ? `/foundation/${nextSpoonLesson.id}/${courseId}`
     : "/learning-hub";
@@ -255,6 +278,7 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
         (user as any).firstName || user.name?.split(" ")[0] || "Learner",
       name: user.name || (user as any).firstName || "Learner",
       avatarUrl: user.image ?? null,
+      profile: userProfile ?? null,
     },
     languageCard: {
       courseId,
