@@ -46,7 +46,6 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     setActiveTab,
     viewMode,
     setViewMode,
-    unreadCount,
     pendingPrompt,
     clearPendingPrompt,
     deleteSession,
@@ -387,6 +386,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
 
   const energyCount = profile?.energy ?? 0;
   const maxEnergy = profile?.maxEnergy ?? 3;
+  const unreadCount = 0
 
   return (
     <>
