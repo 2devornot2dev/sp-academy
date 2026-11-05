@@ -7,7 +7,12 @@ import { JsonValue } from "@prisma/client/runtime/library";
 import { setupFirstLesson } from "@/lib/foundation/setup-first-lesson";
 import { setupNextLesson } from "@/lib/foundation/setup-next-lesson";
 import Stripe from "stripe";
-import { Billing, BillingInterval, PaymentStatus, Prisma } from "@prisma/client";
+import {
+  Billing,
+  BillingInterval,
+  PaymentStatus,
+  Prisma,
+} from "@prisma/client";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
@@ -186,7 +191,7 @@ async function resolveHistoricalContext(
   let resolvedGender = normalizeGender(payload.gender);
   let resolvedFirstName = payload.firstName;
 
-  const [pastLessons, firstTask] = await Promise.all([
+  const [pastLessons, firstTask, langProfile] = await Promise.all([
     prisma.foundationLesson.findMany({
       where: {
         foundationCourseId: courseId,
@@ -207,11 +212,36 @@ async function resolveHistoricalContext(
       orderBy: { createdAt: "asc" },
       select: { payload: true },
     }),
+
+    // Fetch saved per-language levelBand & goal from LanguageProfile
+    prisma.languageProfile
+      .findUnique({
+        where: {
+          userId_languageCode: {
+            userId: payload.userId,
+            languageCode: payload.targetLanguage,
+          },
+        },
+      })
+      .catch(() => null),
   ]);
 
+  // Strip heavy S3 audio paths and intro/outro strings right here so SystemTask payloads stay tiny
   previous_lessons = pastLessons.map((l) => {
-    const { wordAudio, wordLexicon, ...cleanHandoff } =
-      (l.lessonHandoff as Record<string, any>) || {};
+    const {
+      wordAudio,
+      wordLexicon,
+      introNativeAudio,
+      introTargetAudio,
+      outroNativeAudio,
+      outroTargetAudio,
+      npcAudio,
+      introNative,
+      introTarget,
+      outroNative,
+      outroTarget,
+      ...cleanHandoff
+    } = (l.lessonHandoff as Record<string, any>) || {};
     return {
       day: l.orderIndex,
       theme: l.title || cleanHandoff.theme || "",
@@ -231,35 +261,51 @@ async function resolveHistoricalContext(
     }
   }
 
+  let initialData: Record<string, any> | null = null;
   if (firstTask?.payload) {
     try {
-      const initialData =
+      initialData =
         typeof firstTask.payload === "string"
           ? JSON.parse(firstTask.payload)
           : (firstTask.payload as Record<string, any>);
-
-      if (!resolvedLevelBand || resolvedLevelBand === "unspecified") {
-        resolvedLevelBand = initialData.levelBand || "beginner";
-      }
-      if (!resolvedGoal || resolvedGoal === "unspecified") {
-        resolvedGoal = initialData.goal || "general";
-      }
-      if (resolvedGender === "N" && initialData.gender) {
-        resolvedGender = normalizeGender(initialData.gender);
-      }
-      if (!resolvedFirstName || resolvedFirstName === "Learner") {
-        resolvedFirstName = initialData.firstName || resolvedFirstName;
-      }
     } catch (e) {
       console.warn("Could not parse initial task payload:", e);
     }
   }
 
+  // ✅ Always prioritize saved LanguageProfile -> Onboarding Task #1 over generic "beginner"/"general" fallbacks!
+  const dbLevel = (langProfile as any)?.levelBand || initialData?.levelBand;
+  if (
+    dbLevel &&
+    (!resolvedLevelBand ||
+      resolvedLevelBand === "unspecified" ||
+      resolvedLevelBand === "beginner")
+  ) {
+    resolvedLevelBand = dbLevel;
+  }
+
+  const dbGoal = (langProfile as any)?.goal || initialData?.goal;
+  if (
+    dbGoal &&
+    (!resolvedGoal ||
+      resolvedGoal === "unspecified" ||
+      resolvedGoal === "general")
+  ) {
+    resolvedGoal = dbGoal;
+  }
+
+  if (resolvedGender === "N" && initialData?.gender) {
+    resolvedGender = normalizeGender(initialData.gender);
+  }
+  if (!resolvedFirstName || resolvedFirstName === "Learner") {
+    resolvedFirstName = initialData?.firstName || resolvedFirstName;
+  }
+
   return {
     previous_lessons,
     yesterdayLanded,
-    resolvedLevelBand: resolvedLevelBand || "beginner",
-    resolvedGoal: resolvedGoal || "general",
+    resolvedLevelBand: (resolvedLevelBand || "zero").toLowerCase(),
+    resolvedGoal: (resolvedGoal || "general").toLowerCase(),
     resolvedGender,
     resolvedFirstName: resolvedFirstName || "there",
   };
@@ -310,13 +356,14 @@ async function dispatchEduAndSpriteLambdas(
   spriteSpoonPayload?: any,
   spriteBridgePayload?: any
 ) {
-  // Save main spoon payload on SystemTask for 1-click retries
   await prisma.systemTask
     .update({
       where: { id: dbContext.taskId },
       data: { payload: lambdaPayload as Prisma.InputJsonValue },
     })
-    .catch((e) => console.warn("Could not save lambdaPayload to SystemTask:", e));
+    .catch((e) =>
+      console.warn("Could not save lambdaPayload to SystemTask:", e)
+    );
 
   const invocations: Promise<any>[] = [
     lambda.send(
@@ -377,7 +424,6 @@ async function dispatchEduAndSpriteLambdas(
   } catch (error) {
     console.error("❌ Error invoking Lambda:", error);
 
-    // Rollback SystemTasks & delete empty lesson row
     await prisma.systemTask
       .updateMany({
         where: {
@@ -415,7 +461,35 @@ export async function invokeEduBuilder(
   const normalizedPayload: InvokeEduBuilderPayload = {
     ...payload,
     gender: normalizeGender(payload.gender),
+    levelBand: (payload.levelBand || "zero").toLowerCase(),
+    goal: (payload.goal || "general").toLowerCase(),
   };
+
+  // Persist levelBand & goal to LanguageProfile during Onboarding (or when explicitly provided)
+  if (normalizedPayload.isOnboarding && normalizedPayload.targetLanguage) {
+    await prisma.languageProfile
+      .upsert({
+        where: {
+          userId_languageCode: {
+            userId: normalizedPayload.userId,
+            languageCode: normalizedPayload.targetLanguage,
+          },
+        },
+        create: {
+          userId: normalizedPayload.userId,
+          languageCode: normalizedPayload.targetLanguage,
+          levelBand: normalizedPayload.levelBand,
+          goal: normalizedPayload.goal,
+        } as any,
+        update: {
+          levelBand: normalizedPayload.levelBand,
+          goal: normalizedPayload.goal,
+        } as any,
+      })
+      .catch((e) =>
+        console.warn("LanguageProfile levelBand upsert skipped:", e)
+      );
+  }
 
   // 1. Setup Lesson, Course, & SpriteProfile in Postgres
   let dbContext: LessonDbContext;
@@ -456,7 +530,7 @@ export async function invokeEduBuilder(
     resolvedFirstName = hist.resolvedFirstName;
   }
 
-  // 3. Resolve Voice IDs & Sprite Metadata (from DB context or payload)
+  // 3. Resolve Voice IDs & Sprite Metadata
   const resolvedSpriteSlug =
     dbContext.spriteSlug || normalizedPayload.spriteSlug || "vox";
   const resolvedSpriteName = dbContext.spriteName || "Vox";
@@ -466,7 +540,7 @@ export async function invokeEduBuilder(
   const resolvedTargetVoiceId =
     dbContext.targetVoiceId || normalizedPayload.targetVoiceId;
 
-  // 4. Assemble main spoon-edu-builder payload (explicitly including voice IDs!)
+  // 4. Assemble main spoon-edu-builder payload
   const lambdaPayload = {
     ...normalizedPayload,
     type: "lang",
@@ -478,13 +552,12 @@ export async function invokeEduBuilder(
     webhookUrl: dbContext.webhookUrl,
     vocabWebhookUrl: dbContext.vocabWebhookUrl,
     spriteWebhookUrl: dbContext.spriteWebhookUrl,
-    // Explicit Sprite & Voice ID pass down to foundation-builder!
     spriteSlug: resolvedSpriteSlug,
     spriteName: resolvedSpriteName,
     persona: resolvedPersona,
     nativeVoiceId: resolvedNativeVoiceId,
     targetVoiceId: resolvedTargetVoiceId,
-    levelBand: resolvedLevelBand || "beginner",
+    levelBand: resolvedLevelBand || "zero",
     goal: resolvedGoal || "general",
     gender: resolvedGender,
     firstName: resolvedFirstName || "there",

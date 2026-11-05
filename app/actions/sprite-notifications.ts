@@ -2,83 +2,56 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth-guard";
 
-// NOTE: like your other sprite actions, these take userId from the client.
-// Verify it matches the signed-in session user before shipping.
+// Fetch all active (undismissed, unresolved) notifications for the user's sprite
+export async function getActiveNotifications() {
+  const user = await requireUser();
 
-export type SpriteNotificationDTO = {
-  id: string;
-  kind: "BOSS_BUILD_FAILED" | "EXERCISE_BUILD_FAILED" | "INFO";
-  title: string | null;
-  body: string;
-  detail: string | null;
-  createdAt: Date;
-};
-
-/** Everything the sprite UI needs in one round trip. */
-export async function getSpriteInbox(userId: string) {
   const profile = await prisma.spriteProfile.findUnique({
-    where: { userId },
-    select: {
-      dismissedCards: true,
-      notifications: {
-        where: { dismissedAt: null, resolvedAt: null },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          kind: true,
-          title: true,
-          body: true,
-          detail: true,
-          createdAt: true,
-        },
-      },
-    },
+    where: { userId: user.id },
+    select: { id: true },
   });
 
-  return {
-    notifications: (profile?.notifications ?? []) as SpriteNotificationDTO[],
-    dismissedCards: profile?.dismissedCards ?? [],
-  };
+  if (!profile) return [];
+
+  return prisma.spriteNotification.findMany({
+    where: {
+      spriteProfileId: profile.id,
+      dismissedAt: null,
+      resolvedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
-/** The X on a failure card. */
-export async function dismissNotification(
-  userId: string,
-  notificationId: string,
-) {
+// User explicitly clicked the "X" to hide the notification
+export async function dismissNotification(notificationId: string) {
+  const user = await requireUser();
+
   await prisma.spriteNotification.updateMany({
     where: {
       id: notificationId,
-      profile: { userId },
-      dismissedAt: null,
+      profile: { userId: user.id },
     },
     data: { dismissedAt: new Date() },
   });
+
+  return { ok: true };
 }
 
-/** "Clear all" */
-export async function dismissAllNotifications(userId: string) {
+// System successfully retried the task, so the error is resolved!
+export async function resolveNotificationByDedupeKey(dedupeKey: string) {
+  const user = await requireUser();
+
   await prisma.spriteNotification.updateMany({
-    where: { profile: { userId }, dismissedAt: null, resolvedAt: null },
-    data: { dismissedAt: new Date() },
+    where: {
+      dedupeKey,
+      profile: { userId: user.id },
+      resolvedAt: null,
+    },
+    data: { resolvedAt: new Date() },
   });
-}
 
-/**
- * The X on an info card (Active Lesson Objective, Repair Arcade, ...).
- * cardKey includes the lesson, e.g. "objective:Greetings and Names",
- * so a dismissed card stays gone but the next lesson's card shows again.
- */
-export async function dismissCard(userId: string, cardKey: string) {
-  const profile = await prisma.spriteProfile.findUnique({
-    where: { userId },
-    select: { dismissedCards: true },
-  });
-  if (!profile || profile.dismissedCards.includes(cardKey)) return;
-
-  await prisma.spriteProfile.update({
-    where: { userId },
-    data: { dismissedCards: { push: cardKey } },
-  });
+  return { ok: true };
 }

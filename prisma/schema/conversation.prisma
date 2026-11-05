@@ -130,9 +130,12 @@ enum LambdaStatus {
 
 model LanguageProfile {
   id           String @id @default(cuid())
-  userId       String
   languageCode String // e.g., "fr-FR", "es-ES"
+  levelBand    String @default("zero")    // 🟢 "zero" | "beginner" | "intermediate" | "advanced"
+  goal         String @default("general") // 🟢 "general" | "travel" | "work" | "culture"
+
   user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
 
   wordStats WordStat[]
 

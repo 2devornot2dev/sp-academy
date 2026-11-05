@@ -29,6 +29,11 @@ import {
   type LiveTaskStatus,
 } from "@/app/actions/system-task-actions";
 import { pusherClient } from "@/lib/pusher-client";
+import {
+  getActiveNotifications,
+  dismissNotification,
+  resolveNotificationByDedupeKey,
+} from "@/app/actions/sprite-notifications";
 
 export type SpriteType = "vox" | "vivi";
 export type ChatViewMode = "single" | "multi";
@@ -81,7 +86,6 @@ interface SpriteContextValue {
   profile: SpriteProfileData;
   spriteName: string;
   avatarSrc: string;
-
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
   openChat: (options?: { tab?: ActiveTab; prompt?: string }) => void;
@@ -90,32 +94,24 @@ interface SpriteContextValue {
   setActiveTab: (tab: ActiveTab) => void;
   viewMode: ChatViewMode;
   setViewMode: (mode: ChatViewMode) => void;
-
   pendingPrompt: string | null;
   clearPendingPrompt: () => void;
 
+  // Ephemeral Popup Notifications
   current: SpritePayload | null;
-  notifications: SpritePayload[];
-  unreadCount: number;
-  markNotificationsRead: () => void;
-  dismissNotification: (id: string) => void;
   summonSprite: (payload: SpritePayload) => void;
-  summonSpriteNode: (options: {
-    orderIndex: number;
-    stepType?: "SPOON" | "BRIDGE" | "BOSS";
-    dedupeKey?: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  }) => Promise<void>;
+  summonSpriteNode: (options: any) => Promise<void>;
   dismissSprite: () => void;
   isShowing: boolean;
+
+  // 🟢 NEW: DB-Backed Persistent Notifications (For the Briefing Tab!)
+  dbNotifications: any[];
+  dismissDbNotification: (id: string) => Promise<void>;
 
   isPlaying: boolean;
   playAudioUrl: (urlOrKey: string) => Promise<void>;
   stopAudio: () => void;
-
   deleteSession: (sessionId: string) => Promise<boolean>;
-
   liveTask: LiveTaskStatus | null;
   setLiveTask: (task: LiveTaskStatus | null) => void;
   isRetryingTask: boolean;
@@ -135,7 +131,7 @@ export function SpriteProvider({
   const userId = spriteData?.userId ?? null;
 
   const [activeSprite, setActiveSprite] = useState<SpriteType>(
-    (dbSprite?.slug as SpriteType) ?? "vox"
+    (dbSprite?.slug as SpriteType) ?? "vox",
   );
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -154,6 +150,16 @@ export function SpriteProvider({
   const [liveTask, setLiveTask] = useState<LiveTaskStatus | null>(null);
   const [isRetryingTask, setIsRetryingTask] = useState(false);
 
+  // 🟢 DB Notifications State
+  const [dbNotifications, setDbNotifications] = useState<any[]>([]);
+
+  // Fetch DB Notifications on Mount
+  useEffect(() => {
+    if (userId) {
+      getActiveNotifications().then(setDbNotifications).catch(console.error);
+    }
+  }, [userId]);
+
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -166,7 +172,7 @@ export function SpriteProvider({
   const dismissSprite = useCallback(() => {
     stopAudio();
     if (timerRef.current) clearTimeout(timerRef.current);
-    
+
     // If you dismiss a FAILED task generation notification, remember it so it doesn't pop back up on refresh
     setCurrent((prev) => {
       if (prev?.id && prev.id.startsWith("fail_")) {
@@ -223,7 +229,7 @@ export function SpriteProvider({
         setIsPlaying(false);
       });
     },
-    [stopAudio, resolvePlayableUrl]
+    [stopAudio, resolvePlayableUrl],
   );
 
   const summonSprite = useCallback(
@@ -259,7 +265,7 @@ export function SpriteProvider({
         playAudioUrl(nextPayload.audioUrl);
       }
     },
-    [isChatOpen, playAudioUrl, stopAudio]
+    [isChatOpen, playAudioUrl, stopAudio],
   );
 
   const summonSpriteNode = useCallback(
@@ -295,7 +301,7 @@ export function SpriteProvider({
           nativeVoiceId: spriteData.nativeVoiceId,
           targetVoiceId: spriteData.targetVoiceId,
         },
-        orderIndex
+        orderIndex,
       );
 
       if (!node) return;
@@ -306,7 +312,7 @@ export function SpriteProvider({
 
       if (isAccidentalBossNode) {
         console.warn(
-          `[Sprite] Skipped mislabeled Boss node at orderIndex=${orderIndex} during ${stepType}`
+          `[Sprite] Skipped mislabeled Boss node at orderIndex=${orderIndex} during ${stepType}`,
         );
         return;
       }
@@ -335,14 +341,14 @@ export function SpriteProvider({
           : undefined,
       });
     },
-    [spriteData, summonSprite]
+    [spriteData, summonSprite],
   );
 
   const markNotificationsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
-  const dismissNotification = useCallback((id: string) => {
+  const dismissNotification = useCallback(async (id: string): Promise<void> => {
     if (id.startsWith("fail_")) {
       try {
         if (typeof window !== "undefined") {
@@ -367,7 +373,7 @@ export function SpriteProvider({
       setIsChatOpen(true);
       markNotificationsRead();
     },
-    [markNotificationsRead]
+    [markNotificationsRead],
   );
 
   const closeChat = useCallback(() => {
@@ -384,7 +390,7 @@ export function SpriteProvider({
       try {
         const res = await fetch(
           `/api/users/${userId}/sprite/sessions/${sessionId}`,
-          { method: "DELETE" }
+          { method: "DELETE" },
         );
         return res.ok || res.status === 404;
       } catch (err) {
@@ -392,7 +398,7 @@ export function SpriteProvider({
         return false;
       }
     },
-    [userId]
+    [userId],
   );
 
   useEffect(() => {
@@ -419,6 +425,11 @@ export function SpriteProvider({
         ? "top-6 right-6"
         : "bottom-6 left-6";
 
+  const dismissDbNotification = useCallback(async (id: string) => {
+    setDbNotifications((prev) => prev.filter((n) => n.id !== id));
+    await dismissNotification(id).catch(console.error);
+  }, []);
+
   const retryLiveTask = useCallback(
     async (explicitTaskId?: string): Promise<boolean> => {
       const targetId = explicitTaskId || liveTask?.taskId;
@@ -429,59 +440,34 @@ export function SpriteProvider({
       setIsRetryingTask(false);
 
       if (res.ok) {
-        setLiveTask((prev) =>
-          prev ? { ...prev, status: "BUILDING", errorMessage: null } : null
+        setLiveTask((prev) => (prev ? { ...prev, status: "BUILDING" } : null));
+        // 🟢 Resolve the DB Notification so it disappears from the Briefing Tab!
+        await resolveNotificationByDedupeKey(`task-fail:${targetId}`);
+        // Remove it locally
+        setDbNotifications((prev) =>
+          prev.filter((n) => n.dedupeKey !== `task-fail:${targetId}`),
         );
+
         summonSprite({
           id: `retry_${targetId}`,
           badge: "Rebuilding 🛠️",
-          text: `I just restarted the generator for ${
-            liveTask?.label || "your lesson"
-          }. Hang tight while I bake it!`,
-          duration: 7000,
-          position: "bottom-right",
+          text: `I just restarted the generator. Hang tight while I bake it!`,
+          duration: 5000,
         });
         return true;
       }
       return false;
     },
-    [liveTask, summonSprite]
+    [liveTask, summonSprite],
   );
 
   useEffect(() => {
     if (!userId) return;
-
     let mounted = true;
 
     getLiveTaskState(userId).then((cached) => {
       if (!mounted || !cached) return;
       setLiveTask(cached);
-      if (cached.status === "FAILED") {
-        // Halt summoning if this task fail card was already dismissed by the user previously
-        if (
-          typeof window !== "undefined" &&
-          localStorage.getItem(`dismissed_fail_${cached.taskId}`)
-        ) {
-          return;
-        }
-
-        summonSprite({
-          id: `fail_${cached.taskId}`,
-          badge: `${cached.label || "Generation"} Hit a Snag ⚠️`,
-          text: `Something interrupted ${
-            cached.label || "your lesson"
-          } while building (${cached.stage || cached.lambdaName || "builder"}). Want me to retry it?`,
-          duration: Infinity,
-          position: "bottom-right",
-          action: {
-            label: "Retry Generation",
-            variant: "retry",
-            onClick: () => {
-              retryLiveTask(cached.taskId);
-            },
-          },
-        });
-      }
     });
 
     const channelName = `user-${userId}`;
@@ -491,93 +477,174 @@ export function SpriteProvider({
       const nextState: LiveTaskStatus = {
         ...data,
         status: "FAILED",
-        label: data.label || "Lesson Generation",
         updatedAt: new Date().toISOString(),
       };
       setLiveTask(nextState);
-
-      if (
-        typeof window !== "undefined" &&
-        localStorage.getItem(`dismissed_fail_${data.taskId}`)
-      ) {
-        return;
-      }
+      // Refresh DB notifications so the Briefing Tab shows the red error card immediately!
+      getActiveNotifications().then(setDbNotifications).catch(console.error);
 
       summonSprite({
         id: `fail_${data.taskId}`,
-        badge: `${nextState.label} Failed ⚠️`,
-        text: `Oops! My builder hit an error while generating ${nextState.label}. Click Retry and I'll spin it right back up.`,
-        duration: Infinity,
-        position: "bottom-right",
+        badge: `Error ⚠️`,
+        text: `My builder hit a snag. Check the Briefing Tab to retry it!`,
+        duration: 8000,
         action: {
-          label: "Retry Now",
-          variant: "retry",
-          onClick: () => {
-            retryLiveTask(data.taskId);
-          },
+          label: "View Details",
+          variant: "danger",
+          onClick: () => openChat({ tab: "briefing" }),
         },
       });
     };
 
-    const handleBuilding = (data: LiveTaskStatus) => {
+    const handleBuilding = (data: LiveTaskStatus) =>
       setLiveTask({
         ...data,
         status: "BUILDING",
         updatedAt: new Date().toISOString(),
       });
-    };
-
-    const handleCompleted = () => {
-      setLiveTask(null);
-    };
-
-    const handleSpriteNodeReady = (node: {
-      nodeId: string;
-      orderIndex: number;
-      stepType?: string | null;
-      header?: string | null;
-      nativeBody: string;
-      targetBody?: string | null;
-      nativeAudioUrl?: string | null;
-      targetAudioUrl?: string | null;
-      action?: string | null;
-    }) => {
-      summonSprite({
-        id: `${node.nodeId}_${Date.now()}`,
-        badge: node.header ?? undefined,
-        text: node.nativeBody,
-        targetText: node.targetBody ?? undefined,
-        audioUrl: node.nativeAudioUrl ?? node.targetAudioUrl,
-        targetAudioUrl: node.targetAudioUrl,
-        autoPlayAudio: true,
-        duration: 10000,
-        position: "bottom-right",
-        action:
-          node.stepType === "EXERCISE_READY" ||
-          node.stepType === "EXERCISE_BUILDING"
-            ? {
-                label: node.action || "Open Briefing",
-                variant: "primary",
-                onClick: () => openChat({ tab: "briefing" }),
-              }
-            : undefined,
-      });
-    };
+    const handleCompleted = () => setLiveTask(null);
 
     channel.bind("system-task-failed", handleFailed);
     channel.bind("system-task-building", handleBuilding);
     channel.bind("system-task-completed", handleCompleted);
-    channel.bind("sprite-node-ready", handleSpriteNodeReady);
 
     return () => {
       mounted = false;
-      channel.unbind("system-task-failed", handleFailed);
-      channel.unbind("system-task-building", handleBuilding);
-      channel.unbind("system-task-completed", handleCompleted);
-      channel.unbind("sprite-node-ready", handleSpriteNodeReady);
+      channel.unbind_all();
       pusherClient.unsubscribe(channelName);
     };
   }, [userId, summonSprite, retryLiveTask, openChat]);
+
+  // useEffect(() => {
+  //   if (!userId) return;
+
+  //   let mounted = true;
+
+  //   getLiveTaskState(userId).then((cached) => {
+  //     if (!mounted || !cached) return;
+  //     setLiveTask(cached);
+  //     if (cached.status === "FAILED") {
+  //       // Halt summoning if this task fail card was already dismissed by the user previously
+  //       if (
+  //         typeof window !== "undefined" &&
+  //         localStorage.getItem(`dismissed_fail_${cached.taskId}`)
+  //       ) {
+  //         return;
+  //       }
+
+  //       summonSprite({
+  //         id: `fail_${cached.taskId}`,
+  //         badge: `${cached.label || "Generation"} Hit a Snag ⚠️`,
+  //         text: `Something interrupted ${
+  //           cached.label || "your lesson"
+  //         } while building (${cached.stage || cached.lambdaName || "builder"}). Want me to retry it?`,
+  //         duration: Infinity,
+  //         position: "bottom-right",
+  //         action: {
+  //           label: "Retry Generation",
+  //           variant: "retry",
+  //           onClick: () => {
+  //             retryLiveTask(cached.taskId);
+  //           },
+  //         },
+  //       });
+  //     }
+  //   });
+
+  //   const channelName = `user-${userId}`;
+  //   const channel = pusherClient.subscribe(channelName);
+
+  //   const handleFailed = (data: LiveTaskStatus) => {
+  //     const nextState: LiveTaskStatus = {
+  //       ...data,
+  //       status: "FAILED",
+  //       label: data.label || "Lesson Generation",
+  //       updatedAt: new Date().toISOString(),
+  //     };
+  //     setLiveTask(nextState);
+
+  //     if (
+  //       typeof window !== "undefined" &&
+  //       localStorage.getItem(`dismissed_fail_${data.taskId}`)
+  //     ) {
+  //       return;
+  //     }
+
+  //     summonSprite({
+  //       id: `fail_${data.taskId}`,
+  //       badge: `${nextState.label} Failed ⚠️`,
+  //       text: `Oops! My builder hit an error while generating ${nextState.label}. Click Retry and I'll spin it right back up.`,
+  //       duration: Infinity,
+  //       position: "bottom-right",
+  //       action: {
+  //         label: "Retry Now",
+  //         variant: "retry",
+  //         onClick: () => {
+  //           retryLiveTask(data.taskId);
+  //         },
+  //       },
+  //     });
+  //   };
+
+  //   const handleBuilding = (data: LiveTaskStatus) => {
+  //     setLiveTask({
+  //       ...data,
+  //       status: "BUILDING",
+  //       updatedAt: new Date().toISOString(),
+  //     });
+  //   };
+
+  //   const handleCompleted = () => {
+  //     setLiveTask(null);
+  //   };
+
+  //   const handleSpriteNodeReady = (node: {
+  //     nodeId: string;
+  //     orderIndex: number;
+  //     stepType?: string | null;
+  //     header?: string | null;
+  //     nativeBody: string;
+  //     targetBody?: string | null;
+  //     nativeAudioUrl?: string | null;
+  //     targetAudioUrl?: string | null;
+  //     action?: string | null;
+  //   }) => {
+  //     summonSprite({
+  //       id: `${node.nodeId}_${Date.now()}`,
+  //       badge: node.header ?? undefined,
+  //       text: node.nativeBody,
+  //       targetText: node.targetBody ?? undefined,
+  //       audioUrl: node.nativeAudioUrl ?? node.targetAudioUrl,
+  //       targetAudioUrl: node.targetAudioUrl,
+  //       autoPlayAudio: true,
+  //       duration: 10000,
+  //       position: "bottom-right",
+  //       action:
+  //         node.stepType === "EXERCISE_READY" ||
+  //         node.stepType === "EXERCISE_BUILDING"
+  //           ? {
+  //               label: node.action || "Open Briefing",
+  //               variant: "primary",
+  //               onClick: () => openChat({ tab: "briefing" }),
+  //             }
+  //           : undefined,
+  //     });
+  //   };
+
+  //   channel.bind("system-task-failed", handleFailed);
+  //   channel.bind("system-task-building", handleBuilding);
+  //   channel.bind("system-task-completed", handleCompleted);
+  //   channel.bind("sprite-node-ready", handleSpriteNodeReady);
+
+  //   return () => {
+  //     mounted = false;
+  //     channel.unbind("system-task-failed", handleFailed);
+  //     channel.unbind("system-task-building", handleBuilding);
+  //     channel.unbind("system-task-completed", handleCompleted);
+  //     channel.unbind("sprite-node-ready", handleSpriteNodeReady);
+  //     pusherClient.unsubscribe(channelName);
+  //   };
+  // }, [userId, summonSprite, retryLiveTask, openChat]);
 
   return (
     <SpriteContext.Provider
@@ -598,10 +665,6 @@ export function SpriteProvider({
         pendingPrompt,
         clearPendingPrompt,
         current,
-        notifications,
-        unreadCount,
-        markNotificationsRead,
-        dismissNotification,
         summonSprite,
         summonSpriteNode,
         dismissSprite,
@@ -614,6 +677,8 @@ export function SpriteProvider({
         liveTask,
         retryLiveTask,
         setLiveTask,
+        dbNotifications,
+        dismissDbNotification,
       }}
     >
       {children}
