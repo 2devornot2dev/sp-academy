@@ -231,7 +231,7 @@ export default function FreestyleSetup({
   return (
     <div className="flex min-h-screen flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100 lg:h-screen lg:overflow-hidden">
       {/* =====================================================================
-          1. HEADER BANNER (Matched to Dashboard Height so Page Never Scrolls)
+          1. HEADER BANNER
           ===================================================================== */}
       <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
@@ -281,14 +281,14 @@ export default function FreestyleSetup({
       </header>
 
       {/* =====================================================================
-          2. MAIN STAGE GRID (Locked to Viewport on lg+)
+          2. MAIN STAGE GRID
           ===================================================================== */}
       <main className="relative z-20 mx-auto -mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-6 pb-5 lg:px-8">
         <div className="grid h-full min-h-0 w-full grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* LEFT COLUMN (8 Cols): 3D Hero Card + Fixed-Height Stepper Card */}
+          {/* LEFT COLUMN (8 Cols) */}
           <div className="flex min-h-0 flex-col gap-5 lg:col-span-8">
             {/* ===============================================================
-                CARD 1: 3D TACTILE HERO ARENA CARD
+                CARD 1: 3D HERO ARENA CARD (THE SINGLE PRIMARY LAUNCH CTA!)
                 =============================================================== */}
             <div className="group relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
               <img
@@ -355,11 +355,12 @@ export default function FreestyleSetup({
                     </span>
                   </div>
 
+                  {/* THE ONLY LAUNCH BUTTON ON THE PAGE */}
                   <button
                     type="button"
                     onClick={handleStart}
                     disabled={isStarting || !step1Valid}
-                    className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 px-6 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-50"
+                    className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-7 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-50"
                   >
                     {isStarting ? (
                       <>
@@ -369,7 +370,7 @@ export default function FreestyleSetup({
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-current" />
-                        <span>Enter Freestyle Arena</span>
+                        <span>Start 5-Minute Session</span>
                       </>
                     )}
                   </button>
@@ -378,7 +379,7 @@ export default function FreestyleSetup({
             </div>
 
             {/* ===============================================================
-                CARD 2: 3D STEPPER CARD (Fixed-Space In-Place Custom Topic!)
+                CARD 2: 3D STEPPER CARD (Configuration Only — No Duplicate Launch Button)
                 =============================================================== */}
             <div className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm">
               {/* Top 3D Stepper Header */}
@@ -444,7 +445,7 @@ export default function FreestyleSetup({
                 })}
               </div>
 
-              {/* Step Body (Fixed Space — Never Changes Height!) */}
+              {/* Step Body */}
               <div className="flex min-h-0 flex-1 flex-col justify-between px-6 py-4">
                 {step === 1 ? (
                   <div className="flex h-full flex-col justify-between gap-3">
@@ -494,12 +495,7 @@ export default function FreestyleSetup({
                       })}
                     </div>
 
-                    {/* =========================================================
-                        PRE-ALLOCATED FIXED-HEIGHT SCENARIO DOCK (h-[84px])
-                        - When mode === "SPECIFIC": Renders Custom Input + Quick Chips in-place!
-                        - When mode !== "SPECIFIC": Renders Mode Briefing + Quick Switch!
-                        - ZERO height or width shift!
-                        ========================================================= */}
+                    {/* Fixed-Height Scenario Dock (h-[84px]) */}
                     <div className="flex h-[84px] shrink-0 flex-col justify-center rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-2.5">
                       {mode === "SPECIFIC" ? (
                         <div className="space-y-2">
@@ -604,11 +600,11 @@ export default function FreestyleSetup({
                 )}
               </div>
 
-              {/* Step Footer */}
+              {/* Step Footer (Only Step Navigation — No Competing Launch Button!) */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-3">
                 {step === 1 ? (
                   <span className="text-xs font-extrabold text-slate-400">
-                    Step 1 of 2 • Choose Mode
+                    Step 1 of 2 • Choose Conversation Type
                   </span>
                 ) : (
                   <button
@@ -627,41 +623,38 @@ export default function FreestyleSetup({
                     type="button"
                     onClick={() => setStep(2)}
                     disabled={!step1Valid}
-                    className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-2.5 text-xs sm:text-sm font-black text-white shadow-md shadow-blue-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-b-0 disabled:bg-slate-200 disabled:from-transparent disabled:to-transparent disabled:text-slate-400"
+                    className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-5 py-2 text-xs font-black text-white shadow-sm transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-b-0 disabled:bg-slate-200 disabled:from-transparent disabled:to-transparent disabled:text-slate-400"
                   >
                     <span>Next: Difficulty</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleStart}
-                    disabled={isStarting || !step1Valid}
-                    className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-black text-white shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
-                  >
-                    <Play className="h-3.5 w-3.5 fill-current" />
-                    <span>Launch Arena Now</span>
-                  </button>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
+                    <Check className="h-3.5 w-3.5 stroke-[3]" />
+                    <span>Ready — Click Start Above</span>
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
           {/* =================================================================
-              RIGHT COLUMN (4 Cols): 3D SESSION PREFERENCES CARD
+              RIGHT COLUMN (4 Cols): 3D SESSION PREFERENCES CARD (No Duplicate Button!)
               ================================================================= */}
           <div className="flex min-h-0 flex-col lg:col-span-4">
             <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 sm:p-6 shadow-sm">
-              <div>
-                <h3 className="text-lg font-black text-slate-900">
-                  Session Preferences
-                </h3>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">
-                  Customize your AI tutor&apos;s voice, persona, and languages.
-                </p>
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">
+                    Session Preferences
+                  </h3>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Customize your AI tutor&apos;s voice, persona, and languages.
+                  </p>
+                </div>
 
                 {/* 1. 3D Voice Gender Toggle */}
-                <div className="mt-4 space-y-1.5">
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
                     AI Tutor Voice
                   </label>
@@ -673,7 +666,7 @@ export default function FreestyleSetup({
                           key={gender}
                           type="button"
                           onClick={() => setVoiceGender(gender)}
-                          className={`flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 py-2.5 text-xs font-black capitalize transition-all duration-150 ${
+                          className={`flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 py-3 text-xs font-black capitalize transition-all duration-150 ${
                             active
                               ? "border-blue-700 bg-gradient-to-b from-sky-50 to-white text-blue-700 shadow-2xs"
                               : "border-slate-200 border-b-slate-300 bg-slate-50/60 text-slate-600 hover:bg-white"
@@ -690,7 +683,7 @@ export default function FreestyleSetup({
                 </div>
 
                 {/* 2. 3D Tutor Persona Selector */}
-                <div className="mt-4 space-y-1.5">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
                       Tutor Persona
@@ -708,7 +701,7 @@ export default function FreestyleSetup({
                           type="button"
                           onClick={() => setPersona(p.id)}
                           title={p.desc}
-                          className={`flex flex-col items-center gap-1 rounded-2xl border-2 border-b-4 py-2 text-[11px] font-black transition-all duration-150 ${
+                          className={`flex flex-col items-center gap-1 rounded-2xl border-2 border-b-4 py-2.5 text-[11px] font-black transition-all duration-150 ${
                             active
                               ? "border-blue-700 bg-gradient-to-b from-sky-50 to-white text-blue-700 shadow-2xs"
                               : "border-slate-200 border-b-slate-300 bg-slate-50/60 text-slate-600 hover:bg-white"
@@ -725,8 +718,8 @@ export default function FreestyleSetup({
                 </div>
 
                 {/* 3. 3D Language Selectors */}
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="space-y-1.5">
                     <label className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
                       <Globe2 className="h-3 w-3 text-blue-500" /> Practicing
                     </label>
@@ -743,7 +736,7 @@ export default function FreestyleSetup({
                     </select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
                       <Globe2 className="h-3 w-3 text-slate-400" /> Translations
                     </label>
@@ -760,55 +753,39 @@ export default function FreestyleSetup({
                     </select>
                   </div>
                 </div>
-
-                {/* 4. Compact Summary Box */}
-                <div className="mt-4 space-y-1.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-400">Mode</span>
-                    <span className="font-black text-slate-800">
-                      {selectedModeObj.icon} {selectedModeObj.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-400">Level</span>
-                    <span className="font-black text-slate-800">
-                      {selectedLevelObj.label} ({selectedLevelObj.badge})
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-400">Persona</span>
-                    <span className="font-black text-slate-800">
-                      {selectedPersonaObj.icon} {selectedPersonaObj.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-400">Duration</span>
-                    <span className="font-black text-emerald-600">
-                      5 Minutes Live
-                    </span>
-                  </div>
-                </div>
               </div>
 
-              {/* 5. Bottom 3D Launch Button */}
-              <button
-                type="button"
-                onClick={handleStart}
-                disabled={isStarting || !step1Valid}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-50"
-              >
-                {isStarting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Preparing Arena...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 fill-current" />
-                    <span>Start 5-Minute Session</span>
-                  </>
-                )}
-              </button>
+              {/* 4. Bottom Live Configuration Summary Card */}
+              <div className="mt-5 space-y-2 rounded-2xl border-2 border-slate-200/80 bg-slate-50/80 p-4 text-xs">
+                <div className="mb-1 flex items-center justify-between border-b border-slate-200/70 pb-2">
+                  <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
+                    Active Arena Config
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase">
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-500" />
+                    5 Min Live
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-400">Mode</span>
+                  <span className="font-black text-slate-800">
+                    {selectedModeObj.icon} {selectedModeObj.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-400">Level</span>
+                  <span className="font-black text-slate-800">
+                    {selectedLevelObj.label} ({selectedLevelObj.badge})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-400">Tutor</span>
+                  <span className="font-black text-slate-800">
+                    {voiceGender === "female" ? "Sophie" : "Antoine"} (
+                    {selectedPersonaObj.icon} {selectedPersonaObj.label})
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
