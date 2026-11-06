@@ -11,10 +11,57 @@ import {
   BookOpen,
   Trophy,
   Flame,
+  Headphones,
 } from "lucide-react";
 import type { FeedActivityItem } from "@/app/api/shared-activity/route";
 import { UserProfileData } from "@/app/actions/get-home-dashboard";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+
+const ACTIVITY_THEME_MAP: Record<
+  FeedActivityItem["type"],
+  {
+    Icon: any;
+    emblem3D: string;
+    badgePill: string;
+    cardHover: string;
+  }
+> = {
+  SpoonCompleted: {
+    Icon: Headphones,
+    emblem3D:
+      "border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white",
+    badgePill: "bg-sky-50 text-blue-700 ring-1 ring-sky-200/80",
+    cardHover: "hover:border-sky-300",
+  },
+  BossDefeated: {
+    Icon: Crown,
+    emblem3D:
+      "border-b-[3px] border-purple-950 bg-gradient-to-b from-violet-500 to-purple-700 text-amber-300",
+    badgePill: "bg-purple-50 text-purple-700 ring-1 ring-purple-200/80",
+    cardHover: "hover:border-purple-300",
+  },
+  RepairArcade: {
+    Icon: Zap,
+    emblem3D:
+      "border-b-[3px] border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950",
+    badgePill: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
+    cardHover: "hover:border-amber-300",
+  },
+  BookCompleted: {
+    Icon: BookOpen,
+    emblem3D:
+      "border-b-[3px] border-emerald-700 bg-gradient-to-b from-teal-400 to-emerald-600 text-white",
+    badgePill: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80",
+    cardHover: "hover:border-emerald-300",
+  },
+  Achievement: {
+    Icon: Trophy,
+    emblem3D:
+      "border-b-[3px] border-amber-700 bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-950",
+    badgePill: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
+    cardHover: "hover:border-amber-300",
+  },
+};
 
 function LikeButton({ item }: { item: FeedActivityItem }) {
   const [liked, setLiked] = useState(Boolean(item.liked));
@@ -56,10 +103,10 @@ function LikeButton({ item }: { item: FeedActivityItem }) {
     <button
       type="button"
       onClick={handleToggleLike}
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-extrabold transition ${
+      className={`inline-flex shrink-0 items-center gap-1 rounded-xl border-2 border-b-[3px] px-2.5 py-1 text-[11px] font-black transition-all active:translate-y-0.5 active:border-b-0 ${
         liked
-          ? "border-rose-500/40 bg-rose-500/15 text-rose-500"
-          : "border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-300 hover:text-rose-500"
+          ? "border-rose-300 border-b-rose-500 bg-rose-50 text-rose-600 shadow-2xs"
+          : "border-slate-200 border-b-slate-300 bg-white text-slate-500 hover:border-rose-200 hover:text-rose-500"
       }`}
     >
       <Heart
@@ -73,9 +120,13 @@ function LikeButton({ item }: { item: FeedActivityItem }) {
 }
 
 function ActivityTypeEmblem({ item }: { item: FeedActivityItem }) {
+  const theme =
+    ACTIVITY_THEME_MAP[item.type] || ACTIVITY_THEME_MAP.SpoonCompleted;
+  const Icon = theme.Icon;
+
   if (item.imageUrl) {
     return (
-      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-2xs">
+      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-900 shadow-2xs">
         <img
           src={item.imageUrl}
           alt={item.title}
@@ -85,44 +136,20 @@ function ActivityTypeEmblem({ item }: { item: FeedActivityItem }) {
     );
   }
 
-  const config = {
-    BossDefeated: {
-      Icon: Crown,
-      bg: "bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950",
-    },
-    SpoonCompleted: {
-      Icon: Sparkles,
-      bg: "bg-gradient-to-br from-indigo-500 to-teal-500 text-white",
-    },
-    RepairArcade: {
-      Icon: Zap,
-      bg: "bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950",
-    },
-    BookCompleted: {
-      Icon: BookOpen,
-      bg: "bg-gradient-to-br from-purple-500 to-indigo-600 text-white",
-    },
-    Achievement: {
-      Icon: Trophy,
-      bg: "bg-gradient-to-br from-yellow-400 to-amber-500 text-slate-950",
-    },
-  }[item.type] || {
-    Icon: Sparkles,
-    bg: "bg-gradient-to-br from-indigo-500 to-teal-500 text-white",
-  };
-
-  const Icon = config.Icon;
-
   return (
     <div
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-xs ${config.bg}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-2xs ${theme.emblem3D}`}
     >
       <Icon className="h-5 w-5" />
     </div>
   );
 }
 
-export default function ActivityFeed({ profile }: { profile: UserProfileData | null }) {
+export default function ActivityFeed({
+  profile,
+}: {
+  profile: UserProfileData | null;
+}) {
   const [activities, setActivities] = useState<FeedActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const userId = profile?.id;
@@ -147,7 +174,7 @@ export default function ActivityFeed({ profile }: { profile: UserProfileData | n
         {[1, 2, 3, 4].map((n) => (
           <div
             key={n}
-            className="h-20 animate-pulse rounded-2xl border border-slate-100 bg-slate-50 p-3"
+            className="h-20 animate-pulse rounded-2xl border-2 border-b-4 border-slate-100 bg-slate-50/70 p-3"
           />
         ))}
       </div>
@@ -156,64 +183,80 @@ export default function ActivityFeed({ profile }: { profile: UserProfileData | n
 
   if (activities.length === 0) {
     return (
-      <div className="my-auto rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center">
-        <Flame className="mx-auto h-7 w-7 text-indigo-500 mb-1.5" />
-        <p className="text-xs font-extrabold text-slate-800">
+      <div className="my-auto rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-6 text-center">
+        <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
+          <Flame className="h-5 w-5" />
+        </div>
+        <p className="text-xs font-black text-slate-800">
           No recent activity yet
         </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          Complete a Spoon or Boss Stage to post your first win!
+        <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+          Complete a Spoon, Book, or Boss Stage to post your first win!
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200">
+    <div className="flex-1 space-y-2.5 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200">
       {activities.map((item, idx) => {
         const safeDate = item.createdAt ? new Date(item.createdAt) : new Date();
         const timeAgo = formatDistanceToNow(safeDate, { addSuffix: true });
-        const userName = item.user?.name || "Learner";
-        const displayUsername = item.user?.displayUsername || item.user?.username || "Learner";
-        const avatarUrl = item.user?.avatarUrl || item.user?.image || "";
+        const userObj = (item.user || {}) as Record<string, any>;
+        const displayUsername =
+          userObj.displayUsername ||
+          userObj.username ||
+          userObj.name ||
+          "Learner";
+        const avatarUrl = userObj.avatarUrl || userObj.image || "";
+
+        const theme =
+          ACTIVITY_THEME_MAP[item.type] || ACTIVITY_THEME_MAP.SpoonCompleted;
 
         return (
           <div
             key={`${item.id || idx}-${idx}`}
-            className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 transition hover:border-indigo-200 hover:bg-white"
+            className={`rounded-2xl border-2 border-b-4 border-slate-200/80 border-b-slate-300/80 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs ${theme.cardHover}`}
           >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-teal-500 text-[10px] font-black text-white">
-                  <Avatar>
-                    <AvatarImage src={avatarUrl} alt={displayUsername} />
-                    <AvatarFallback>
-                      {displayUsername[0]?.toUpperCase() || "L"}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-                <span className="text-xs font-extrabold text-slate-800 truncate">
+            {/* Top Row: User Avatar + Username + Time + Category Badge */}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Avatar className="h-6 w-6 shrink-0 rounded-lg border-b-2 border-blue-800 shadow-2xs">
+                  <AvatarImage
+                    src={avatarUrl || undefined}
+                    alt={displayUsername}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="rounded-lg bg-gradient-to-b from-sky-400 to-blue-600 text-[10px] font-black text-white">
+                    {displayUsername[0]?.toUpperCase() || "L"}
+                  </AvatarFallback>
+                </Avatar>
+
+                <span className="truncate text-xs font-black text-slate-800">
                   {displayUsername}
                 </span>
-                <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                <span className="shrink-0 text-[10px] font-semibold text-slate-400">
                   · {timeAgo}
                 </span>
               </div>
 
-              <span className="rounded-md bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase text-indigo-700 shrink-0">
+              <span
+                className={`shrink-0 rounded-lg px-2 py-0.5 text-[9px] font-black tracking-wide uppercase ${theme.badgePill}`}
+              >
                 {item.badge}
               </span>
             </div>
 
+            {/* Bottom Row: 3D Emblem/Thumbnail + Title/Detail + 3D Like Button */}
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <ActivityTypeEmblem item={item} />
                 <div className="min-w-0">
-                  <p className="text-xs font-extrabold text-slate-900 truncate">
+                  <p className="truncate text-xs font-black text-slate-900">
                     {item.title}
                   </p>
                   {item.detail && (
-                    <p className="text-[11px] font-medium text-slate-500 truncate">
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
                       {item.detail}
                     </p>
                   )}

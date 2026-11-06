@@ -9,6 +9,9 @@ import {
   Zap,
   ArrowRight,
   ChevronRight,
+  Crown,
+  Sparkles,
+  Check,
 } from "lucide-react";
 import ActivityFeed from "@/components/home/activity-feed";
 import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
@@ -24,16 +27,28 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
   const greeting = getGreeting();
   const signatures = getSignatures(wordSuperlatives);
   const badges = getBadges(languageCard);
-  const profile = user?.profile
+  const profile = user?.profile;
 
-  const cyclePct =
-    upcoming.focusType === "BOSS"
-      ? 100
-      : Math.max(18, Math.round((languageCard.spoonsInCurrentCycle / 3) * 100));
+  const isBossFocus = upcoming.focusType === "BOSS";
+  const isBridgeFocus = upcoming.focusType === "BRIDGE";
+
+  const cyclePct = isBossFocus
+    ? 100
+    : Math.max(18, Math.round((languageCard.spoonsInCurrentCycle / 3) * 100));
+
+  // Color-code the 3D Hero CTA button to match the unified app color system:
+  // SPOON = Primary Blue, BRIDGE = Accent Amber, BOSS = Tertiary Purple
+  const cta3DStyle = isBossFocus
+    ? "border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 text-white shadow-purple-500/30"
+    : isBridgeFocus
+      ? "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/30"
+      : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/30";
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100">
-      {/* 1. HEADER BANNER */}
+    <div className="flex min-h-screen flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100 lg:h-screen lg:overflow-hidden">
+      {/* =====================================================================
+          1. HEADER BANNER
+          ===================================================================== */}
       <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
         <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
@@ -69,7 +84,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
           </div>
 
           <div className="max-w-3xl">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] ">
+            <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl md:text-4xl">
               {greeting}, {user.firstName}!
             </h1>
             <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">
@@ -80,70 +95,132 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
         </div>
       </header>
 
-      {/* 2. MAIN GRID */}
-      <main className="relative z-20 mx-auto -mt-10 flex-1 min-h-0 w-full max-w-7xl px-6 pb-5 lg:px-8">
-        <div className="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-12">
+      {/* =====================================================================
+          2. MAIN DASHBOARD GRID
+          ===================================================================== */}
+      <main className="relative z-20 mx-auto -mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-6 pb-5 lg:px-8">
+        <div className="grid h-full min-h-0 w-full grid-cols-1 gap-6 lg:grid-cols-12">
           {/* LEFT COLUMN */}
-          <div className="flex flex-col gap-5 min-h-0 lg:col-span-8">
-            {/* CARD 1: DARK HERO */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0F172A] via-[#131D36] to-[#1E1B4B] p-6 text-white shadow-xl shrink-0">
-              <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex-1 space-y-3 text-center sm:text-left">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-indigo-300">
+          <div className="flex min-h-0 flex-col gap-5 lg:col-span-8">
+            {/* ===============================================================
+                CARD 1: 3D TACTILE MILESTONE HERO CARD
+                =============================================================== */}
+            <div className="relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-r from-[#0F172A] via-[#131D36] to-[#1E1B4B] p-6 sm:px-7 text-white shadow-xl">
+              {/* Subtle Ambient Glows */}
+              <div className="pointer-events-none absolute -top-20 -right-10 h-56 w-56 rounded-full bg-indigo-500/20 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-sky-500/15 blur-3xl" />
+
+              <div className="relative z-10 flex flex-col items-center justify-between gap-5 sm:flex-row">
+                <div className="flex-1 space-y-3.5 text-center sm:text-left">
+                  {/* Top 3D Player & Crown Badge */}
+                  <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1 text-[11px] font-black tracking-wider uppercase backdrop-blur-md">
                     <span>{languageCard.flag}</span>
-                    <span>{user.name}</span>
-                    <span>·</span>
-                    <span className="text-amber-300">
+                    <span className="text-white">{user.name}</span>
+                    <span className="text-white/30">•</span>
+                    <span className="inline-flex items-center gap-1 text-amber-300">
+                      <Crown className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                       {languageCard.bossesDefeated} Boss Crowns
                     </span>
                   </div>
 
+                  {/* Title & Next Unlock */}
                   <div>
-                    <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                      Milestone {languageCard.currentMilestone}
-                    </h2>
-                    <p className="text-xs font-semibold text-slate-300 mt-0.5">
-                      Next Unlock: 🎁 {upcoming.nextBossReward}
+                    <div className="flex flex-wrap items-baseline justify-center gap-2.5 sm:justify-start">
+                      <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+                        Milestone {languageCard.currentMilestone}
+                      </h2>
+                      <span className="rounded-lg bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-300 ring-1 ring-emerald-400/30">
+                        {languageCard.rankTitle}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-slate-300">
+                      Next Unlock:{" "}
+                      <span className="font-bold text-amber-300">
+                        🎁 {upcoming.nextBossReward}
+                      </span>
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-                    <div className="h-3.5 w-full sm:w-60 rounded-full bg-slate-800 p-0.5">
+                  {/* 3D Milestone Progress Bar + Mini Step Nodes */}
+                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-2">
+                      {/* 3 Mini 3D Spoon Indicators + Boss Crown */}
+                      {[1, 2, 3].map((stepIdx) => {
+                        const isStepDone =
+                          isBossFocus ||
+                          languageCard.spoonsInCurrentCycle >= stepIdx;
+                        const isStepCurrent =
+                          !isBossFocus &&
+                          languageCard.spoonsInCurrentCycle + 1 === stepIdx;
+                        return (
+                          <div
+                            key={stepIdx}
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg border-b-2 text-[11px] font-black transition-all ${
+                              isStepDone
+                                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-xs"
+                                : isStepCurrent
+                                  ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white ring-2 ring-sky-300/60"
+                                  : "border-slate-800 bg-slate-800/90 text-slate-500"
+                            }`}
+                          >
+                            {isStepDone ? (
+                              <Check className="h-3.5 w-3.5 stroke-[3.5]" />
+                            ) : (
+                              stepIdx
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Mini Boss Node */}
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-teal-300 transition-all duration-500"
-                        style={{ width: `${cyclePct}%` }}
-                      />
+                        className={`flex h-7 w-7 items-center justify-center rounded-lg border-b-2 ${
+                          isBossFocus
+                            ? "border-purple-950 bg-gradient-to-b from-amber-400 to-fuchsia-600 text-white animate-pulse"
+                            : "border-slate-800 bg-slate-800/90 text-amber-400/60"
+                        }`}
+                      >
+                        <Crown className="h-3.5 w-3.5 fill-current" />
+                      </div>
                     </div>
-                    <span className="text-xs font-extrabold text-amber-300 whitespace-nowrap">
-                      {upcoming.focusType === "BOSS"
+
+                    <span className="text-xs font-extrabold text-amber-300">
+                      {isBossFocus
                         ? `Boss Stage ${languageCard.currentMilestone} Unlocked!`
                         : `${languageCard.spoonsInCurrentCycle} / 3 Spoons to Boss ${languageCard.currentMilestone}`}
                     </span>
                   </div>
 
-                  <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                  {/* 3D Tactile "Up Next" Action Button */}
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1 sm:justify-start">
                     <Link
                       href={upcoming.href}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-indigo-600/30 transition active:scale-95"
+                      className={`inline-flex items-center gap-2.5 rounded-2xl border-b-4 px-6 py-3 text-xs sm:text-sm font-black shadow-lg transition-all duration-150 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 ${cta3DStyle}`}
                     >
-                      <span className="text-indigo-200 font-bold">
-                        Up Next:
+                      <Sparkles className="h-4 w-4 shrink-0" />
+                      <span className="opacity-85">Up Next:</span>
+                      <span className="truncate max-w-[220px] sm:max-w-xs">
+                        {upcoming.title}
                       </span>
-                      <span>{upcoming.title}</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <ArrowRight className="h-4 w-4 shrink-0" />
                     </Link>
                   </div>
                 </div>
 
-                <HeroTrophyIllustration />
+                {/* Trophy 3D Illustration */}
+                <div className="shrink-0">
+                  <HeroTrophyIllustration />
+                </div>
               </div>
             </div>
 
-            {/* CARD 2: SIGNATURES (2x2 stat cards) + HEX BADGES */}
-            <div className="flex-1 min-h-0 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col gap-4 overflow-y-auto">
-              {/* Signatures: header + 2x2 grid (grows to fill space) */}
-              <div className="flex flex-1 min-h-0 flex-col">
-                <div className="flex items-center justify-between mb-3 shrink-0">
+            {/* ===============================================================
+                CARD 2: 3D WORD MATRIX SIGNATURES + HEX BADGES
+                =============================================================== */}
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm">
+              {/* Signatures 2x2 Grid */}
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="mb-3 flex shrink-0 items-center justify-between">
                   <div>
                     <h3 className="text-sm font-black text-slate-900">
                       Word Matrix Signatures
@@ -155,14 +232,14 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                   </div>
                   <Link
                     href="/learning-hub"
-                    className="inline-flex items-center gap-0.5 text-xs font-extrabold text-indigo-600 hover:text-indigo-700"
+                    className="inline-flex items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-blue-600 transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50 active:translate-y-0.5 active:border-b-0"
                   >
                     <span>Learning Hub</span>
                     <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
 
-                <div className="grid flex-1 grid-cols-2 auto-rows-fr gap-3">
+                <div className="grid auto-rows-fr flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
                   {signatures.map(
                     ({
                       id,
@@ -173,22 +250,23 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       cardClass,
                       statClass,
                     }) => (
-                      <div
+                      <Link
                         key={id}
-                        className={`group relative flex min-h-[120px] items-center justify-between overflow-hidden rounded-2xl p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl ${cardClass}`}
+                        href="/matrix"
+                        className={`group relative flex min-h-[120px] items-center justify-between overflow-hidden rounded-2xl border-b-[5px] border-black/20 p-4 text-white shadow-[0_6px_16px_rgba(15,23,42,0.12),inset_0_2px_0_rgba(255,255,255,0.3)] transition-all duration-150 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 ${cardClass}`}
                       >
-                        <Icon className="pointer-events-none absolute -bottom-4 -right-3 h-28 w-28 text-white/10 transition-transform duration-300 group-hover:scale-110" />
+                        <Icon className="pointer-events-none absolute -right-3 -bottom-4 h-28 w-28 text-white/10 transition-transform duration-300 group-hover:scale-110" />
 
                         <div className="relative z-10 min-w-0 pr-3">
-                          <span className="inline-block rounded-full border border-white/20 bg-white/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider">
+                          <span className="inline-block rounded-full border border-white/25 bg-white/20 px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase shadow-2xs">
                             {label}
                           </span>
 
-                          <div className="mt-2 truncate text-3xl font-black leading-none tracking-tight">
+                          <div className="mt-2 truncate text-3xl font-black tracking-tight leading-none drop-shadow-2xs">
                             {item?.word || fallback}
                           </div>
 
-                          <div className="mt-1 truncate text-sm font-semibold text-white/90">
+                          <div className="mt-1 truncate text-sm font-bold text-white/90">
                             {item
                               ? `“${item.translation}”`
                               : "Practice to unlock"}
@@ -196,42 +274,42 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
 
                           {item?.subLabel && (
                             <span
-                              className={`mt-2.5 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-black ${statClass}`}
+                              className={`mt-2.5 inline-flex items-center rounded-xl border-b-2 border-black/15 px-2.5 py-1 text-xs font-black ${statClass}`}
                             >
                               {item.subLabel}
                             </span>
                           )}
                         </div>
 
-                        <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-inner transition-transform duration-300 group-hover:rotate-6 lg:h-20 lg:w-20">
-                          <Icon className="h-8 w-8 drop-shadow lg:h-10 lg:w-10" />
+                        <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-b-[3px] border-white/30 bg-white/20 shadow-inner transition-transform duration-300 group-hover:rotate-6 lg:h-16 lg:w-16">
+                          <Icon className="h-7 w-7 drop-shadow lg:h-8 lg:w-8" />
                         </div>
-                      </div>
-                    ),
+                      </Link>
+                    )
                   )}
                 </div>
               </div>
 
-              {/* Badges */}
+              {/* Recent Badges Strip */}
               <div className="shrink-0 border-t border-slate-100 pt-3.5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-black tracking-wider text-slate-400 uppercase">
                     Recent Badges ({badges.filter((b) => b.unlocked).length}/
                     {badges.length})
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                   {badges.map((b) => (
                     <div
                       key={b.id}
-                      className={`flex flex-col items-center text-center ${
+                      className={`flex flex-col items-center rounded-2xl p-1.5 text-center transition-transform hover:-translate-y-0.5 ${
                         b.unlocked ? "" : "opacity-40 grayscale"
                       }`}
                     >
                       <svg
-                        width={54}
-                        height={54}
+                        width={52}
+                        height={52}
                         viewBox="0 0 100 100"
                         className="drop-shadow-xs"
                       >
@@ -268,10 +346,10 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                           {b.emoji}
                         </text>
                       </svg>
-                      <span className="mt-1 text-[11px] font-extrabold text-slate-800 leading-tight truncate w-full">
+                      <span className="mt-1 w-full truncate text-[11px] font-black leading-tight text-slate-800">
                         {b.title}
                       </span>
-                      <span className="text-[9px] font-semibold text-slate-400">
+                      <span className="text-[9px] font-bold text-slate-400">
                         {b.sub}
                       </span>
                     </div>
@@ -281,10 +359,12 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: SPOON FEED */}
-          <div className="flex flex-col min-h-0 lg:col-span-4">
-            <div className="flex h-full min-h-[380px] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between shrink-0 border-b border-slate-100 pb-3">
+          {/* =================================================================
+              RIGHT COLUMN: 3D SPOON FEED CARD
+              ================================================================= */}
+          <div className="flex min-h-0 flex-col lg:col-span-4">
+            <div className="flex h-full min-h-[380px] flex-col overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex shrink-0 items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="text-base font-black text-slate-900">
                     Spoon Feed
@@ -293,8 +373,8 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                     Live Boss Crowns, mastered Spoons &amp; wins
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black text-emerald-700">
-                  <Flame className="h-3 w-3 fill-emerald-500 text-emerald-500" />
+                <span className="inline-flex items-center gap-1 rounded-xl border-b-2 border-emerald-600 bg-emerald-500 px-2.5 py-1 text-[10px] font-black text-white shadow-2xs">
+                  <Flame className="h-3 w-3 fill-amber-300 text-amber-300" />
                   Live
                 </span>
               </div>
