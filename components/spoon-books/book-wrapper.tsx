@@ -21,6 +21,7 @@ import {
   X,
   Gauge,
   BookOpenCheck,
+  Headphones,
 } from "lucide-react";
 import { useSprite } from "@/context/sprite-context";
 import type {
@@ -41,10 +42,18 @@ const CELEBRATION_EMOJIS = [
 ];
 
 const SPEED_OPTIONS = [
-  { label: "0.75x Slow", value: 0.75 },
-  { label: "0.85x Learner", value: 0.85 },
-  { label: "1.0x Normal", value: 1.0 },
+  { label: "0.75x", value: 0.75 },
+  { label: "0.85x", value: 0.85 },
+  { label: "1x", value: 1.0 },
 ] as const;
+
+// Subtle alternating Ken Burns camera paths so every page feels like a living movie shot
+const CAMERA_MOTIONS = [
+  { scale: [1.0, 1.065], x: ["0%", "-1.2%"], y: ["0%", "-0.8%"] },
+  { scale: [1.05, 1.0], x: ["-1%", "0.8%"], y: ["-0.6%", "0%"] },
+  { scale: [1.0, 1.06], x: ["0%", "1.2%"], y: ["0%", "-1%"] },
+  { scale: [1.04, 1.0], x: ["1%", "-0.8%"], y: ["0.5%", "-0.5%"] },
+];
 
 export interface BookWrapperProps {
   book: SpoonBookWebhookPayload & {
@@ -119,8 +128,9 @@ export function BookWrapper({
   const [emojiBurstKey, setEmojiBurstKey] = useState<number>(0);
   const [wrongShakeKey, setWrongShakeKey] = useState<number>(0);
 
-  // Audio + 60fps Word Tracking State
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(0.85); // Default to 0.85x learner pace!
+  // Audio + 60fps Word Tracking + Auto Read-Along State
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(0.85);
+  const [autoReadAlong, setAutoReadAlong] = useState<boolean>(true);
   const [activeSentenceIdx, setActiveSentenceIdx] = useState<number | null>(
     null
   );
@@ -140,13 +150,20 @@ export function BookWrapper({
     book.mediaUrls?.coverImageUrl ||
     book.characterAvatarUrl;
 
-  const isAudioActive = isPlayingPage || activeSentenceIdx !== null;
+  const ambientBackdropUrl =
+    currentPage === 0
+      ? book.mediaUrls?.coverImageUrl || book.characterAvatarUrl
+      : activePageImageUrl;
 
-  // Shuffle options once per page load so the correct answer isn't always first!
+  const isAudioActive = isPlayingPage || activeSentenceIdx !== null;
+  const cameraMotion =
+    CAMERA_MOTIONS[(Math.max(1, currentPage) - 1) % CAMERA_MOTIONS.length];
+
+  // Shuffle options once per page load
   const shuffledOptions = useMemo(() => {
     const opts = activePageContent?.checkpoint?.options;
     if (!opts) return [];
-    
+
     const shuffled = [...opts];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -155,7 +172,6 @@ export function BookWrapper({
     return shuffled;
   }, [activePageContent?.checkpoint]);
 
-  // Stop any playing audio & cancel 60fps loop
   const stopAudio = useCallback(() => {
     sequenceCancelledRef.current = true;
     if (rafRef.current) {
@@ -172,20 +188,11 @@ export function BookWrapper({
   }, []);
 
   useEffect(() => {
-    stopAudio();
-    setActiveVocab(null);
-    setSelectedOption(null);
-    setEmojiBurstKey(0);
-  }, [currentPage, selectedLang, stopAudio]);
-
-  // Update live audio playbackRate if user toggles speed mid-sentence
-  useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackSpeed;
     }
   }, [playbackSpeed]);
 
-  // Resolve presigned audio URL from S3 key
   const resolveAudioUrl = useCallback(
     (s3Key?: string | null) => {
       if (!s3Key) return undefined;
@@ -194,7 +201,7 @@ export function BookWrapper({
     [book.mediaUrls?.sentenceAudioUrls]
   );
 
-  // Play a sentence with 60fps word-by-word karaoke highlighting!
+  // Play a sentence with 60fps word-by-word karaoke highlighting
   const playSentenceWithWordTracking = useCallback(
     (sentence: BookSentence): Promise<void> => {
       return new Promise((resolve) => {
@@ -217,7 +224,6 @@ export function BookWrapper({
 
         const audio = new Audio(url);
         audio.playbackRate = playbackSpeed;
-        // Keep natural voice pitch when slowed down
         if ("preservesPitch" in audio) {
           audio.preservesPitch = true;
         }
@@ -231,11 +237,9 @@ export function BookWrapper({
           const currentMs = audioRef.current.currentTime * 1000;
 
           if (timestamps.length > 0) {
-            // Use exact Groq Whisper millisecond timestamps
             let matchedIdx = -1;
             for (let i = 0; i < timestamps.length; i++) {
               const ts = timestamps[i];
-              // Give a tiny 60ms lookahead so highlighting feels snappy
               if (currentMs >= ts.startMs - 60 && currentMs <= ts.endMs + 120) {
                 matchedIdx = i;
                 break;
@@ -248,7 +252,6 @@ export function BookWrapper({
               setActiveWordIdx(Math.min(matchedIdx, words.length - 1));
             }
           } else if (audioRef.current.duration > 0) {
-            // Proportional fallback if Whisper timestamps weren't returned
             const progress =
               audioRef.current.currentTime / audioRef.current.duration;
             const estIdx = Math.min(
@@ -283,7 +286,6 @@ export function BookWrapper({
     [isAudioMuted, playbackSpeed, resolveAudioUrl]
   );
 
-  // Play isolated vocabulary word audio
   const playVocabAudio = useCallback(
     (s3Key?: string | null) => {
       if (!s3Key || isAudioMuted) return;
@@ -298,45 +300,71 @@ export function BookWrapper({
     [isAudioMuted, playbackSpeed, resolveAudioUrl]
   );
 
-  // Play ALL sentences on the current page back-to-back with a natural 380ms breather between sentences
+  // Core function to play all sentences on the active page sequentially
+  const runPageNarration = useCallback(
+    async (sentences: BookSentence[]) => {
+      if (!sentences.length) return;
+      sequenceCancelledRef.current = false;
+      setIsPlayingPage(true);
+
+      for (let i = 0; i < sentences.length; i++) {
+        if (sequenceCancelledRef.current) break;
+        setActiveSentenceIdx(i);
+        await playSentenceWithWordTracking(sentences[i]);
+
+        if (!sequenceCancelledRef.current && i < sentences.length - 1) {
+          await new Promise((r) => setTimeout(r, 380));
+        }
+      }
+
+      if (!sequenceCancelledRef.current) {
+        setIsPlayingPage(false);
+        setActiveSentenceIdx(null);
+        setActiveWordIdx(null);
+      }
+    },
+    [playSentenceWithWordTracking]
+  );
+
   const handlePlayAllSentences = useCallback(async () => {
     if (!activePageContent?.sentences?.length) return;
-
     if (isPlayingPage) {
       stopAudio();
       return;
     }
+    await runPageNarration(activePageContent.sentences);
+  }, [activePageContent, isPlayingPage, runPageNarration, stopAudio]);
 
-    sequenceCancelledRef.current = false;
-    setIsPlayingPage(true);
+  // Auto-narrate on page turn when Read-Along is enabled!
+  useEffect(() => {
+    stopAudio();
+    setActiveVocab(null);
+    setSelectedOption(null);
+    setEmojiBurstKey(0);
 
-    for (let i = 0; i < activePageContent.sentences.length; i++) {
-      if (sequenceCancelledRef.current) break;
-      setActiveSentenceIdx(i);
-      await playSentenceWithWordTracking(activePageContent.sentences[i]);
-
-      // Natural pause between sentences so it doesn't rush!
-      if (
-        !sequenceCancelledRef.current &&
-        i < activePageContent.sentences.length - 1
-      ) {
-        await new Promise((r) => setTimeout(r, 380));
-      }
-    }
-
-    if (!sequenceCancelledRef.current) {
-      setIsPlayingPage(false);
-      setActiveSentenceIdx(null);
-      setActiveWordIdx(null);
+    if (
+      autoReadAlong &&
+      !isAudioMuted &&
+      currentPage >= 1 &&
+      currentPage <= totalPages &&
+      activePageContent?.sentences?.length
+    ) {
+      const timer = setTimeout(() => {
+        void runPageNarration(activePageContent.sentences);
+      }, 480);
+      return () => clearTimeout(timer);
     }
   }, [
+    currentPage,
+    selectedLang,
+    autoReadAlong,
+    isAudioMuted,
+    totalPages,
     activePageContent,
-    isPlayingPage,
-    playSentenceWithWordTracking,
+    runPageNarration,
     stopAudio,
   ]);
 
-  // Play a single sentence when tapped
   const handleTapSentence = useCallback(
     async (index: number, sentence: BookSentence) => {
       stopAudio();
@@ -406,7 +434,6 @@ export function BookWrapper({
   const isCurrentPageGated =
     currentPage >= 1 && currentPage <= totalPages && !isCurrentPageSolved;
 
-  // Build a set of spotlight vocabulary words on this page so we can underline them inline
   const pageVocabSet = useMemo(() => {
     const map = new Map<string, PageDefinition>();
     for (const d of activePageContent?.definitions || []) {
@@ -416,23 +443,38 @@ export function BookWrapper({
   }, [activePageContent?.definitions]);
 
   return (
-    <div className="relative flex min-h-[calc(100vh-1rem)] w-full flex-col bg-gradient-to-br from-slate-50 via-sky-50/30 to-emerald-50/30 text-slate-900">
+    <div className="relative flex min-h-[calc(100vh-1rem)] w-full flex-col overflow-hidden bg-slate-100/90 text-slate-900">
       {/* =====================================================================
-          1. CLEAN LIGHT HEADER BAR (With Speed Control!)
+          DYNAMIC AMBILIGHT CINEMA BACKDROP (Shifts color mood with every page!)
           ===================================================================== */}
-      <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between bg-white/85 px-4 sm:px-8 backdrop-blur-md">
+      {ambientBackdropUrl && (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <img
+            key={`amb-${currentPage}-${ambientBackdropUrl}`}
+            src={ambientBackdropUrl}
+            alt=""
+            className="h-full w-full scale-125 object-cover opacity-30 blur-[90px] saturate-150 transition-all duration-1000"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-transparent to-slate-100/80" />
+        </div>
+      )}
+
+      {/* =====================================================================
+          1. 3D TACTILE HEADER BAR (With Auto Read-Along & Speed Controls)
+          ===================================================================== */}
+      <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 sm:px-8 backdrop-blur-md">
         <button
           type="button"
           onClick={onBackToLibrary}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+          className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-sky-300 active:translate-y-0.5 active:border-b-0"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           <span>Bookshelf</span>
         </button>
 
         {/* Center Title + Progress Pills */}
         <div className="flex flex-col items-center gap-1">
-          <span className="max-w-[200px] sm:max-w-md truncate text-sm font-extrabold text-slate-800">
+          <span className="max-w-[180px] sm:max-w-md truncate text-xs sm:text-sm font-black text-slate-900">
             {currentTranslation?.title || book.slug}
           </span>
           <div className="flex items-center gap-1.5">
@@ -456,23 +498,38 @@ export function BookWrapper({
           </div>
         </div>
 
-        {/* Right Controls: Reading Pace + Language + Mute */}
+        {/* Right Controls: Auto Read-Along + Speed + Language + Mute */}
         <div className="flex items-center gap-2">
+          {/* Auto Read-Along Toggle */}
+          <button
+            type="button"
+            onClick={() => setAutoReadAlong((prev) => !prev)}
+            className={`hidden md:inline-flex items-center gap-1.5 rounded-xl border-b-[3px] px-3 py-1.5 text-[11px] font-black transition active:translate-y-0.5 active:border-b-0 ${
+              autoReadAlong
+                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
+                : "border-slate-300 bg-slate-100 text-slate-500"
+            }`}
+            title="Automatically narrate each page when turning pages"
+          >
+            <Headphones className="h-3.5 w-3.5" />
+            <span>Read-Along: {autoReadAlong ? "ON" : "OFF"}</span>
+          </button>
+
           {/* Voice Speed Control */}
-          <div className="hidden sm:flex items-center gap-1 rounded-full bg-slate-100 p-1">
-            <Gauge className="ml-2 h-3.5 w-3.5 text-sky-600" />
+          <div className="hidden sm:flex items-center gap-0.5 rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70">
+            <Gauge className="mx-1.5 h-3.5 w-3.5 text-blue-600" />
             {SPEED_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setPlaybackSpeed(opt.value)}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold transition ${
+                className={`rounded-lg px-2 py-0.5 text-[11px] font-black transition ${
                   playbackSpeed === opt.value
-                    ? "bg-white text-sky-700 shadow-xs"
+                    ? "bg-white text-blue-700 shadow-2xs"
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
-                {opt.value}x
+                {opt.label}
               </button>
             ))}
           </div>
@@ -484,7 +541,7 @@ export function BookWrapper({
                 setSelectedLang(e.target.value);
                 setCurrentPage(0);
               }}
-              className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-sky-700 uppercase focus:outline-none"
+              className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-blue-700 uppercase focus:outline-none"
             >
               {availableLanguages.map((lang) => (
                 <option key={lang} value={lang}>
@@ -494,7 +551,7 @@ export function BookWrapper({
             </select>
           ) : (
             <div
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600"
+              className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600"
               title="Multi-language editions unlocked on Unlimited+"
             >
               <Globe2 className="h-3.5 w-3.5 text-sky-500" />
@@ -506,13 +563,13 @@ export function BookWrapper({
           <button
             type="button"
             onClick={() => setIsAudioMuted((prev) => !prev)}
-            className="rounded-full bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
+            className="rounded-xl bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
             title={isAudioMuted ? "Unmute" : "Mute"}
           >
             {isAudioMuted ? (
               <VolumeX className="h-4 w-4 text-rose-500" />
             ) : (
-              <Volume2 className="h-4 w-4 text-sky-600" />
+              <Volume2 className="h-4 w-4 text-blue-600" />
             )}
           </button>
         </div>
@@ -521,7 +578,7 @@ export function BookWrapper({
       {/* =====================================================================
           2. MAIN CINEMA STORYBOOK STAGE
           ===================================================================== */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-3 sm:px-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-3 sm:px-6">
         <AnimatePresence mode="wait">
           {currentPage === 0 ? (
             /* ================= PAGE 0: CINEMATIC COVER ================= */
@@ -530,9 +587,9 @@ export function BookWrapper({
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="relative w-full overflow-hidden rounded-[2rem] bg-white shadow-xl"
+              className="relative w-full overflow-hidden rounded-[2.25rem] border-2 border-b-[6px] border-slate-900 bg-slate-950 shadow-2xl"
             >
-              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950">
                 {book.mediaUrls?.introVideoUrl ? (
                   <video
                     src={book.mediaUrls.introVideoUrl}
@@ -543,27 +600,34 @@ export function BookWrapper({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <img
+                  <motion.img
                     src={
                       book.mediaUrls?.coverImageUrl || book.characterAvatarUrl
                     }
                     alt={currentTranslation?.title}
+                    animate={{ scale: [1.0, 1.06] }}
+                    transition={{
+                      duration: 14,
+                      repeat: Infinity,
+                      repeatType: "reverse",
+                      ease: "easeInOut",
+                    }}
                     className="h-full w-full object-cover"
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
                 <div className="absolute inset-x-0 bottom-0 flex flex-col items-start justify-end p-6 sm:p-10 text-white">
                   <div className="mb-3 flex items-center gap-2">
-                    <span className="rounded-full bg-emerald-400 px-3 py-1 text-[11px] font-black tracking-wide text-slate-950 uppercase">
+                    <span className="rounded-lg bg-emerald-400 px-3 py-1 text-[11px] font-black tracking-wide text-slate-950 uppercase">
                       {book.levelBand}
                     </span>
-                    <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold text-white capitalize backdrop-blur-md">
+                    <span className="rounded-lg bg-white/20 px-3 py-1 text-[11px] font-bold text-white capitalize backdrop-blur-md">
                       {book.genre}
                     </span>
                   </div>
 
-                  <h1 className="text-3xl font-black tracking-tight sm:text-5xl">
+                  <h1 className="text-3xl font-black tracking-tight drop-shadow-md sm:text-5xl">
                     {currentTranslation?.title}
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm font-medium text-white/90 sm:text-base">
@@ -571,13 +635,13 @@ export function BookWrapper({
                   </p>
 
                   <div className="mt-6 flex w-full flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 rounded-full bg-white/15 py-1.5 pr-4 pl-1.5 backdrop-blur-md">
+                    <div className="flex items-center gap-3 rounded-full border border-white/15 bg-white/15 py-1.5 pr-4 pl-1.5 backdrop-blur-md">
                       <img
                         src={book.characterAvatarUrl}
                         alt={book.characterName}
-                        className="h-8 w-8 rounded-full object-cover"
+                        className="h-8 w-8 rounded-full object-cover ring-2 ring-emerald-400"
                       />
-                      <span className="text-xs font-bold text-white">
+                      <span className="text-xs font-extrabold text-white">
                         Starring {book.characterName}
                       </span>
                     </div>
@@ -585,8 +649,9 @@ export function BookWrapper({
                     <button
                       type="button"
                       onClick={handleNextPage}
-                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400 px-8 py-3.5 text-sm font-black text-slate-950 shadow-lg transition hover:scale-[1.02] active:scale-[0.98]"
+                      className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm sm:text-base font-black text-white shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
                     >
+                      <Play className="h-4 w-4 fill-current" />
                       <span>Start Story</span>
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -595,38 +660,57 @@ export function BookWrapper({
               </div>
             </motion.div>
           ) : currentPage >= 1 && currentPage <= totalPages ? (
-            /* ================= PAGES 1..N: 16:9 STAGE + KARAOKE DOCK ================= */
+            /* ================= PAGES 1..N: LIVING KEN-BURNS CINEMA STAGE ================= */
             <motion.div
               key={`page-${currentPage}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              initial={{ opacity: 0, y: 12, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
               className="flex w-full flex-col gap-3.5"
             >
-              {/* LARGE 16:9 ILLUSTRATION CANVAS */}
-              <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-[2rem] bg-slate-200 shadow-2xl">
-                <img
+              {/* LARGE 16:9 LIVING CINEMA CANVAS */}
+              <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-[2.25rem] border-2 border-b-[6px] border-slate-900/90 bg-slate-950 shadow-2xl">
+                {/* KEN BURNS LIVING CAMERA MOTION */}
+                <motion.img
+                  key={`art-${currentPage}-${activePageImageUrl}`}
                   src={activePageImageUrl}
                   alt={`Page ${currentPage}`}
-                  className="h-full w-full object-cover"
+                  animate={cameraMotion}
+                  transition={{
+                    duration: 16,
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    ease: "easeInOut",
+                  }}
+                  className="h-full w-full object-cover will-change-transform"
                 />
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/45 to-transparent" />
+                {/* Top Subtle Vignette */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent" />
+
+                {/* Bottom Cinema Letterbox Scrim (Lets 100% of the art show through while making white text pop!) */}
+                <div
+                  className={`pointer-events-none absolute inset-x-0 bottom-0 transition-all duration-500 ${
+                    isAudioActive
+                      ? "h-56 bg-gradient-to-t from-slate-950/95 via-slate-950/75 to-transparent"
+                      : "h-48 bg-gradient-to-t from-slate-950/90 via-slate-950/55 to-transparent"
+                  }`}
+                />
 
                 {/* Top Floating Badges */}
                 <div className="absolute top-4 inset-x-4 flex items-center justify-between">
-                  <span className="rounded-full bg-white/90 px-3.5 py-1 text-xs font-extrabold text-slate-800 shadow-sm backdrop-blur-md">
+                  <span className="rounded-xl border border-white/15 bg-slate-950/75 px-3.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur-md">
                     Page {currentPage} of {totalPages}
                   </span>
 
                   <button
                     type="button"
                     onClick={() => setIsCheckpointDrawerOpen(true)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-extrabold shadow-md backdrop-blur-md transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border-b-[3px] px-4 py-1.5 text-xs font-black shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
                       isCurrentPageSolved
-                        ? "bg-emerald-500/95 text-white"
-                        : "bg-amber-400 text-slate-950 hover:scale-105"
+                        ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                        : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
                     }`}
                   >
                     {isCurrentPageSolved ? (
@@ -644,112 +728,112 @@ export function BookWrapper({
                 </div>
 
                 {/* =============================================================
-                    LOW FLOATING STORY DOCK WITH WORD-BY-WORD KARAOKE HIGHLIGHTING
+                    UNOBSTRUCTED CINEMA SUBTITLE STAGE (No Giant White Box!)
                     ============================================================= */}
-                <div
-                  className={`absolute inset-x-2.5 bottom-2 sm:inset-x-4 sm:bottom-3 rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 transition-all duration-500 ${
-                    isAudioActive
-                      ? "bg-white/96 opacity-100 shadow-2xl ring-2 ring-sky-400/60 backdrop-blur-xl"
-                      : "bg-white/75 opacity-90 hover:bg-white/95 hover:opacity-100 shadow-lg backdrop-blur-md"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3.5">
-                      <button
-                        type="button"
-                        onClick={handlePlayAllSentences}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition ${
-                          isPlayingPage
-                            ? "bg-rose-500 text-white"
-                            : "bg-gradient-to-tr from-sky-500 to-emerald-400 text-white hover:scale-105"
-                        }`}
-                        title={
-                          isPlayingPage
-                            ? "Stop reading"
-                            : "Read page aloud word-by-word"
-                        }
-                      >
-                        {isPlayingPage ? (
-                          <Square className="h-4 w-4 fill-current" />
-                        ) : (
-                          <Play className="h-5 w-5 fill-current ml-0.5" />
-                        )}
-                      </button>
-
-                      {/* WORD-BY-WORD KARAOKE SENTENCE RENDERER */}
-                      <div className="space-y-1">
-                        <div className="text-base sm:text-lg md:text-xl font-extrabold leading-relaxed text-slate-900">
-                          {activePageContent?.sentences.map((sent, sIdx) => {
-                            const isSentenceActive = activeSentenceIdx === sIdx;
-                            const words = sent.textTarget.trim().split(/\s+/);
-
-                            return (
-                              <span
-                                key={sent.sentenceIndex ?? sIdx}
-                                onClick={() => handleTapSentence(sIdx, sent)}
-                                className={`mr-2.5 inline cursor-pointer rounded-lg px-1 py-0.5 transition-colors ${
-                                  isSentenceActive
-                                    ? "bg-sky-50/90 ring-1 ring-sky-200"
-                                    : "hover:bg-slate-100/70"
-                                }`}
-                              >
-                                {words.map((wordToken, wIdx) => {
-                                  const isWordHighlighted =
-                                    isSentenceActive && activeWordIdx === wIdx;
-                                  const cleanToken = wordToken
-                                    .toLowerCase()
-                                    .replace(/[.,!?'"«»]/g, "");
-                                  const isVocabWord =
-                                    pageVocabSet.has(cleanToken);
-
-                                  return (
-                                    <span
-                                      key={wIdx}
-                                      className={`mr-1 inline-block rounded-md px-1 py-0.5 transition-all duration-150 ${
-                                        isWordHighlighted
-                                          ? "bg-sky-500 text-white scale-105 shadow-xs"
-                                          : isVocabWord
-                                            ? "underline decoration-emerald-500 decoration-2 underline-offset-4 text-sky-950"
-                                            : ""
-                                      }`}
-                                    >
-                                      {wordToken}
-                                    </span>
-                                  );
-                                })}
-                              </span>
-                            );
-                          })}
-                        </div>
-
-                        {showTranslations && (
-                          <p className="text-xs sm:text-sm font-semibold text-slate-600">
-                            {activePageContent?.sentences
-                              .map((s) => s.textNative)
-                              .join(" ")}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
+                <div className="absolute inset-x-4 bottom-3 sm:inset-x-7 sm:bottom-5 z-10 flex items-end justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    {/* 3D Tactile Play / Stop Button */}
                     <button
                       type="button"
-                      onClick={() => setShowTranslations((prev) => !prev)}
-                      className="shrink-0 rounded-full bg-slate-900/10 px-2.5 py-1 text-[10px] font-bold text-slate-700 transition hover:bg-slate-900/15"
+                      onClick={handlePlayAllSentences}
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                        isPlayingPage
+                          ? "border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
+                          : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                      }`}
+                      title={
+                        isPlayingPage
+                          ? "Stop reading"
+                          : "Read page aloud word-by-word"
+                      }
                     >
-                      {showTranslations ? "Hide EN" : "Show EN"}
+                      {isPlayingPage ? (
+                        <Square className="h-4 w-4 fill-current" />
+                      ) : (
+                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                      )}
                     </button>
+
+                    {/* Cinema Karaoke Subtitle Stream */}
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="text-lg sm:text-xl md:text-2xl font-black leading-snug tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
+                        {activePageContent?.sentences.map((sent, sIdx) => {
+                          const isSentenceActive = activeSentenceIdx === sIdx;
+                          const words = sent.textTarget.trim().split(/\s+/);
+
+                          return (
+                            <span
+                              key={sent.sentenceIndex ?? sIdx}
+                              onClick={() => handleTapSentence(sIdx, sent)}
+                              className={`mr-2.5 inline cursor-pointer rounded-lg px-1 py-0.5 transition-opacity ${
+                                activeSentenceIdx !== null && !isSentenceActive
+                                  ? "opacity-65 hover:opacity-100"
+                                  : "opacity-100"
+                              }`}
+                            >
+                              {words.map((wordToken, wIdx) => {
+                                const isWordHighlighted =
+                                  isSentenceActive && activeWordIdx === wIdx;
+                                const cleanToken = wordToken
+                                  .toLowerCase()
+                                  .replace(/[.,!?'"«»]/g, "");
+                                const matchedDefn =
+                                  pageVocabSet.get(cleanToken);
+
+                                return (
+                                  <span
+                                    key={wIdx}
+                                    onClick={(e) => {
+                                      if (matchedDefn) {
+                                        e.stopPropagation();
+                                        handleTapVocab(matchedDefn);
+                                      }
+                                    }}
+                                    className={`mr-1 inline-block rounded-lg px-1.5 py-0.5 transition-all duration-150 ${
+                                      isWordHighlighted
+                                        ? "-translate-y-0.5 scale-105 bg-amber-300 text-slate-950 shadow-[0_0_20px_rgba(252,211,77,0.65)]"
+                                        : matchedDefn
+                                          ? "underline decoration-emerald-400 decoration-2 underline-offset-4 text-emerald-300 hover:bg-white/15"
+                                          : "hover:text-sky-300"
+                                    }`}
+                                  >
+                                    {wordToken}
+                                  </span>
+                                );
+                              })}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {showTranslations && (
+                        <p className="text-xs sm:text-sm font-semibold text-slate-300/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
+                          {activePageContent?.sentences
+                            .map((s) => s.textNative)
+                            .join(" ")}
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Show / Hide English Subtitle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTranslations((prev) => !prev)}
+                    className="shrink-0 rounded-xl border border-white/20 bg-black/50 px-3 py-1.5 text-[10px] font-black text-white/90 backdrop-blur-md transition hover:bg-black/75"
+                  >
+                    {showTranslations ? "Hide EN" : "Show EN"}
+                  </button>
                 </div>
               </div>
 
               {/* =================================================================
-                  BOTTOM BAR: PROMINENT VOCABULARY CARD + PAGE NAVIGATION
+                  3D TACTILE BOTTOM BAR: WORD SPOTLIGHT + PAGE NAVIGATION
                   ================================================================= */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-md backdrop-blur-md">
-                {/* High-Visibility Spotlight Vocabulary Pills */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-b-[5px] border-slate-200/90 border-b-slate-300 bg-white/95 px-4 py-3 shadow-md backdrop-blur-md">
+                {/* 3D Spotlight Vocabulary Pills */}
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black tracking-wide text-emerald-800 uppercase">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-1.5 text-[11px] font-black tracking-wide text-emerald-800 uppercase">
                     <BookOpenCheck className="h-3.5 w-3.5" />
                     Word Spotlight
                   </span>
@@ -761,32 +845,32 @@ export function BookWrapper({
                         key={idx}
                         type="button"
                         onClick={() => handleTapVocab(defn)}
-                        className={`inline-flex items-center gap-2.5 rounded-xl px-4 py-2 text-xs sm:text-sm transition-all ${
+                        className={`inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 px-3.5 py-1.5 text-xs sm:text-sm transition-all active:translate-y-0.5 active:border-b-2 ${
                           isSelected
-                            ? "bg-sky-600 text-white shadow-md scale-[1.02]"
-                            : "bg-sky-50/90 text-slate-900 hover:bg-sky-100 ring-1 ring-sky-200/80"
+                            ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
+                            : "border-slate-200 border-b-slate-300 bg-slate-50/90 text-slate-900 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
                         }`}
                       >
                         <Volume2
                           className={`h-4 w-4 ${
-                            isSelected ? "text-white" : "text-sky-600"
+                            isSelected ? "text-white" : "text-blue-600"
                           }`}
                         />
-                        <span className="text-sm font-black">{defn.word}</span>
+                        <span className="font-black">{defn.word}</span>
                         {defn.phonetic && (
                           <span
-                            className={`text-xs font-medium ${
-                              isSelected ? "text-sky-100" : "text-slate-500"
+                            className={`text-xs font-semibold ${
+                              isSelected ? "text-sky-100" : "text-slate-400"
                             }`}
                           >
                             /{defn.phonetic}/
                           </span>
                         )}
                         <span
-                          className={`rounded-md px-2 py-0.5 text-xs font-extrabold ${
+                          className={`rounded-lg px-2 py-0.5 text-xs font-black ${
                             isSelected
                               ? "bg-white/20 text-white"
-                              : "bg-emerald-500/15 text-emerald-700"
+                              : "bg-emerald-100 text-emerald-800"
                           }`}
                         >
                           {defn.translation}
@@ -796,12 +880,12 @@ export function BookWrapper({
                   })}
                 </div>
 
-                {/* Page Navigation + Checkpoint Trigger */}
+                {/* 3D Page Navigation + Checkpoint Trigger */}
                 <div className="ml-auto flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={handlePrevPage}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+                    className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     <span>Previous</span>
@@ -811,16 +895,16 @@ export function BookWrapper({
                     <button
                       type="button"
                       onClick={() => setIsCheckpointDrawerOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:scale-105"
+                      className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                     >
                       <HelpCircle className="h-4 w-4" />
-                      <span>Answer Checkpoint to Continue</span>
+                      <span>Answer Checkpoint</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleNextPage}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 px-6 py-2.5 text-xs font-black text-white shadow-md transition hover:scale-105"
+                      className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                     >
                       <span>
                         {currentPage === totalPages
@@ -834,15 +918,15 @@ export function BookWrapper({
               </div>
             </motion.div>
           ) : (
-            /* ================= OUTRO: COMPLETION CARD ================= */
+            /* ================= OUTRO: 3D COMPLETION CARD ================= */
             <motion.div
               key="book-outro"
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="mx-auto flex w-full max-w-md flex-col items-center space-y-6 rounded-3xl bg-white p-8 text-center shadow-xl"
+              className="mx-auto flex w-full max-w-md flex-col items-center space-y-6 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-8 text-center shadow-xl"
             >
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-amber-300 to-emerald-400 text-2xl font-black text-slate-950 shadow-md">
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border-b-[5px] border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-2xl font-black text-slate-950 shadow-lg">
                 {totalPages}/{totalPages}
               </div>
 
@@ -852,7 +936,7 @@ export function BookWrapper({
                 </h2>
                 <p className="text-sm leading-relaxed text-slate-600">
                   You finished all {totalPages} pages of{" "}
-                  <span className="font-bold text-sky-600">
+                  <span className="font-bold text-blue-600">
                     {currentTranslation?.title}
                   </span>
                   .
@@ -866,7 +950,7 @@ export function BookWrapper({
                     setCurrentPage(1);
                     setCompletedCheckpoints(new Set());
                   }}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-100 py-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white py-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
                 >
                   <RotateCcw className="h-4 w-4" />
                   <span>Read Story Again</span>
@@ -875,7 +959,7 @@ export function BookWrapper({
                 <button
                   type="button"
                   onClick={onBackToLibrary}
-                  className="w-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 py-3.5 text-xs font-black text-white shadow-md transition hover:brightness-105"
+                  className="w-full rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3.5 text-xs font-black text-white shadow-lg shadow-emerald-500/25 transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                 >
                   Back to Bookshelf
                 </button>
@@ -897,7 +981,7 @@ export function BookWrapper({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setIsCheckpointDrawerOpen(false)}
-              className="fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-xs"
+              className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-xs"
             />
 
             <motion.div
@@ -905,7 +989,7 @@ export function BookWrapper({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.98 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="fixed inset-x-3 bottom-3 sm:inset-x-0 sm:bottom-5 z-50 mx-auto w-auto sm:w-full max-w-xl overflow-hidden rounded-[2rem] bg-white p-6 sm:p-7 shadow-2xl ring-1 ring-slate-200/80"
+              className="fixed inset-x-3 bottom-3 sm:inset-x-0 sm:bottom-5 z-50 mx-auto w-auto sm:w-full max-w-xl overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 bg-white p-6 sm:p-7 shadow-2xl"
             >
               {/* 🎉 EMOJI DROP RAIN OVERLAY */}
               <AnimatePresence>
@@ -948,7 +1032,7 @@ export function BookWrapper({
 
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-0.5 text-[10px] font-black tracking-wide text-sky-700 uppercase">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-0.5 text-[10px] font-black tracking-wide text-blue-700 uppercase">
                     <Sparkles className="h-3 w-3" />
                     Page {currentPage} Challenge
                   </span>
@@ -995,12 +1079,12 @@ export function BookWrapper({
                             setWrongShakeKey((prev) => prev + 1);
                           }
                         }}
-                        className={`flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition-colors duration-200 ${
+                        className={`flex w-full items-center justify-between rounded-2xl border-2 border-b-4 px-4 py-3.5 text-left text-sm font-black transition-all duration-150 ${
                           isCorrectSelection
-                            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                            ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
                             : isWrongSelection
-                              ? "bg-rose-50 text-rose-900 ring-2 ring-rose-300"
-                              : "bg-slate-100/80 text-slate-800 hover:bg-sky-50/90"
+                              ? "border-rose-400 bg-rose-50 text-rose-900"
+                              : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-sky-300"
                         }`}
                       >
                         <span>{opt.text}</span>
@@ -1010,7 +1094,7 @@ export function BookWrapper({
                               ? "bg-white/25 text-white scale-110"
                               : isWrongSelection
                                 ? "bg-rose-200 text-rose-800"
-                                : "bg-white/70 text-slate-400"
+                                : "bg-slate-100 text-slate-400"
                           }`}
                         >
                           {isCorrectSelection
@@ -1053,10 +1137,10 @@ export function BookWrapper({
                       setEmojiBurstKey((prev) => prev + 1);
                       handleCompleteCurrentCheckpoint();
                     }}
-                    className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black transition ${
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 py-3.5 text-sm font-black transition ${
                       isCurrentPageSolved
-                        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
-                        : "bg-slate-100 text-slate-800 hover:bg-sky-50"
+                        ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
+                        : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
                     }`}
                   >
                     <Mic className="h-4 w-4" />
@@ -1103,9 +1187,9 @@ export function BookWrapper({
                   type="button"
                   disabled={!isCurrentPageSolved}
                   onClick={handleNextPage}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2.5 text-xs font-black transition-all ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-5 py-2.5 text-xs font-black transition-all ${
                     isCurrentPageSolved
-                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-105"
+                      ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
                       : "cursor-not-allowed bg-slate-200/70 text-slate-400"
                   }`}
                 >
