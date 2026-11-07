@@ -23,6 +23,7 @@ import {
   Info,
 } from "lucide-react";
 import { EnrichedWordStat, SessionScore, WordStat } from "./matrix-types";
+import { VoiceMicButton } from "@/components/ui/misc/voice-mic-button";
 
 interface MatrixWordCardProps {
   wordStat: EnrichedWordStat;
@@ -163,41 +164,16 @@ export function MatrixWordCard({
             <Turtle className="h-3.5 w-3.5" />
           </button>
 
-          <button
-            type="button"
-            onClick={() => onPronunciationTest(wordStat)}
-            disabled={isAnalyzing || isOtherCardBusy}
-            className={`inline-flex h-8 items-center gap-1 rounded-xl border-b-[3px] px-3 text-xs font-black text-white shadow-2xs transition-all active:translate-y-0.5 active:border-b-0 disabled:opacity-40 ${
-              isListening
-                ? "animate-pulse border-rose-800 bg-rose-600"
-                : isAnalyzing
-                  ? "cursor-wait border-indigo-800 bg-indigo-600"
-                  : displayScore !== null
-                    ? displayScore >= 80
-                      ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 hover:brightness-105"
-                      : "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950! hover:brightness-105"
-                    : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:brightness-105"
-            }`}
-          >
-            {isListening ? (
-              <>
-                <Square className="h-3 w-3 fill-current" />
-                <span>Stop</span>
-              </>
-            ) : isAnalyzing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : displayScore !== null ? (
-              <>
-                <Mic className="h-3 w-3" />
-                <span>{Math.round(displayScore)}%</span>
-              </>
-            ) : (
-              <>
-                <Mic className="h-3 w-3" />
-                <span>Try</span>
-              </>
-            )}
-          </button>
+         <VoiceMicButton
+  size="sm"
+  isListening={isListening}
+  isAnalyzing={isAnalyzing}
+  disabled={isOtherCardBusy}
+  score={displayScore}
+  idleLabel="Try"
+  onClick={() => onPronunciationTest(wordStat)}
+/>
+          
         </div>
       </div>
 

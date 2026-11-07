@@ -34,6 +34,7 @@ interface MatrixDojoModalProps {
   onListen: (wordStat: WordStat, speed: number) => void;
   onPronunciationTest: (wordStat: WordStat) => void;
 }
+import { VoiceMicButton } from "@/components/ui/misc/voice-mic-button";
 
 export function MatrixDojoModal({
   isOpen,
@@ -155,36 +156,15 @@ export function MatrixDojoModal({
         )}
 
         {/* 3D Big Microphone Button */}
-        <button
-          type="button"
+        <VoiceMicButton
+          size="lg"
+          isListening={isListening}
+          isAnalyzing={isAnalyzing}
+          idleLabel={`Tap & Speak “${activeDojoWord.cleanWord}”`}
+          listeningLabel="Listening... Tap to Stop"
+          analyzingLabel="Analyzing Your Accent..."
           onClick={() => onPronunciationTest(activeDojoWord)}
-          disabled={status === "analyzing"}
-          className={`flex w-full items-center justify-center gap-3 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
-            isListening
-              ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600"
-              : isAnalyzing
-                ? "cursor-wait border-indigo-800 bg-indigo-600"
-                : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25 hover:brightness-105"
-          }`}
-        >
-          {isListening ? (
-            <>
-              <Square className="h-5 w-5 fill-current" />
-              <span>Listening... Tap to Stop</span>
-            </>
-          ) : isAnalyzing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Analyzing Your Accent...</span>
-            </>
-          ) : (
-            <>
-              <Mic className="h-5 w-5" />
-              <span>Tap &amp; Speak &ldquo;{activeDojoWord.cleanWord}&rdquo;</span>
-            </>
-          )}
-        </button>
-
+        />
         {/* Footer 3D Navigation */}
         <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
           <button

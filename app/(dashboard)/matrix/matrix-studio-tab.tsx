@@ -21,6 +21,7 @@ import {
   Check,
 } from "lucide-react";
 import { EnrichedWordStat, SessionScore, WordStat } from "./matrix-types";
+import { VoiceMicButton } from "@/components/ui/misc/voice-mic-button";
 
 interface MatrixStudioTabProps {
   enrichedWords: EnrichedWordStat[];
@@ -58,7 +59,7 @@ export function MatrixStudioTab({
 
       const pickTop3 = (
         list: EnrichedWordStat[],
-        sortFn: (a: EnrichedWordStat, b: EnrichedWordStat) => number
+        sortFn: (a: EnrichedWordStat, b: EnrichedWordStat) => number,
       ) => {
         const sorted = [...list].sort(sortFn);
         if (sorted.length === 0) return [];
@@ -71,17 +72,17 @@ export function MatrixStudioTab({
 
       const seen = pickTop3(
         enrichedWords.filter((w) => w.seenCount > 0),
-        (a, b) => b.seenCount - a.seenCount
+        (a, b) => b.seenCount - a.seenCount,
       );
 
       const heard = pickTop3(
         enrichedWords.filter((w) => w.heardCount > 0),
-        (a, b) => b.heardCount - a.heardCount
+        (a, b) => b.heardCount - a.heardCount,
       );
 
       const tapped = pickTop3(
         enrichedWords.filter((w) => w.tappedCorrect + w.tappedWrong > 0),
-        (a, b) => b.tappedCorrect - a.tappedCorrect
+        (a, b) => b.tappedCorrect - a.tappedCorrect,
       );
 
       const spoken = pickTop3(
@@ -89,7 +90,7 @@ export function MatrixStudioTab({
         (a, b) =>
           (b.avgSpokenScore ?? 0) !== (a.avgSpokenScore ?? 0)
             ? (b.avgSpokenScore ?? 0) - (a.avgSpokenScore ?? 0)
-            : b.spokenAttempts - a.spokenAttempts
+            : b.spokenAttempts - a.spokenAttempts,
       );
 
       return {
@@ -108,16 +109,16 @@ export function MatrixStudioTab({
       [...enrichedWords]
         .filter(
           (w) =>
-            w.spokenAttempts === 0 && (w.seenCount > 0 || w.tappedCorrect > 0)
+            w.spokenAttempts === 0 && (w.seenCount > 0 || w.tappedCorrect > 0),
         )
         .sort(
           (a, b) =>
             b.seenCount +
             b.tappedCorrect * 2 -
-            (a.seenCount + a.tappedCorrect * 2)
+            (a.seenCount + a.tappedCorrect * 2),
         )
         .slice(0, 6),
-    [enrichedWords]
+    [enrichedWords],
   );
 
   const lowListenWords = useMemo(
@@ -125,14 +126,14 @@ export function MatrixStudioTab({
       [...enrichedWords]
         .filter((w) => w.heardCount <= 1)
         .sort(
-          (a, b) => a.heardCount - b.heardCount || b.seenCount - a.seenCount
+          (a, b) => a.heardCount - b.heardCount || b.seenCount - a.seenCount,
         )
         .slice(0, 6),
-    [enrichedWords]
+    [enrichedWords],
   );
 
   const [gapTab, setGapTab] = useState<"ZERO_SPOKEN" | "LOW_LISTEN">(
-    "ZERO_SPOKEN"
+    "ZERO_SPOKEN",
   );
   const activeGapList =
     gapTab === "ZERO_SPOKEN" ? zeroSpokenHighSeen : lowListenWords;
@@ -151,11 +152,11 @@ export function MatrixStudioTab({
 
       const pool = [...enrichedWords].sort(
         (a, b) =>
-          a.heardCount + a.tappedCorrect - (b.heardCount + b.tappedCorrect)
+          a.heardCount + a.tappedCorrect - (b.heardCount + b.tappedCorrect),
       );
       const candidatePool = pool.slice(
         0,
-        Math.max(6, Math.floor(pool.length * 0.4))
+        Math.max(6, Math.floor(pool.length * 0.4)),
       );
       const target =
         candidatePool[Math.floor(Math.random() * candidatePool.length)] ||
@@ -176,7 +177,7 @@ export function MatrixStudioTab({
         onListen(target, 0.9);
       }
     },
-    [enrichedWords, onListen]
+    [enrichedWords, onListen],
   );
 
   useEffect(() => {
@@ -277,28 +278,18 @@ export function MatrixStudioTab({
                     >
                       <Volume2 className="h-4 w-4" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onPronunciationTest(champion)}
-                      disabled={status === "analyzing"}
-                      title="Speak"
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl border-b-[3px] text-white shadow-2xs transition-all active:translate-y-0.5 active:border-b-0 ${
+                    <VoiceMicButton
+                      size="icon"
+                      isListening={
                         activeMicWordId === champion.id &&
                         status === "listening"
-                          ? "animate-pulse border-rose-800 bg-rose-600"
-                          : config.micBtn3D
-                      }`}
-                    >
-                      {activeMicWordId === champion.id &&
-                      status === "listening" ? (
-                        <Square className="h-3.5 w-3.5 fill-current" />
-                      ) : activeMicWordId === champion.id &&
-                        status === "analyzing" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Mic className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                      }
+                      isAnalyzing={
+                        activeMicWordId === champion.id &&
+                        status === "analyzing"
+                      }
+                      onClick={() => onPronunciationTest(champion)}
+                    />
                   </div>
                 </div>
               </div>
@@ -513,27 +504,13 @@ export function MatrixStudioTab({
                         <Turtle className="h-3.5 w-3.5" />
                       </button>
 
-                      <button
-                        type="button"
+                      <VoiceMicButton
+                        size="sm"
+                        idleLabel="Say"
+                        isListening={isListening}
+                        isAnalyzing={isAnalyzing}
                         onClick={() => onPronunciationTest(item)}
-                        disabled={isAnalyzing}
-                        className={`inline-flex h-9 items-center gap-1 rounded-xl border-b-[3px] px-3 text-xs font-black text-white shadow-2xs transition-all active:translate-y-0.5 active:border-b-0 ${
-                          isListening
-                            ? "animate-pulse border-rose-800 bg-rose-600"
-                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:brightness-105"
-                        }`}
-                      >
-                        {isListening ? (
-                          <Square className="h-3 w-3 fill-current" />
-                        ) : isAnalyzing ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <>
-                            <Mic className="h-3 w-3" />
-                            <span>Say</span>
-                          </>
-                        )}
-                      </button>
+                      />
                     </div>
                   </div>
                 );
@@ -628,8 +605,7 @@ export function MatrixStudioTab({
                         btnStyle =
                           "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md shadow-emerald-500/20";
                       } else if (isPicked && !isCorrectTarget) {
-                        btnStyle =
-                          "border-rose-400 bg-rose-50 text-rose-800";
+                        btnStyle = "border-rose-400 bg-rose-50 text-rose-800";
                       } else {
                         btnStyle =
                           "border-slate-200 bg-slate-50 text-slate-400 opacity-60";

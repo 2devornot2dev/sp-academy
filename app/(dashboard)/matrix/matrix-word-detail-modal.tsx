@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { EnrichedWordStat, SessionScore, WordStat } from "./matrix-types";
+import { VoiceMicButton } from "@/components/ui/misc/voice-mic-button";
 
 interface MatrixWordDetailModalProps {
   wordStat: EnrichedWordStat | null;
@@ -72,13 +73,10 @@ export function MatrixWordDetailModal({
 }: MatrixWordDetailModalProps) {
   if (!wordStat) return null;
 
-  const isListening =
-    activeMicWordId === wordStat.id && status === "listening";
-  const isAnalyzing =
-    activeMicWordId === wordStat.id && status === "analyzing";
+  const isListening = activeMicWordId === wordStat.id && status === "listening";
+  const isAnalyzing = activeMicWordId === wordStat.id && status === "analyzing";
   const displayScore = sessionResult?.overall ?? wordStat.avgSpokenScore;
-  const totalTaps =
-    (wordStat.tappedCorrect || 0) + (wordStat.tappedWrong || 0);
+  const totalTaps = (wordStat.tappedCorrect || 0) + (wordStat.tappedWrong || 0);
   const tapAccuracy =
     totalTaps > 0
       ? Math.round((wordStat.tappedCorrect / totalTaps) * 100)
@@ -95,9 +93,7 @@ export function MatrixWordDetailModal({
     ...wordStat.relatedPhrases,
     ...wordStat.linkedComponentWords,
     ...wordStat.sameLemmaWords,
-  ].filter(
-    (item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx
-  );
+  ].filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx);
 
   return (
     <div
@@ -191,39 +187,19 @@ export function MatrixWordDetailModal({
               <span>Slow 0.6x</span>
             </button>
 
-            <button
-              type="button"
+            <VoiceMicButton
+              size="md"
+              className="ml-auto"
+              isListening={isListening}
+              isAnalyzing={isAnalyzing}
+              idleLabel={
+                displayScore !== null && displayScore !== undefined
+                  ? `Try Again (${Math.round(displayScore)}%)`
+                  : "Try Speaking"
+              }
+              listeningLabel="Stop Recording"
               onClick={() => onPronunciationTest(wordStat)}
-              disabled={isAnalyzing}
-              className={`ml-auto inline-flex items-center gap-2 rounded-xl border-b-4 px-5 py-2.5 text-xs font-black text-white shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
-                isListening
-                  ? "animate-pulse border-rose-800 bg-rose-600"
-                  : isAnalyzing
-                    ? "cursor-wait border-indigo-800 bg-indigo-600"
-                    : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/20 hover:brightness-105"
-              }`}
-            >
-              {isListening ? (
-                <>
-                  <Square className="h-3.5 w-3.5 fill-current" />
-                  <span>Stop Recording</span>
-                </>
-              ) : isAnalyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Scoring...</span>
-                </>
-              ) : (
-                <>
-                  <Mic className="h-4 w-4" />
-                  <span>
-                    {displayScore !== null && displayScore !== undefined
-                      ? `Try Again (${Math.round(displayScore)}%)`
-                      : "Try Speaking"}
-                  </span>
-                </>
-              )}
-            </button>
+            />
           </div>
         </div>
 
@@ -280,7 +256,8 @@ export function MatrixWordDetailModal({
           {/* 4-Signal 3D Telemetry Tiles */}
           <div>
             <h4 className="mb-3 text-[11px] font-black tracking-wider text-slate-400 uppercase">
-              Interaction Telemetry ({Math.round(wordStat.masteryScore * 10) / 10} pts)
+              Interaction Telemetry (
+              {Math.round(wordStat.masteryScore * 10) / 10} pts)
             </h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/50 p-3.5">
@@ -350,9 +327,7 @@ export function MatrixWordDetailModal({
               </h4>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {linkedItems.map((rel) => {
-                  const fullRel = allEnrichedWords.find(
-                    (e) => e.id === rel.id
-                  );
+                  const fullRel = allEnrichedWords.find((e) => e.id === rel.id);
                   return (
                     <button
                       key={rel.id}
