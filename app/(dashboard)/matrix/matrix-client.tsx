@@ -52,13 +52,13 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
   const [mainTab, setMainTab] = useState<"STUDIO" | "VAULT">("STUDIO");
 
   const [viewMode, setViewMode] = useState<ViewMode>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<string>("GREETING");
+  // Default to "ALL" so Full Matrix Vault shows all unlocked words immediately
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortByOption>("recent");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Selected word for the full X-Ray Detail Modal
   const [detailWordId, setDetailWordId] = useState<string | null>(null);
 
   const [activeMicWordId, setActiveMicWordId] = useState<string | null>(null);
@@ -236,12 +236,21 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
     sortBy,
   ]);
 
-  // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [viewMode, categoryFilter, statusFilter, searchQuery, sortBy, selectedLang]);
+  }, [
+    viewMode,
+    categoryFilter,
+    statusFilter,
+    searchQuery,
+    sortBy,
+    selectedLang,
+  ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredWords.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredWords.length / ITEMS_PER_PAGE)
+  );
   const paginatedWords = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredWords.slice(start, start + ITEMS_PER_PAGE);
@@ -481,14 +490,14 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
 
   if (!profiles.length) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 mb-4">
-          <Sparkles className="w-8 h-8" />
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-8 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-lg">
+          <Sparkles className="h-8 w-8" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h2 className="text-2xl font-black text-slate-900">
           Your Word Matrix is Empty
         </h2>
-        <p className="text-slate-500 dark:text-slate-400 max-w-md mt-2">
+        <p className="mt-2 max-w-md text-sm font-medium text-slate-500">
           Complete lessons to unlock words and phrases. Every word you encounter
           will be organized here for pronunciation mastery.
         </p>
@@ -497,7 +506,7 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/80 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 selection:bg-indigo-100 pb-24">
+    <div className="min-h-screen bg-slate-100/80 pb-24 font-sans text-slate-900 selection:bg-indigo-100">
       <MatrixHeroHeader
         localProfiles={localProfiles}
         selectedLang={selectedLang}
@@ -509,16 +518,16 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
       />
 
       <main className="mx-auto max-w-7xl px-6 pt-8 lg:px-8">
-        {/* TOP 2-TAB MODE SWITCHER */}
+        {/* TOP 2-TAB 3D MODE SWITCHER */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="inline-flex gap-2 rounded-3xl border-2 border-b-[5px] border-slate-200/90 border-b-slate-300 bg-white p-2 shadow-xs">
             <button
               type="button"
               onClick={() => setMainTab("STUDIO")}
-              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black transition-all ${
+              className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black transition-all duration-150 ${
                 mainTab === "STUDIO"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  ? "border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm shadow-blue-500/25 active:translate-y-0.5 active:border-b-0"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <Sparkles className="h-4 w-4" />
@@ -528,10 +537,10 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
             <button
               type="button"
               onClick={() => setMainTab("VAULT")}
-              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black transition-all ${
+              className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black transition-all duration-150 ${
                 mainTab === "VAULT"
-                  ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  ? "border-b-4 border-indigo-900 bg-gradient-to-b from-indigo-500 to-purple-700 text-white shadow-sm shadow-indigo-500/25 active:translate-y-0.5 active:border-b-0"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <Database className="h-4 w-4" />
@@ -578,14 +587,14 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
                 onPronunciationTest={handlePronunciationTest}
               />
             ) : filteredWords.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center">
-                <p className="text-slate-500 dark:text-slate-400">
+              <div className="rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-12 text-center shadow-xs">
+                <p className="font-bold text-slate-500">
                   No words or phrases match your current filter.
                 </p>
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   {paginatedWords.map((wordStat, index) => (
                     <MatrixWordCard
                       key={wordStat.id}
@@ -606,12 +615,12 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
                   ))}
                 </div>
 
-                {/* PAGINATION FOOTER (Fixes the endless 340-card scroll) */}
+                {/* 3D PAGINATION FOOTER */}
                 {totalPages > 1 && (
-                  <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                  <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border-2 border-b-[5px] border-slate-200/90 border-b-slate-300 bg-white px-5 py-3.5 shadow-xs">
                     <span className="text-xs font-bold text-slate-500">
                       Showing{" "}
-                      <strong className="text-slate-900 dark:text-white">
+                      <strong className="font-black text-slate-900">
                         {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
                         {Math.min(
                           currentPage * ITEMS_PER_PAGE,
@@ -619,24 +628,26 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
                         )}
                       </strong>{" "}
                       of{" "}
-                      <strong className="text-slate-900 dark:text-white">
+                      <strong className="font-black text-slate-900">
                         {filteredWords.length}
                       </strong>{" "}
                       items
                     </span>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         disabled={currentPage === 1}
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        className="inline-flex items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-40"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                         Prev
                       </button>
 
-                      <span className="px-3 text-xs font-black text-slate-700 dark:text-slate-200">
+                      <span className="px-2 text-xs font-black text-slate-700">
                         Page {currentPage} of {totalPages}
                       </span>
 
@@ -646,7 +657,7 @@ export default function MatrixClient({ matrix, userId }: MatrixClientProps) {
                         onClick={() =>
                           setCurrentPage((p) => Math.min(totalPages, p + 1))
                         }
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        className="inline-flex items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-40"
                       >
                         Next
                         <ChevronRight className="h-3.5 w-3.5" />
