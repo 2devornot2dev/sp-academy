@@ -10,7 +10,6 @@ import {
   Volume2,
   Turtle,
   Trophy,
-  Sparkles,
   Play,
   HelpCircle,
   CheckCircle2,
@@ -19,6 +18,7 @@ import {
   Flame,
   Square,
   Loader2,
+  Check,
 } from "lucide-react";
 import { EnrichedWordStat, SessionScore, WordStat } from "./matrix-types";
 
@@ -52,18 +52,16 @@ export function MatrixStudioTab({
   // ============================================================================
   // 1. TOP 3 PODIUM LISTS (1st Champion + 2nd & 3rd Runner-Ups)
   // ============================================================================
-  // Deduplicate #1 Champions across the 4 Podium Cards so all 4 cards showcase different words!
   const { mostSeenTop3, mostHeardTop3, mostTappedTop3, mostSpokenTop3 } =
     useMemo(() => {
       const usedChampions = new Set<string>();
 
       const pickTop3 = (
         list: EnrichedWordStat[],
-        sortFn: (a: EnrichedWordStat, b: EnrichedWordStat) => number,
+        sortFn: (a: EnrichedWordStat, b: EnrichedWordStat) => number
       ) => {
         const sorted = [...list].sort(sortFn);
         if (sorted.length === 0) return [];
-        // Pick highest-ranked word that hasn't already been crowned #1 on an earlier card
         const champIdx = sorted.findIndex((w) => !usedChampions.has(w.id));
         const champ = sorted[champIdx !== -1 ? champIdx : 0];
         usedChampions.add(champ.id);
@@ -73,17 +71,17 @@ export function MatrixStudioTab({
 
       const seen = pickTop3(
         enrichedWords.filter((w) => w.seenCount > 0),
-        (a, b) => b.seenCount - a.seenCount,
+        (a, b) => b.seenCount - a.seenCount
       );
 
       const heard = pickTop3(
         enrichedWords.filter((w) => w.heardCount > 0),
-        (a, b) => b.heardCount - a.heardCount,
+        (a, b) => b.heardCount - a.heardCount
       );
 
       const tapped = pickTop3(
         enrichedWords.filter((w) => w.tappedCorrect + w.tappedWrong > 0),
-        (a, b) => b.tappedCorrect - a.tappedCorrect,
+        (a, b) => b.tappedCorrect - a.tappedCorrect
       );
 
       const spoken = pickTop3(
@@ -91,7 +89,7 @@ export function MatrixStudioTab({
         (a, b) =>
           (b.avgSpokenScore ?? 0) !== (a.avgSpokenScore ?? 0)
             ? (b.avgSpokenScore ?? 0) - (a.avgSpokenScore ?? 0)
-            : b.spokenAttempts - a.spokenAttempts,
+            : b.spokenAttempts - a.spokenAttempts
       );
 
       return {
@@ -110,16 +108,16 @@ export function MatrixStudioTab({
       [...enrichedWords]
         .filter(
           (w) =>
-            w.spokenAttempts === 0 && (w.seenCount > 0 || w.tappedCorrect > 0),
+            w.spokenAttempts === 0 && (w.seenCount > 0 || w.tappedCorrect > 0)
         )
         .sort(
           (a, b) =>
             b.seenCount +
             b.tappedCorrect * 2 -
-            (a.seenCount + a.tappedCorrect * 2),
+            (a.seenCount + a.tappedCorrect * 2)
         )
         .slice(0, 6),
-    [enrichedWords],
+    [enrichedWords]
   );
 
   const lowListenWords = useMemo(
@@ -127,14 +125,14 @@ export function MatrixStudioTab({
       [...enrichedWords]
         .filter((w) => w.heardCount <= 1)
         .sort(
-          (a, b) => a.heardCount - b.heardCount || b.seenCount - a.seenCount,
+          (a, b) => a.heardCount - b.heardCount || b.seenCount - a.seenCount
         )
         .slice(0, 6),
-    [enrichedWords],
+    [enrichedWords]
   );
 
   const [gapTab, setGapTab] = useState<"ZERO_SPOKEN" | "LOW_LISTEN">(
-    "ZERO_SPOKEN",
+    "ZERO_SPOKEN"
   );
   const activeGapList =
     gapTab === "ZERO_SPOKEN" ? zeroSpokenHighSeen : lowListenWords;
@@ -151,14 +149,13 @@ export function MatrixStudioTab({
     (autoPlay = false) => {
       if (enrichedWords.length < 3) return;
 
-      // Prioritize low-heard or missed-tap words so the quiz actually helps weak spots
       const pool = [...enrichedWords].sort(
         (a, b) =>
-          a.heardCount + a.tappedCorrect - (b.heardCount + b.tappedCorrect),
+          a.heardCount + a.tappedCorrect - (b.heardCount + b.tappedCorrect)
       );
       const candidatePool = pool.slice(
         0,
-        Math.max(6, Math.floor(pool.length * 0.4)),
+        Math.max(6, Math.floor(pool.length * 0.4))
       );
       const target =
         candidatePool[Math.floor(Math.random() * candidatePool.length)] ||
@@ -179,7 +176,7 @@ export function MatrixStudioTab({
         onListen(target, 0.9);
       }
     },
-    [enrichedWords, onListen],
+    [enrichedWords, onListen]
   );
 
   useEffect(() => {
@@ -203,7 +200,7 @@ export function MatrixStudioTab({
   };
 
   // ============================================================================
-  // HELPER TO RENDER EACH OF THE 4 PODIUM CARDS
+  // HELPER TO RENDER EACH OF THE 4 3D PODIUM CARDS
   // ============================================================================
   const renderPodiumCard = (config: {
     title: string;
@@ -212,42 +209,49 @@ export function MatrixStudioTab({
     items: EnrichedWordStat[];
     headerGradient: string;
     badgeColor: string;
-    micBtnColor: string; // <-- 1. Add this
+    micBtn3D: string;
     formatMetric: (w: EnrichedWordStat) => string;
   }) => {
     const champion = config.items[0];
     const runnersUp = config.items.slice(1, 3);
 
     return (
-      <div className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-        {/* Top Colored Banner */}
-        <div className={`px-5 py-4 text-white ${config.headerGradient}`}>
+      <div className="flex flex-col justify-between overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm transition-transform hover:-translate-y-0.5">
+        {/* Top Colored 3D Banner */}
+        <div
+          className={`border-b-4 border-black/15 px-5 py-4 text-white shadow-[inset_0_2px_0_rgba(255,255,255,0.3)] ${config.headerGradient}`}
+        >
           <div className="flex items-center justify-between">
-            <h3 className="mt-1 text-lg font-black tracking-tight">
-              {config.title}
-            </h3>
-            <div className="rounded-xl bg-white/20 p-2 backdrop-blur-sm">
+            <div>
+              <span className="text-[10px] font-black tracking-wider text-white/80 uppercase">
+                {config.subtitle}
+              </span>
+              <h3 className="text-lg font-black tracking-tight drop-shadow-2xs">
+                {config.title}
+              </h3>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border-b-2 border-white/30 bg-white/20 shadow-inner backdrop-blur-xs">
               {config.icon}
             </div>
           </div>
         </div>
 
         {/* Body: #1 Champion + #2 & #3 Runner-Ups */}
-        <div className="flex flex-1 flex-col justify-between p-5">
+        <div className="flex flex-1 flex-col justify-between p-4 sm:p-5">
           {!champion ? (
-            <div className="flex h-40 flex-col items-center justify-center text-center text-xs font-medium text-slate-400">
+            <div className="flex h-40 flex-col items-center justify-center text-center text-xs font-bold text-slate-400">
               No stats recorded yet. Practice to crown a #1 word!
             </div>
           ) : (
             <>
-              {/* #1 Champion Box */}
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/50">
+              {/* #1 Champion 3D Box */}
+              <div className="rounded-2xl border-2 border-b-4 border-slate-200/90 border-b-slate-300 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                    <Trophy className="h-3 w-3 text-amber-500" /> #1 Champion
+                  <span className="inline-flex items-center gap-1 rounded-lg border-b-2 border-orange-600/40 bg-amber-100 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-amber-900 uppercase">
+                    <Trophy className="h-3 w-3 text-amber-600" /> #1 Champion
                   </span>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-black ${config.badgeColor}`}
+                    className={`rounded-lg px-2.5 py-0.5 text-[11px] font-black ${config.badgeColor}`}
                   >
                     {config.formatMetric(champion)}
                   </span>
@@ -255,21 +259,21 @@ export function MatrixStudioTab({
 
                 <div className="mt-2.5 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xl font-black text-slate-900 dark:text-white">
+                    <p className="truncate text-xl font-black text-slate-900">
                       {champion.cleanWord}
                     </p>
-                    <p className="truncate text-xs font-semibold text-slate-400">
+                    <p className="truncate text-xs font-bold text-slate-400">
                       {champion.translation || champion.categoryLabel}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => onListen(champion, 0.9)}
                       disabled={status !== "idle"}
                       title="Listen"
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-indigo-600 shadow-xs border border-slate-200 hover:bg-indigo-600 hover:text-white transition dark:bg-slate-900 dark:border-slate-700"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white text-indigo-600 transition-all hover:border-sky-300 hover:bg-sky-50 active:translate-y-0.5 active:border-b-0"
                     >
                       <Volume2 className="h-4 w-4" />
                     </button>
@@ -277,12 +281,12 @@ export function MatrixStudioTab({
                       type="button"
                       onClick={() => onPronunciationTest(champion)}
                       disabled={status === "analyzing"}
-                      title="Try"
-                      className={`flex h-9 w-9 items-center justify-center rounded-full text-white shadow-xs transition active:scale-95 ${
+                      title="Speak"
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl border-b-[3px] text-white shadow-2xs transition-all active:translate-y-0.5 active:border-b-0 ${
                         activeMicWordId === champion.id &&
                         status === "listening"
-                          ? "bg-rose-600 animate-pulse"
-                          : config.micBtnColor
+                          ? "animate-pulse border-rose-800 bg-rose-600"
+                          : config.micBtn3D
                       }`}
                     >
                       {activeMicWordId === champion.id &&
@@ -299,31 +303,31 @@ export function MatrixStudioTab({
                 </div>
               </div>
 
-              {/* #2 and #3 Runner-Ups */}
+              {/* #2 and #3 3D Runner-Ups */}
               <div className="mt-3 space-y-2">
                 {runnersUp.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs dark:border-slate-800/80 dark:bg-slate-900"
+                    className="flex items-center justify-between gap-2 rounded-xl border-2 border-b-[3px] border-slate-200/80 border-b-slate-300/80 bg-white px-3 py-2 text-xs transition hover:border-sky-300"
                   >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[10px] font-black text-slate-600">
                         #{idx + 2}
                       </span>
-                      <span className="truncate font-extrabold text-slate-800 dark:text-slate-200">
+                      <span className="truncate font-black text-slate-800">
                         {item.cleanWord}
                       </span>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="font-bold text-slate-500">
+                      <span className="font-bold text-slate-400">
                         {config.formatMetric(item)}
                       </span>
                       <button
                         type="button"
                         onClick={() => onListen(item, 0.9)}
                         disabled={status !== "idle"}
-                        className="rounded-lg p-1 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                        className="rounded-lg bg-slate-100 p-1 text-slate-500 transition hover:bg-sky-100 hover:text-blue-600"
                       >
                         <Volume2 className="h-3.5 w-3.5" />
                       </button>
@@ -341,7 +345,7 @@ export function MatrixStudioTab({
   return (
     <div className="space-y-8">
       {/* ====================================================================
-          ROW 1: THE 4 HALL OF FAME PODIUM CARDS (1st, 2nd, 3rd)
+          ROW 1: THE 4 3D HALL OF FAME PODIUM CARDS
       ==================================================================== */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {renderPodiumCard({
@@ -349,10 +353,10 @@ export function MatrixStudioTab({
           subtitle: "Visual Exposure",
           icon: <Eye className="h-5 w-5 text-white" />,
           items: mostSeenTop3,
-          headerGradient: "bg-gradient-to-br from-sky-500 to-blue-600",
-          badgeColor: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-          micBtnColor:
-            "bg-gradient-to-br from-sky-500 to-blue-600 hover:opacity-90",
+          headerGradient: "bg-gradient-to-b from-sky-400 to-blue-600",
+          badgeColor: "bg-sky-100 text-blue-800",
+          micBtn3D:
+            "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:brightness-105",
           formatMetric: (w) => `${w.seenCount}x seen`,
         })}
 
@@ -361,22 +365,23 @@ export function MatrixStudioTab({
           subtitle: "Ear Training",
           icon: <Ear className="h-5 w-5 text-white" />,
           items: mostHeardTop3,
-          headerGradient: "bg-gradient-to-br from-indigo-500 to-violet-600",
-          badgeColor: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-          micBtnColor:
-            "bg-gradient-to-br from-indigo-500 to-violet-600 hover:opacity-90",
+          headerGradient: "bg-gradient-to-b from-indigo-500 to-purple-700",
+          badgeColor: "bg-purple-100 text-purple-800",
+          micBtn3D:
+            "border-purple-950 bg-gradient-to-b from-violet-500 to-purple-700 hover:brightness-105",
           formatMetric: (w) => `${w.heardCount}x heard`,
         })}
 
         {renderPodiumCard({
           title: "Most Tapped",
           subtitle: "Exercise Accuracy",
-          icon: <MousePointerClick className="h-5 w-5 text-white" />,
+          icon: <MousePointerClick className="h-5 w-5 text-slate-950" />,
           items: mostTappedTop3,
-          headerGradient: "bg-gradient-to-br from-amber-500 to-orange-500",
-          badgeColor: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-          micBtnColor:
-            "bg-gradient-to-br from-amber-500 to-orange-500 hover:opacity-90",
+          headerGradient:
+            "bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950!",
+          badgeColor: "bg-amber-100 text-amber-900",
+          micBtn3D:
+            "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950! hover:brightness-105",
           formatMetric: (w) =>
             `${w.tappedCorrect}/${w.tappedCorrect + w.tappedWrong} taps`,
         })}
@@ -386,11 +391,10 @@ export function MatrixStudioTab({
           subtitle: "Voice Mastery",
           icon: <Mic className="h-5 w-5 text-white" />,
           items: mostSpokenTop3,
-          headerGradient: "bg-gradient-to-br from-emerald-500 to-teal-600",
-          badgeColor:
-            "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-          micBtnColor:
-            "bg-gradient-to-br from-emerald-500 to-teal-600 hover:opacity-90",
+          headerGradient: "bg-gradient-to-b from-emerald-400 to-teal-600",
+          badgeColor: "bg-emerald-100 text-emerald-800",
+          micBtn3D:
+            "border-emerald-800 bg-gradient-to-b from-emerald-400 to-teal-600 hover:brightness-105",
           formatMetric: (w) => {
             const sc = sessionScores[w.id]?.overall ?? w.avgSpokenScore;
             return sc !== null
@@ -401,31 +405,31 @@ export function MatrixStudioTab({
       </div>
 
       {/* ====================================================================
-          ROW 2: INTERACTIVE LEARNING BOOSTERS (Left: 0 Spoken / Low Listen | Right: Mini Audio Quiz)
+          ROW 2: 3D INTERACTIVE LEARNING BOOSTERS
       ==================================================================== */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* LEFT 7 COLS: "0 Spoken" & "Low Listen" Action Deck */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm lg:col-span-7 dark:border-slate-800 dark:bg-slate-900">
+        {/* LEFT 7 COLS: "0 Spoken" & "Low Listen" 3D Action Deck */}
+        <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm lg:col-span-7">
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">
                   Smart Blind-Spot Detector
                 </span>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                  Level Up Your Unspoken & Unheard Words
+                <h3 className="text-xl font-black text-slate-900">
+                  Level Up Your Unspoken &amp; Unheard Words
                 </h3>
               </div>
 
-              {/* Sub-toggle: 0 Spoken vs Low Listen */}
-              <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-extrabold dark:bg-slate-800">
+              {/* 3D Sub-toggle: 0 Spoken vs Low Listen */}
+              <div className="flex items-center gap-1.5 rounded-2xl bg-slate-100 p-1.5 text-xs font-black">
                 <button
                   type="button"
                   onClick={() => setGapTab("ZERO_SPOKEN")}
-                  className={`rounded-lg px-3 py-1.5 transition ${
+                  className={`rounded-xl px-3 py-1.5 transition-all ${
                     gapTab === "ZERO_SPOKEN"
-                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white"
-                      : "text-slate-500 hover:text-slate-900"
+                      ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   🎙️ 0 Spoken ({zeroSpokenHighSeen.length})
@@ -433,10 +437,10 @@ export function MatrixStudioTab({
                 <button
                   type="button"
                   onClick={() => setGapTab("LOW_LISTEN")}
-                  className={`rounded-lg px-3 py-1.5 transition ${
+                  className={`rounded-xl px-3 py-1.5 transition-all ${
                     gapTab === "LOW_LISTEN"
-                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white"
-                      : "text-slate-500 hover:text-slate-900"
+                      ? "border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   👂 Low Listen ({lowListenWords.length})
@@ -444,13 +448,13 @@ export function MatrixStudioTab({
               </div>
             </div>
 
-            <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-xs font-semibold text-slate-500">
               {gapTab === "ZERO_SPOKEN"
                 ? "You've seen and tapped these words in lessons, but you haven't spoken them out loud yet. Say them once to boost your mastery!"
                 : "These words have low audio exposure. Tap Normal or Slow (0.6x) to lock their sound into your ear!"}
             </p>
 
-            {/* Grid of 6 Action Pills */}
+            {/* Grid of 6 3D Action Pills */}
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {activeGapList.map((item) => {
                 const isListening =
@@ -467,10 +471,10 @@ export function MatrixStudioTab({
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-800/40"
+                    className="flex items-center justify-between gap-2 rounded-2xl border-2 border-b-4 border-slate-200/90 border-b-slate-300 bg-slate-50/60 px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-base font-black text-slate-900 dark:text-white">
+                      <p className="truncate text-base font-black text-slate-900">
                         {item.cleanWord}
                       </p>
                       <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold text-slate-400">
@@ -480,16 +484,16 @@ export function MatrixStudioTab({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => onListen(item, 0.9)}
                         disabled={status !== "idle"}
                         title="Listen (1.0x)"
-                        className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl border-2 border-b-[3px] transition-all active:translate-y-0.5 active:border-b-0 ${
                           isPlayingNormal
-                            ? "bg-indigo-600 text-white animate-pulse"
-                            : "bg-indigo-500/10 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                            ? "animate-pulse border-blue-800 bg-blue-600 text-white"
+                            : "border-slate-200 border-b-slate-300 bg-white text-blue-600 hover:border-sky-300 hover:bg-sky-50"
                         }`}
                       >
                         <Volume2 className="h-4 w-4" />
@@ -500,10 +504,10 @@ export function MatrixStudioTab({
                         onClick={() => onListen(item, 0.6)}
                         disabled={status !== "idle"}
                         title="Slow (0.6x)"
-                        className={`flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                        className={`flex h-8 w-8 items-center justify-center rounded-xl border-2 border-b-[3px] transition-all active:translate-y-0.5 active:border-b-0 ${
                           isPlayingSlow
-                            ? "border-amber-500 bg-amber-500 text-white animate-pulse"
-                            : "border-slate-200 bg-white text-slate-500 hover:border-amber-400 hover:text-amber-600 dark:border-slate-700 dark:bg-slate-900"
+                            ? "animate-pulse border-orange-700 bg-amber-400 text-slate-950"
+                            : "border-slate-200 border-b-slate-300 bg-white text-slate-500 hover:border-amber-300 hover:text-amber-600"
                         }`}
                       >
                         <Turtle className="h-3.5 w-3.5" />
@@ -513,10 +517,10 @@ export function MatrixStudioTab({
                         type="button"
                         onClick={() => onPronunciationTest(item)}
                         disabled={isAnalyzing}
-                        className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-extrabold text-white transition ${
+                        className={`inline-flex h-9 items-center gap-1 rounded-xl border-b-[3px] px-3 text-xs font-black text-white shadow-2xs transition-all active:translate-y-0.5 active:border-b-0 ${
                           isListening
-                            ? "bg-rose-600 animate-pulse"
-                            : "bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600"
+                            ? "animate-pulse border-rose-800 bg-rose-600"
+                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:brightness-105"
                         }`}
                       >
                         {isListening ? (
@@ -538,58 +542,58 @@ export function MatrixStudioTab({
           </div>
 
           {activeGapList.length > 0 && (
-            <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
               <span className="text-xs font-bold text-slate-400">
                 Want to clear all {activeGapList.length} in a guided session?
               </span>
               <button
                 type="button"
                 onClick={() => onStartDojo(activeGapList)}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-500 transition active:scale-95"
+                className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-700 px-5 py-2.5 text-xs font-black text-white shadow-md shadow-indigo-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Practice {activeGapList.length} Words in Dojo
+                <span>Practice {activeGapList.length} Words in Dojo</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* RIGHT 5 COLS: INTERACTIVE MINI AUDIO QUIZ ("EAR & TAP BOOSTER") */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm lg:col-span-5 dark:border-slate-800 dark:bg-slate-900">
+        {/* RIGHT 5 COLS: 3D INTERACTIVE MINI AUDIO QUIZ ("EAR & TAP BOOSTER") */}
+        <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm lg:col-span-5">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                <span className="text-[11px] font-black tracking-widest text-amber-600 uppercase">
                   Mini Audio Challenge
                 </span>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                  Ear & Tap Booster
+                <h3 className="text-xl font-black text-slate-900">
+                  Ear &amp; Tap Booster
                 </h3>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-extrabold text-amber-600 dark:text-amber-400">
-                <Flame className="h-4 w-4 fill-amber-500 text-amber-500" />
+              <div className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-3 py-1 text-xs font-black text-slate-950 shadow-2xs">
+                <Flame className="h-3.5 w-3.5 fill-current" />
                 <span>Streak: {quizStreak}</span>
               </div>
             </div>
 
             {!quizTarget ? (
-              <div className="flex h-48 items-center justify-center text-center text-xs text-slate-400">
-                Unlock at least 3 words to play the Ear & Tap Booster!
+              <div className="flex h-48 items-center justify-center text-center text-xs font-bold text-slate-400">
+                Unlock at least 3 words to play the Ear &amp; Tap Booster!
               </div>
             ) : (
               <div className="mt-5">
-                {/* Mystery Speaker Box */}
-                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/40 p-5 text-center dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                {/* 3D Mystery Speaker Box */}
+                <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-sky-200 bg-sky-50/40 p-5 text-center">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => onListen(quizTarget, 0.9)}
                       disabled={status !== "idle"}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-500 transition active:scale-95"
+                      className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                     >
                       <Volume2 className="h-5 w-5" />
-                      Play Mystery Audio
+                      <span>Play Mystery Audio</span>
                     </button>
 
                     <button
@@ -597,38 +601,38 @@ export function MatrixStudioTab({
                       onClick={() => onListen(quizTarget, 0.6)}
                       disabled={status !== "idle"}
                       title="Play Slow (0.6x)"
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 transition active:scale-95 dark:border-amber-800 dark:bg-amber-950/40"
+                      className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-b-4 border-amber-300 border-b-orange-500 bg-amber-50 text-amber-700 transition-all hover:-translate-y-0.5 hover:bg-amber-100 active:translate-y-0.5 active:border-b-2"
                     >
                       <Turtle className="h-5 w-5" />
                     </button>
                   </div>
 
-                  <p className="mt-2.5 text-xs font-semibold text-slate-500">
-                    Listen closely and tap the word you heard (+1 Heard & +1
+                  <p className="mt-2.5 text-xs font-bold text-slate-500">
+                    Listen closely and tap the word you heard (+1 Heard &amp; +1
                     Tap)
                   </p>
                 </div>
 
-                {/* 3 Multiple-Choice Word Pills */}
+                {/* 3 Multiple-Choice 3D Word Pills */}
                 <div className="mt-4 space-y-2.5">
-                  {quizOptions.map((option) => {
+                  {quizOptions.map((option, idx) => {
                     const isPicked = selectedOptionId === option.id;
                     const isCorrectTarget = option.id === quizTarget.id;
                     const showResult = selectedOptionId !== null;
 
                     let btnStyle =
-                      "border-slate-200 bg-white text-slate-800 hover:border-indigo-400 hover:bg-indigo-50/40 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-100";
+                      "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2";
 
                     if (showResult) {
                       if (isCorrectTarget) {
                         btnStyle =
-                          "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
+                          "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md shadow-emerald-500/20";
                       } else if (isPicked && !isCorrectTarget) {
                         btnStyle =
-                          "border-rose-500 bg-rose-500/15 text-rose-800 dark:text-rose-200";
+                          "border-rose-400 bg-rose-50 text-rose-800";
                       } else {
                         btnStyle =
-                          "border-slate-200 bg-slate-50 text-slate-400 opacity-60 dark:border-slate-800 dark:bg-slate-900";
+                          "border-slate-200 bg-slate-50 text-slate-400 opacity-60";
                       }
                     }
 
@@ -638,25 +642,27 @@ export function MatrixStudioTab({
                         type="button"
                         disabled={showResult}
                         onClick={() => handleQuizSelect(option)}
-                        className={`flex w-full items-center justify-between rounded-2xl border-2 px-4 py-3 text-left font-black transition-all ${btnStyle}`}
+                        className={`flex w-full items-center justify-between rounded-2xl border-2 border-b-4 px-4 py-3 text-left font-black transition-all duration-150 ${btnStyle}`}
                       >
                         <div>
                           <span className="text-base">{option.cleanWord}</span>
                           {showResult && option.translation && (
-                            <span className="ml-2 text-xs font-semibold opacity-75">
+                            <span className="ml-2 text-xs font-bold opacity-85">
                               ({option.translation})
                             </span>
                           )}
                         </div>
 
-                        {showResult && isCorrectTarget && (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        )}
-                        {showResult && isPicked && !isCorrectTarget && (
+                        {showResult && isCorrectTarget ? (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-white">
+                            <Check className="h-3.5 w-3.5 stroke-[3.5]" />
+                          </span>
+                        ) : showResult && isPicked && !isCorrectTarget ? (
                           <XCircle className="h-5 w-5 text-rose-600" />
-                        )}
-                        {!showResult && (
-                          <HelpCircle className="h-4 w-4 text-slate-300" />
+                        ) : (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-400">
+                            {String.fromCharCode(65 + idx)}
+                          </span>
                         )}
                       </button>
                     );
@@ -667,8 +673,8 @@ export function MatrixStudioTab({
           </div>
 
           {quizTarget && (
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-400">
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+              <span className="text-xs font-extrabold text-slate-500">
                 {selectedOptionId
                   ? selectedOptionId === quizTarget.id
                     ? "🎉 Spot on! +1 Tap & +1 Heard logged."
@@ -679,10 +685,10 @@ export function MatrixStudioTab({
               <button
                 type="button"
                 onClick={() => generateNextQuizRound(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-indigo-600 transition dark:bg-white dark:text-slate-900"
+                className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Next Word
+                <span>Next Word</span>
               </button>
             </div>
           )}
