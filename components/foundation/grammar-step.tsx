@@ -9,8 +9,9 @@ import {
   Play,
   Lock,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
-import { ScrollArea } from "../ui/scroll-area";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { useSpeak } from "@/hooks/use-speak";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
@@ -67,6 +68,7 @@ export function GrammarStep({
 
   const allWordsHeard = heardWords.size === uniqueWords.length;
   const isNextEnabled = hasPlayedSentence && allWordsHeard;
+  const showScrollHint = !allWordsHeard && (data?.words?.length ?? 0) > 4;
 
   return (
     <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
@@ -212,65 +214,83 @@ export function GrammarStep({
           </span>
         </div>
 
-        <ScrollArea className="h-[260px]">
-          <div className="grid grid-cols-1 gap-3 pr-3 pb-2 md:grid-cols-2">
-            {data.words.map((wordObj: any, idx: number) => {
-              const isThisWordPlaying =
-                isWordPlaying && activeWord === wordObj.word;
-              const hasBeenHeard = heardWords.has(wordObj.word);
+        <div className="relative rounded-2xl border border-slate-200/80 bg-slate-50/50 p-2.5">
+          <ScrollArea className="h-[260px] pr-4">
+            <div className="grid grid-cols-1 gap-3 pb-6 md:grid-cols-2">
+              {data.words.map((wordObj: any, idx: number) => {
+                const isThisWordPlaying =
+                  isWordPlaying && activeWord === wordObj.word;
+                const hasBeenHeard = heardWords.has(wordObj.word);
 
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleWordClick(wordObj.word)}
-                  disabled={isWordPlaying}
-                  className={`group flex items-center gap-3.5 rounded-2xl border-2 border-b-[4px] p-3.5 text-left transition-all duration-150 ${
-                    isThisWordPlaying
-                      ? "-translate-y-0.5 border-blue-600 bg-sky-50 shadow-md"
-                      : hasBeenHeard
-                        ? "border-emerald-400 bg-emerald-50/30 hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2"
-                        : "border-slate-200 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
-                  }`}
-                >
-                  {/* 3D Mini Speaker Badge */}
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] transition-all ${
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleWordClick(wordObj.word)}
+                    disabled={isWordPlaying}
+                    className={`group flex items-center gap-3.5 rounded-2xl border-2 border-b-[4px] p-3.5 text-left transition-all duration-150 ${
                       isThisWordPlaying
-                        ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                        ? "-translate-y-0.5 border-blue-600 bg-sky-50 shadow-md"
                         : hasBeenHeard
-                          ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                          : "border-sky-200 bg-sky-50 text-blue-600 group-hover:border-blue-800 group-hover:bg-gradient-to-b group-hover:from-sky-400 group-hover:to-blue-600 group-hover:text-white"
+                          ? "border-emerald-400 bg-emerald-50/30 hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2"
+                          : "border-slate-200 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
                     }`}
                   >
-                    {isThisWordPlaying ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : hasBeenHeard ? (
-                      <Check size={14} strokeWidth={3.5} />
-                    ) : (
-                      <Volume2 size={14} />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-1.5">
-                      <span className="text-base font-black text-slate-900">
-                        {wordObj.word}
-                      </span>
-                      <span className="text-xs font-bold text-slate-400">
-                        = {wordObj.gloss}
-                      </span>
+                    {/* 3D Mini Speaker Badge */}
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] transition-all ${
+                        isThisWordPlaying
+                          ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                          : hasBeenHeard
+                            ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                            : "border-sky-200 bg-sky-50 text-blue-600 group-hover:border-blue-800 group-hover:bg-gradient-to-b group-hover:from-sky-400 group-hover:to-blue-600 group-hover:text-white"
+                      }`}
+                    >
+                      {isThisWordPlaying ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : hasBeenHeard ? (
+                        <Check size={14} strokeWidth={3.5} />
+                      ) : (
+                        <Volume2 size={14} />
+                      )}
                     </div>
 
-                    <span className="mt-0.5 block text-[10px] font-extrabold tracking-widest text-blue-600/80 uppercase">
-                      {wordObj.role}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </ScrollArea>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-1.5">
+                        <span className="text-base font-black text-slate-900">
+                          {wordObj.word}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">
+                          = {wordObj.gloss}
+                        </span>
+                      </div>
+
+                      <span className="mt-0.5 block text-[10px] font-extrabold tracking-widest text-blue-600/80 uppercase">
+                        {wordObj.role}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Always-visible styled vertical scrollbar */}
+            <ScrollBar
+              orientation="vertical"
+              className="w-2.5 rounded-full bg-slate-200/80 p-0.5 opacity-100 [&>div]:rounded-full [&>div]:bg-slate-400 hover:[&>div]:bg-blue-500"
+            />
+          </ScrollArea>
+
+          {/* Subtle Bottom Scroll Hint Pill when more words exist */}
+          {showScrollHint && (
+            <div className="pointer-events-none absolute right-4 bottom-2 left-2 flex justify-center bg-gradient-to-t from-slate-50 via-slate-50/80 to-transparent pt-4 pb-0.5">
+              <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white/95 px-3 py-0.5 text-[10px] font-extrabold tracking-wide text-blue-600 shadow-xs">
+                <span>Scroll for more words</span>
+                <ChevronDown size={12} className="animate-bounce" />
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 4. Footer with Checklist Pills + 3D Next Button */}
