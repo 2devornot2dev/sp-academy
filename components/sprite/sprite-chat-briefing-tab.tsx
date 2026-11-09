@@ -61,8 +61,8 @@ export function SpriteChatBriefingTab({
       setActiveExercise(ex);
       if (ex?.status === "READY" || ex?.status === "COMPLETED") {
         setIsGenerating(false);
-      } else if (ex?.status === "BUILDING") {
-        setIsGenerating(true);
+      } else if (ex?.status === "FAILED") {
+        setIsGenerating(false);
       }
     } catch (err) {
       console.warn("[BriefingTab] Failed to fetch active exercise:", err);
@@ -74,6 +74,21 @@ export function SpriteChatBriefingTab({
   useEffect(() => {
     void refreshExercise();
   }, [refreshExercise, liveTask?.status]);
+
+  // Poll every 5 seconds ONLY while actively generating a workout in this session
+  useEffect(() => {
+    if (!isGenerating) return;
+    const interval = setInterval(() => {
+      void refreshExercise();
+    }, 5000);
+    const timeout = setTimeout(() => {
+      setIsGenerating(false);
+    }, 45000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [isGenerating, refreshExercise]);
 
   const handleBuildNewWorkout = async () => {
     if (!userId) return;
@@ -90,7 +105,6 @@ export function SpriteChatBriefingTab({
     await refreshExercise();
   };
 
-  // Render the 3-Round Sprite Exercise Arcade full-stage when active
   if (
     isPlayingArcade &&
     userId &&
@@ -119,7 +133,6 @@ export function SpriteChatBriefingTab({
 
   const isBuildingNow =
     isGenerating ||
-    activeExercise?.status === "BUILDING" ||
     (liveTask?.taskType === "SPRITE_EXERCISE_GENERATION" &&
       liveTask.status === "BUILDING");
 
@@ -132,99 +145,105 @@ export function SpriteChatBriefingTab({
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto custom-scrollbar">
       {/* 1. DB-BACKED SYSTEM NOTIFICATIONS (Errors, Alerts) */}
-      {dbNotifications.map((notif) => (
-        <div
-          key={notif.id}
-          className={`relative overflow-hidden rounded-3xl border p-5 shadow-lg shrink-0 ${
-            notif.kind === "SYSTEM_ERROR"
-              ? "border-rose-500/30 bg-rose-950/40"
-              : "border-sky-500/30 bg-sky-950/40"
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
-                  notif.kind === "SYSTEM_ERROR"
-                    ? "bg-gradient-to-b from-rose-500 to-rose-700"
-                    : "bg-gradient-to-b from-sky-400 to-blue-600"
-                }`}
-              >
-                {notif.kind === "SYSTEM_ERROR" ? (
-                  <AlertTriangle size={20} />
-                ) : (
-                  <Sparkles size={20} />
-                )}
-              </span>
-              <div>
-                <h3
-                  className={`text-sm font-black uppercase tracking-wider ${
-                    notif.kind === "SYSTEM_ERROR"
-                      ? "text-rose-400"
-                      : "text-sky-400"
+      {dbNotifications.map((notif) => {
+        const isErrorKind =
+          notif.kind === "SYSTEM_ERROR" ||
+          notif.kind === "BOSS_BUILD_FAILED" ||
+          notif.kind === "EXERCISE_BUILD_FAILED";
+
+        return (
+          <div
+            key={notif.id}
+            className={`relative overflow-hidden rounded-3xl border p-5 shadow-lg shrink-0 ${
+              isErrorKind
+                ? "border-rose-500/30 bg-rose-950/40"
+                : "border-sky-500/30 bg-sky-950/40"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
+                    isErrorKind
+                      ? "bg-gradient-to-b from-rose-500 to-rose-700"
+                      : "bg-gradient-to-b from-sky-400 to-blue-600"
                   }`}
                 >
-                  {notif.title || "System Alert"}
-                </h3>
-                <p className="text-sm font-medium text-white mt-0.5">
-                  {notif.body}
-                </p>
+                  {isErrorKind ? (
+                    <AlertTriangle size={20} />
+                  ) : (
+                    <Sparkles size={20} />
+                  )}
+                </span>
+                <div>
+                  <h3
+                    className={`text-sm font-black uppercase tracking-wider ${
+                      isErrorKind ? "text-rose-400" : "text-sky-400"
+                    }`}
+                  >
+                    {notif.title || "System Alert"}
+                  </h3>
+                  <p className="text-sm font-medium text-white mt-0.5">
+                    {notif.body}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => dismissDbNotification(notif.id)}
-              className="rounded-full p-1.5 text-slate-400 transition hover:bg-white/10"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Action Row */}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            {notif.kind === "SYSTEM_ERROR" && (
               <button
                 type="button"
-                onClick={() => {
-                  const taskId = (notif.payload as any)?.taskId;
-                  if (taskId) retryLiveTask(taskId);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-900/50 transition hover:bg-rose-500"
+                onClick={() => dismissDbNotification(notif.id)}
+                className="rounded-full p-1.5 text-slate-400 transition hover:bg-white/10"
               >
-                <RotateCcw size={14} /> Retry Generation
+                <X size={16} />
               </button>
-            )}
+            </div>
 
-            {notif.detail && (
-              <button
-                type="button"
-                onClick={() =>
-                  setExpandedLogId(
-                    expandedLogId === notif.id ? null : notif.id
-                  )
-                }
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 transition hover:text-white"
-              >
-                View Error Log{" "}
-                <ChevronDown
-                  size={14}
-                  className={expandedLogId === notif.id ? "rotate-180" : ""}
-                />
-              </button>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {isErrorKind && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const taskId = (notif.payload as any)?.taskId;
+                    if (taskId) {
+                      await retryLiveTask(taskId);
+                    }
+                    await dismissDbNotification(notif.id);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-900/50 transition hover:bg-rose-500"
+                >
+                  <RotateCcw size={14} /> Retry Generation
+                </button>
+              )}
+
+              {notif.detail && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedLogId(
+                      expandedLogId === notif.id ? null : notif.id,
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 transition hover:text-white"
+                >
+                  View Error Log{" "}
+                  <ChevronDown
+                    size={14}
+                    className={expandedLogId === notif.id ? "rotate-180" : ""}
+                  />
+                </button>
+              )}
+            </div>
+
+            {expandedLogId === notif.id && notif.detail && (
+              <div className="mt-3 rounded-xl border border-white/5 bg-slate-950/80 p-3">
+                <pre className="custom-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-[10px] text-slate-400">
+                  {notif.detail}
+                </pre>
+              </div>
             )}
           </div>
-
-          {/* Expandable Error Log */}
-          {expandedLogId === notif.id && notif.detail && (
-            <div className="mt-3 rounded-xl border border-white/5 bg-slate-950/80 p-3">
-              <pre className="custom-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-[10px] text-slate-400">
-                {notif.detail}
-              </pre>
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       {/* 2. Active Lesson Objective Card */}
       <div className="relative shrink-0 overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg">
