@@ -543,7 +543,18 @@ export function SpriteProvider({
       targetAudioUrl?: string | null;
       action?: string | null;
     }) => {
-      // Clear any building state when an exercise or sprite node finishes
+      // 1. ONLY auto-pop from Pusher if it's a Sprite Exercise notification!
+      // Curriculum nodes (SPOON / BRIDGE / BOSS) are now pre-baked in the background
+      // by the daisy-chain, and FoundationHubPage's `summonSpriteNode` already summons
+      // the exact node for the user's `currentFocus` when they actually reach that step!
+      const isExerciseNotification =
+        node.stepType === "EXERCISE_READY" ||
+        node.stepType === "EXERCISE_BUILDING";
+
+      if (!isExerciseNotification) {
+        return;
+      }
+
       setLiveTask(null);
 
       summonSpriteRef.current({
@@ -556,15 +567,11 @@ export function SpriteProvider({
         autoPlayAudio: true,
         duration: 10000,
         position: "bottom-right",
-        action:
-          node.stepType === "EXERCISE_READY" ||
-          node.stepType === "EXERCISE_BUILDING"
-            ? {
-                label: node.action || "Open Briefing",
-                variant: "primary",
-                onClick: () => openChatRef.current({ tab: "briefing" }),
-              }
-            : undefined,
+        action: {
+          label: node.action || "Open Briefing",
+          variant: "primary",
+          onClick: () => openChatRef.current({ tab: "briefing" }),
+        },
       });
     };
 
