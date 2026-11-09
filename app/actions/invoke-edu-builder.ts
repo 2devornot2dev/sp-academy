@@ -196,6 +196,8 @@ async function resolveHistoricalContext(
       where: {
         foundationCourseId: courseId,
         id: { not: currentLessonId },
+        orderIndex: { lt: payload.spoon },
+        NOT: { lessonHandoff: { equals: Prisma.DbNull } },
       },
       orderBy: { orderIndex: "asc" },
       select: { orderIndex: true, title: true, lessonHandoff: true },
@@ -315,7 +317,7 @@ async function resolveHistoricalContext(
 // HELPER 3: Construct Standardized Sprite Lambda Payload
 // ---------------------------------------------------------------------------
 function buildSpritePayload(
-  stepType: "SPOON" | "BRIDGE",
+  stepType: "SPOON" | "BRIDGE", 
   orderIndex: number,
   nodeId: string,
   webhookUrl: string,

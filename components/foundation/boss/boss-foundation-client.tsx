@@ -7,6 +7,7 @@ import { BossFoundationProvider } from "@/context/boss-context";
 import BossFoundationFreestyle from "./boss-foundation-freestyle";
 import { BossData } from "@/app/(dashboard)/foundation/actions/get-boss-data";
 import { BossScenarioData } from "@/lib/boss/schemas";
+import { startNextMilestoneDaisyChain } from "@/lib/foundation/advance-build-chain";
 import {
   ShieldAlert,
   Play,
@@ -69,6 +70,8 @@ export default function BossFoundationClient({
     Math.max(1, Math.round(totalExercises * 0.8));
 
   const milestoneIndex = (session as any)?.milestoneIndex ?? 1;
+  const courseId =
+    (session as any)?.foundationCourseId || (session as any)?.course?.id;
   const attempts = (session as any)?.attempts ?? 0;
   const bestScore = (session as any)?.score ?? null;
 
@@ -77,7 +80,6 @@ export default function BossFoundationClient({
     (session as any)?.targetLanguage ||
     "fr-FR";
 
-  // Grab introVideoS3Key from the DB row or scenarioData.boss fallback
   const introVideoKey: string | undefined =
     (session as any)?.introVideoS3Key ??
     (boss as any)?.introVideoKey ??
@@ -88,12 +90,12 @@ export default function BossFoundationClient({
 
   const allKeys = useMemo(() => {
     const keys: (string | undefined)[] = [
-      avatarKeys.default,       // index 0
-      boss?.coverUrl ?? undefined, // index 1
-      avatarKeys.happy,         // index 2
-      avatarKeys.sad,           // index 3
-      avatarKeys.angry,         // index 4
-      introVideoKey,            // index 5 (Boss Intro Video!)
+      avatarKeys.default,
+      boss?.coverUrl ?? undefined,
+      avatarKeys.happy,
+      avatarKeys.sad,
+      avatarKeys.angry,
+      introVideoKey,
     ];
     playlist.forEach((item) => {
       keys.push(item.audioKey ?? undefined);
@@ -114,6 +116,16 @@ export default function BossFoundationClient({
   const resolvedIntroVideoUrl =
     urls[5] ||
     (introVideoKey?.startsWith("http") ? introVideoKey : undefined);
+
+  const handleStartEncounter = () => {
+    setHasStarted(true);
+    if (courseId) {
+      void startNextMilestoneDaisyChain({
+        courseId,
+        currentMilestoneIndex: milestoneIndex,
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen w-full animate-bg p-4 sm:p-6 flex flex-col justify-center">
@@ -220,7 +232,7 @@ export default function BossFoundationClient({
               </div>
 
               <button
-                onClick={() => setHasStarted(true)}
+                onClick={handleStartEncounter}
                 disabled={isLoading}
                 className={`group relative flex w-full items-center justify-center gap-3 rounded-2xl py-4 text-lg font-extrabold text-white transition-all ${
                   isLoading

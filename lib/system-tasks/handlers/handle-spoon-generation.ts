@@ -6,6 +6,7 @@ import { pusherServer } from "@/lib/pusher-server";
 import { foundationLessonWebhookSchema } from "@/lib/schema/foundation/lesson-schema";
 import { clearLiveTaskState } from "@/app/actions/system-task-actions";
 import { invalidateDossierCache } from "@/lib/sprites/get-cached-dossier";
+import { advanceMilestoneBuildChain } from "@/lib/foundation/advance-build-chain";
 
 const json = (v: unknown) => v as Prisma.InputJsonValue;
 
@@ -198,6 +199,12 @@ export async function handleSpoonGeneration(task: SystemTask, body: unknown) {
   await prisma.systemTask.update({
     where: { id: task.id },
     data: { status: "COMPLETED" },
+  });
+
+  // 7. DAISY-CHAIN: Automatically bake next Spoon in this milestone (1 -> 2 -> 3) or Boss (after 3)!
+  await advanceMilestoneBuildChain({
+    courseId: data.foundationCourseId,
+    completedSpoonNumber: data.orderIndex,
   });
 
   console.log(

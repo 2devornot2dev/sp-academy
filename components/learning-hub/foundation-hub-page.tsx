@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { MessageSquare, Dumbbell, Sparkles, ArrowRight } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 import type { UserGenerationData } from "@/lib/upstash";
 import { useSprite } from "@/context/sprite-context";
@@ -34,7 +35,15 @@ export default function FoundationHubPage({
   generationData,
 }: Props) {
   const router = useRouter();
-  const { summonSpriteNode, profile, liveTask, setLiveTask } = useSprite();
+  const {
+    summonSpriteNode,
+    profile,
+    liveTask,
+    setLiveTask,
+    openChat,
+    spriteName,
+    avatarSrc,
+  } = useSprite();
 
   const lessons = path?.lessons ?? [];
   const courseId = path?.courseId ?? (path as any)?.id ?? "default";
@@ -232,18 +241,75 @@ export default function FoundationHubPage({
             {waitingOnSpoon && generationData ? (
               <GenerationCycleCard data={generationData} />
             ) : (
-              <PrimaryHeroCard
-                path={path}
-                vocabDue={vocabDue}
-                nextLesson={nextLesson}
-                bossDue={bossDue}
-                waitingOnSpoon={waitingOnSpoon}
-                waitingOnVocab={waitingOnVocab}
-                waitingOnBoss={waitingOnBoss}
-                getLessonHref={getLessonHref}
-                getBossHref={getBossHref}
-                displayTitles={displayTitles}
-              />
+              <>
+                <PrimaryHeroCard
+                  path={path}
+                  vocabDue={vocabDue}
+                  nextLesson={nextLesson}
+                  bossDue={bossDue}
+                  waitingOnSpoon={waitingOnSpoon}
+                  waitingOnVocab={waitingOnVocab}
+                  waitingOnBoss={waitingOnBoss}
+                  getLessonHref={getLessonHref}
+                  getBossHref={getBossHref}
+                  displayTitles={displayTitles}
+                />
+
+                {/* WHILE BAKING ACTION BAR (Shows whenever Spoon, Bridge, or Boss is generating) */}
+                {isGenerating && (
+                  <div className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-xl">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-3.5">
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-teal-400/40 bg-slate-800">
+                          <img
+                            src={avatarSrc}
+                            alt={spriteName}
+                            className="h-full w-full object-cover object-top"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5 text-teal-400" />
+                            <span className="text-[11px] font-black tracking-wider text-teal-300 uppercase">
+                              While Your Next Stage Is Baking...
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-200">
+                            Jump into a 1-on-1 AI warm-up with {spriteName} or
+                            play a 3-round Sprite Workout!
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openChat({
+                              tab: "session",
+                              prompt: `Let's do a quick 1-on-1 conversational warm-up while my next stage is building!`,
+                            })
+                          }
+                          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>1-on-1 AI Chat</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openChat({ tab: "briefing" })}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/25 px-4 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-500/40"
+                        >
+                          <Dumbbell className="h-3.5 w-3.5 text-amber-300" />
+                          <span>Sprite Exercise</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <LearningPathMiniCards
@@ -274,8 +340,8 @@ export default function FoundationHubPage({
               getVocabHref={getVocabHref}
               getBossHref={getBossHref}
               displayTitles={displayTitles}
-              onLaunchSpriteExercise={(item) => {
-                console.log("Launch Sprite Exercise for:", item);
+              onLaunchSpriteExercise={() => {
+                openChat({ tab: "briefing" });
               }}
             />
           </div>
