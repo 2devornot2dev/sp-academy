@@ -14,7 +14,7 @@ export async function handleSpriteNotificationGeneration(
       where: { id: task.id },
       data: {
         status: "FAILED",
-        result: body,
+        result: typeof body === "string" ? body : JSON.stringify(body),
       },
     });
     return NextResponse.json({ ok: false, error: body.error }, { status: 200 });
@@ -43,6 +43,7 @@ export async function handleSpriteNotificationGeneration(
           targetBody: body.targetBody || "",
           nativeAudioUrl: body.nativeAudioUrl ?? null,
           targetAudioUrl: body.targetAudioUrl ?? null,
+          videoUrl: body.videoUrl ?? null,
           action: body.action ?? null,
         },
       ];
@@ -58,50 +59,53 @@ export async function handleSpriteNotificationGeneration(
     );
   }
 
-  // 3. Upsert each generated node into SpriteNode (NO videoUrl!) & mark SystemTask COMPLETED
+  // 3. Upsert each generated node into SpriteNode & mark SystemTask COMPLETED
   try {
-    for (const post of validPosts) {
-      const resolvedNodeId = String(post.nodeId || fallbackNodeId);
-      const parts = resolvedNodeId.split(":");
-      const resolvedOrderIndex = Number(post.orderIndex ?? defaultOrderIndex);
+    await prisma.$transaction([
+      ...validPosts.map((post: any) => {
+        const resolvedNodeId = String(post.nodeId || fallbackNodeId);
+        const parts = resolvedNodeId.split(":");
+        const resolvedOrderIndex = Number(post.orderIndex ?? defaultOrderIndex);
 
-      await prisma.spriteNode.upsert({
-        where: { nodeId: resolvedNodeId },
-        update: {
-          header: post.header || "Mission Update",
-          nativeBody: post.nativeBody || "",
-          targetBody: post.targetBody || "",
-          nativeAudioUrl: post.nativeAudioUrl ?? null,
-          targetAudioUrl: post.targetAudioUrl ?? null,
-          action: post.action ?? null,
+        return prisma.spriteNode.upsert({
+          where: { nodeId: resolvedNodeId },
+          update: {
+            header: post.header || "Mission Update",
+            nativeBody: post.nativeBody || "",
+            targetBody: post.targetBody || "",
+            nativeAudioUrl: post.nativeAudioUrl ?? null,
+            targetAudioUrl: post.targetAudioUrl ?? null,
+            videoUrl: post.videoUrl ?? null,
+            action: post.action ?? null,
+          },
+          create: {
+            nodeId: resolvedNodeId,
+            spriteSlug: post.spriteSlug || parts[0] || "vox",
+            nativeLanguage: post.nativeLanguage || "en-US",
+            targetLanguage: post.targetLanguage || "fr-FR",
+            nativeVoiceId: post.nativeVoiceId || parts[1] || "en-US-boy-01",
+            targetVoiceId: post.targetVoiceId || parts[2] || "fr-FR-boy-01",
+            orderIndex: resolvedOrderIndex,
+            header: post.header || "Mission Update",
+            nativeBody: post.nativeBody || "",
+            targetBody: post.targetBody || "",
+            nativeAudioUrl: post.nativeAudioUrl ?? null,
+            targetAudioUrl: post.targetAudioUrl ?? null,
+            videoUrl: post.videoUrl ?? null,
+            action: post.action ?? null,
+          },
+        });
+      }),
+      prisma.systemTask.update({
+        where: { id: task.id },
+        data: {
+          status: "COMPLETED",
+          result: typeof body === "string" ? body : JSON.stringify(body),
         },
-        create: {
-          nodeId: resolvedNodeId,
-          spriteSlug: post.spriteSlug || parts[0] || "vox",
-          nativeLanguage: post.nativeLanguage || "en-US",
-          targetLanguage: post.targetLanguage || "fr-FR",
-          nativeVoiceId: post.nativeVoiceId || parts[1] || "en-US-boy-01",
-          targetVoiceId: post.targetVoiceId || parts[2] || "fr-FR-boy-01",
-          orderIndex: resolvedOrderIndex,
-          header: post.header || "Mission Update",
-          nativeBody: post.nativeBody || "",
-          targetBody: post.targetBody || "",
-          nativeAudioUrl: post.nativeAudioUrl ?? null,
-          targetAudioUrl: post.targetAudioUrl ?? null,
-          action: post.action ?? null,
-        },
-      });
-    }
-
-    await prisma.systemTask.update({
-      where: { id: task.id },
-      data: {
-        status: "COMPLETED",
-        result: body,
-      },
-    });
+      }),
+    ]);
   } catch (err: any) {
-    console.error("[handleSpriteNotification] upsert failed:", err);
+    console.error("[handleSpriteNotification] transaction failed:", err);
     return NextResponse.json(
       { ok: false, error: String(err?.message ?? err) },
       { status: 500 },
@@ -122,6 +126,7 @@ export async function handleSpriteNotificationGeneration(
         targetBody: firstPost.targetBody || "",
         nativeAudioUrl: firstPost.nativeAudioUrl ?? null,
         targetAudioUrl: firstPost.targetAudioUrl ?? null,
+        videoUrl: firstPost.videoUrl ?? null,
         action: firstPost.action ?? null,
       });
     } catch (err) {

@@ -5,7 +5,7 @@ import { useSpeak } from "@/hooks/use-speak";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
 import { cleanWord } from "@/components/foundation/word-tap";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Mic,
   Square,
@@ -27,6 +27,7 @@ type VoicePhase = "waiting" | "speaking" | "wrapping_up";
 
 const PASSING_SCORE = 60;
 const MAX_REQUIRED_ATTEMPTS = 2;
+const AUTO_ADVANCE_DELAY_MS = 1400; // Gives user 1.4s to see their green score before flowing to next chunk
 
 const tone = (score: number, omitted: boolean) => {
   if (omitted || score < 60)
@@ -203,11 +204,13 @@ export function PronunciationStep({
   const trackedSeen = useRef<Set<string>>(new Set());
   const trackedHeard = useRef<Set<string>>(new Set());
   const lastTrackedScore = useRef<unknown>(null);
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [assessedText, setAssessedText] = useState<string | null>(null);
   const [voicePhase, setVoicePhase] = useState<VoicePhase>("waiting");
   const [stepAttempts, setStepAttempts] = useState<number>(0);
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false);
 
   const isListening = status === "listening";
   const isAnalyzing = status === "analyzing";
@@ -236,6 +239,33 @@ export function PronunciationStep({
 
   const tokens: string[] = (currentText ?? "").split(/\s+/).filter(Boolean);
   const scoreIsForThisStep = !!score && assessedText === currentText;
+
+  const clearAutoAdvance = useCallback(() => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    setIsAutoAdvancing(false);
+  }, []);
+
+  const stopAllAudio = useCallback(() => {
+    try {
+      stopTTS();
+      stopWordAudio();
+    } catch (e) {
+      console.warn("Error stopping audio:", e);
+    }
+  }, [stopTTS, stopWordAudio]);
+
+  const handleNextWord = useCallback(() => {
+    clearAutoAdvance();
+    stopAllAudio();
+    if (currentIndex < totalSteps - 1) {
+      setCurrentIndex((prev) => prev + 1);
+    } else {
+      onNext();
+    }
+  }, [clearAutoAdvance, stopAllAudio, currentIndex, totalSteps, onNext]);
 
   useEffect(() => {
     if (!isListening) setVoicePhase("waiting");
@@ -276,11 +306,45 @@ export function PronunciationStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentText]);
 
+  // Reset state & AUTO-PLAY audio when moving to a new chunk!
+  useEffect(() => {
+    clearAutoAdvance();
+    reset();
+    setAssessedText(null);
+    setVoicePhase("waiting");
+    setStepAttempts(0);
+    stopAllAudio();
+
+    if (!currentText) return;
+
+    const playTimer = setTimeout(() => {
+      tokens.forEach((t) => {
+        const key = cleanWord(t);
+        if (key && !trackedHeard.current.has(key)) {
+          trackInteraction(key, { heard: 1 });
+          trackedHeard.current.add(key);
+        }
+      });
+
+      if (isFullSentenceStep) {
+        void speak(currentText, targetLang);
+      } else {
+        void playWord(currentText, "m");
+      }
+    }, 320);
+
+    return () => clearTimeout(playTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
+  // Score tracking + AUTO-ADVANCE on pass (or max attempts)
   useEffect(() => {
     if (!score || score === lastTrackedScore.current) return;
     if (assessedText !== currentText) return;
     lastTrackedScore.current = score;
-    setStepAttempts((prev) => prev + 1);
+
+    const nextAttempts = stepAttempts + 1;
+    setStepAttempts(nextAttempts);
 
     tokens.forEach((t) => {
       const key = cleanWord(t);
@@ -291,35 +355,32 @@ export function PronunciationStep({
         spokenScore: r ? r.score : score.pronunciationScore,
       });
     });
+
+    const overall = Math.round(score.pronunciationScore);
+    const passed = overall >= PASSING_SCORE;
+
+    // Auto-advance to the next chunk seamlessly when passed (on non-final chunks)
+    if (passed && !isFullSentenceStep) {
+      clearAutoAdvance();
+      setIsAutoAdvancing(true);
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        setIsAutoAdvancing(false);
+        setCurrentIndex((prev) => Math.min(prev + 1, totalSteps - 1));
+      }, AUTO_ADVANCE_DELAY_MS);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [score]);
 
-  const stopAllAudio = () => {
-    try {
-      stopTTS();
-      stopWordAudio();
-    } catch (e) {
-      console.warn("Error stopping audio:", e);
-    }
-  };
-
   useEffect(() => {
-    reset();
-    setAssessedText(null);
-    setVoicePhase("waiting");
-    setStepAttempts(0);
-    stopAllAudio();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex]);
-
-  useEffect(() => {
-    return () => stopAllAudio();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      clearAutoAdvance();
+      stopAllAudio();
+    };
+  }, [clearAutoAdvance, stopAllAudio]);
 
   const handleStartRecording = async () => {
     if (isBusy) return;
-
+    clearAutoAdvance();
     stopAllAudio();
 
     if (!currentText || !targetLang) {
@@ -332,6 +393,7 @@ export function PronunciationStep({
 
   const handlePlayAudio = async () => {
     if (isBusy) return;
+    clearAutoAdvance();
 
     if (isAudioActive) {
       stopAllAudio();
@@ -352,15 +414,6 @@ export function PronunciationStep({
       await speak(currentText, targetLang);
     } else {
       await playWord(currentText, "m");
-    }
-  };
-
-  const handleNextWord = () => {
-    stopAllAudio();
-    if (currentIndex < totalSteps - 1) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
-      onNext();
     }
   };
 
@@ -404,13 +457,13 @@ export function PronunciationStep({
 
   return (
     <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
-      {/* 1. Header & Segmented Progress */}
+      {/* 1. Header & Clickable Segmented Progress */}
       <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
           <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">
             {isFullSentenceStep
               ? "Final Step • Full Sentence"
-              : `Chunk ${currentIndex + 1} of ${totalSteps - 1}`}
+              : `Chunk ${currentIndex + 1} of ${totalSteps - 1} • Auto-Flows on Pass`}
           </span>
           <h2 className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
             Pronunciation Lab
@@ -418,24 +471,41 @@ export function PronunciationStep({
         </div>
 
         <div className="flex items-center gap-2">
-          {Array.from({ length: totalSteps }).map((_, idx) => (
-            <div
-              key={idx}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
-                idx === currentIndex
-                  ? "w-9 bg-gradient-to-r from-sky-400 to-blue-600"
-                  : idx < currentIndex
-                    ? "w-5 bg-emerald-500"
-                    : "w-5 bg-slate-200"
-              }`}
-            />
-          ))}
+          {Array.from({ length: totalSteps }).map((_, idx) => {
+            const isSelectable = idx <= currentIndex && !isBusy;
+            return (
+              <button
+                key={idx}
+                type="button"
+                disabled={!isSelectable}
+                onClick={() => {
+                  if (isSelectable) {
+                    clearAutoAdvance();
+                    setCurrentIndex(idx);
+                  }
+                }}
+                title={
+                  idx === breakdown.length
+                    ? "Full Sentence"
+                    : breakdown[idx]?.text
+                }
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  idx === currentIndex
+                    ? "w-9 bg-gradient-to-r from-sky-400 to-blue-600"
+                    : idx < currentIndex
+                      ? "w-5 cursor-pointer bg-emerald-500 hover:bg-emerald-600"
+                      : "w-5 cursor-not-allowed bg-slate-200"
+                }`}
+              />
+            );
+          })}
         </div>
       </div>
 
       {/* 2. 3D Target Flashcard Stage */}
       <div
-        className={`relative mb-6 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 ${
+        key={currentIndex}
+        className={`relative mb-6 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 animate-in fade-in slide-in-from-right-3 ${
           isListening
             ? "border-indigo-500 ring-4 ring-indigo-500/10"
             : isAnalyzing
@@ -457,7 +527,12 @@ export function PronunciationStep({
             return (
               <span
                 key={i}
-                onClick={() => !isBusy && playWord(token, "m")}
+                onClick={() => {
+                  if (!isBusy) {
+                    clearAutoAdvance();
+                    playWord(token, "m");
+                  }
+                }}
                 title={
                   r
                     ? r.omitted
@@ -499,35 +574,16 @@ export function PronunciationStep({
         </div>
       </div>
 
-      {/* 3. Interactive 3D Recorder & Listen Controls */}
+      {/* 3. Interactive 3D Recorder & Replay Controls */}
       <div className="mb-6 flex flex-col items-center">
         {!isListening && !isAnalyzing && (
           <div className="flex w-full max-w-2xl flex-col items-center gap-2.5">
             <div className="flex w-full flex-col gap-3.5 sm:flex-row">
-              {/* 3D Listen Button */}
-              <button
-                type="button"
-                onClick={handlePlayAudio}
-                disabled={isBusy}
-                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 px-6 py-4 text-base font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${
-                  isAudioActive
-                    ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md"
-                    : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:border-sky-400 hover:bg-sky-50/40"
-                }`}
-              >
-                {isAudioActive ? (
-                  <Square size={20} className="fill-current" />
-                ) : (
-                  <Volume2 size={22} className="text-blue-600" />
-                )}
-                <span>{isAudioActive ? "Stop Audio" : "1. Listen"}</span>
-              </button>
-
-              {/* 3D Speak / Retry Button */}
+              {/* Primary Speak / Retry Button (Front & Center) */}
               <button
                 type="button"
                 onClick={handleStartRecording}
-                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                className={`flex-[1.5] inline-flex items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
                   scoreIsForThisStep && !hasPassedStep
                     ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25"
                     : scoreIsForThisStep
@@ -539,20 +595,45 @@ export function PronunciationStep({
                   <>
                     <RotateCcw size={20} />
                     <span>
-                      {hasPassedStep ? "Practice Again" : "Try Again"}
+                      {isAutoAdvancing
+                        ? "Stay & Practice Again"
+                        : hasPassedStep
+                          ? "Practice Again"
+                          : "Try Again"}
                     </span>
                   </>
                 ) : (
                   <>
                     <Mic size={22} />
-                    <span>2. Start Speaking</span>
+                    <span>Tap to Speak</span>
                   </>
                 )}
+              </button>
+
+              {/* Secondary Replay Audio Button */}
+              <button
+                type="button"
+                onClick={handlePlayAudio}
+                disabled={isBusy}
+                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 px-5 py-4 text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${
+                  isAudioActive
+                    ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md"
+                    : "border-slate-200 border-b-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50/40"
+                }`}
+              >
+                {isAudioActive ? (
+                  <Square size={18} className="fill-current" />
+                ) : (
+                  <Volume2 size={20} className="text-blue-600" />
+                )}
+                <span>{isAudioActive ? "Playing..." : "Replay Audio"}</span>
               </button>
             </div>
 
             <p className="text-center text-xs font-semibold text-slate-400">
-              Recording stops and scores automatically as soon as you pause
+              {isAutoAdvancing
+                ? "Great pronunciation! Moving to next chunk automatically..."
+                : "Audio plays automatically • Tap to Speak and pause when finished"}
             </p>
           </div>
         )}
@@ -649,7 +730,8 @@ export function PronunciationStep({
             </div>
             {hasPassedStep ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
-                <CheckCircle2 size={14} /> Great job!
+                <CheckCircle2 size={14} />{" "}
+                {isAutoAdvancing ? "Passed! Next chunk..." : "Great job!"}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
