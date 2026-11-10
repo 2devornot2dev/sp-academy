@@ -40,6 +40,8 @@ export async function POST(req: Request) {
       nativeLanguage,
       targetLanguage,
       targetVoiceId: targetVoiceId || `${targetLanguage}-boy-01`,
+      mode: freestyleData.mode || "SPECIFIC", // <-- Added optional mode
+      level: freestyleData.level || "EASY",   // <-- Added optional level
       topic: freestyleData.topic || "Casual conversation",
       persona:
         freestyleData.persona ||

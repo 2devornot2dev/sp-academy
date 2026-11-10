@@ -1,3 +1,4 @@
+// components/freestyle/freestyle-wrapper.tsx
 "use client";
 
 import { useState, useCallback } from "react";
@@ -11,11 +12,92 @@ export type FreestyleSessionConfig = {
   id: string;
   mode: string;
   topic?: string;
+  persona?: string;
+  tutorName?: string;
   nativeLanguage: string;
   targetLanguage: string;
   voiceGender: "male" | "female";
   aiAvatarUrl: string;
   level: "EASY" | "MEDIUM" | "FLUENT" | "ZERO";
+  requiredChunks?: string[];
+  openingLine?: string;
+  starterHintTarget?: string;
+  starterHintNative?: string;
+};
+
+// Built-in level-calibrated starter chunks & mission hints per language & level
+function buildCalibratedMission(
+  targetLang: string,
+  level: "ZERO" | "EASY" | "MEDIUM" | "FLUENT",
+  topic?: string,
+  mode?: string,
+) {
+  const isEs = targetLang.toLowerCase().startsWith("es");
+  const cleanTopic = topic?.trim() || "Everyday Conversation";
+
+  if (isEs) {
+    const byLevel = {
+      ZERO: {
+        chunks: ["Hola", "Me llamo", "Por favor"],
+        hintTarget: "¡Hola! Me llamo Paul, ¿cómo estás?",
+        hintNative: "Hi! My name is Paul, how are you?",
+      },
+      EASY: {
+        chunks: ["Me gustaría", "Por favor", "¿Cuánto cuesta?"],
+        hintTarget: "Hola, me gustaría pedir un café, por favor.",
+        hintNative: "Hello, I would like to order a coffee, please.",
+      },
+      MEDIUM: {
+        chunks: ["En mi opinión", "Normalmente", "Me encanta"],
+        hintTarget: "Normalmente me encanta viajar y conocer lugares nuevos.",
+        hintNative: "Usually I love traveling and discovering new places.",
+      },
+      FLUENT: {
+        chunks: ["Sin embargo", "Hoy en día", "Me parece que"],
+        hintTarget: "Me parece que hoy en día es fundamental practicar a diario.",
+        hintNative: "It seems to me that nowadays it's essential to practice daily.",
+      },
+    };
+    return byLevel[level] || byLevel.EASY;
+  }
+
+  // Default: French (fr-FR)
+  const frByLevel = {
+    ZERO: {
+      chunks: ["Bonjour", "Je m'appelle", "S'il vous plaît"],
+      hintTarget: "Bonjour ! Je m'appelle Paul, comment ça va ?",
+      hintNative: "Hello! My name is Paul, how is it going?",
+    },
+    EASY: {
+      chunks: ["Je voudrais", "S'il vous plaît", "C'est super"],
+      hintTarget: "Bonjour ! Je voudrais pratiquer mon français, s'il vous plaît.",
+      hintNative: `Hello! I'd like to practice my French (${cleanTopic}), please.`,
+    },
+    MEDIUM: {
+      chunks: ["D'habitude", "J'aime beaucoup", "À mon avis"],
+      hintTarget: "D'habitude, j'aime beaucoup discuter de ce sujet.",
+      hintNative: "Usually, I really enjoy talking about this topic.",
+    },
+    FLUENT: {
+      chunks: ["Cependant", "En fait", "Il me semble que"],
+      hintTarget: "En fait, il me semble que c'est un sujet très intéressant.",
+      hintNative: "Actually, it seems to me that this is a very interesting topic.",
+    },
+  };
+
+  return frByLevel[level] || frByLevel.EASY;
+}
+
+const LEVEL_INSTRUCTIONS: Record<
+  "ZERO" | "EASY" | "MEDIUM" | "FLUENT",
+  string
+> = {
+  ZERO: "ABSOLUTE ZERO BEGINNER (A0): Speak ONLY in ultra-short 3 to 5 word phrases. Speak slowly, use basic cognates, and gently prompt the user to say one simple phrase at a time.",
+  EASY: "BEGINNER (A1-A2): Keep sentences short (5 to 8 everyday words), clear, and encouraging. Avoid complex tenses or slang.",
+  MEDIUM:
+    "INTERMEDIATE (B1-B2): Speak at a natural conversational pace using everyday idioms, past/future tenses, and follow-up questions.",
+  FLUENT:
+    "ADVANCED / FLUENT (C1+): Speak at full native speed with rich vocabulary, nuanced expressions, and engaging debate.",
 };
 
 export default function FreestyleWrapper({
@@ -32,30 +114,56 @@ export default function FreestyleWrapper({
   const [pendingReviewId, setPendingReviewId] = useState<string | null>(null);
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
 
-  const handleReviewReady = useCallback((id: string) => {
-    setPendingReviewId(null);
-    setReviewSessionId(id);
-  }, []);
-
-  const handleReviewFailed = useCallback(() => {
-    setPendingReviewId(null);
-    setReviewSessionId(null);
-  }, []);
-
-  // useReviewPusher(pendingReviewId, handleReviewReady, handleReviewFailed);
-
   const handleStartSession = async (
     config: Omit<FreestyleSessionConfig, "id" | "aiAvatarUrl">
   ) => {
-    const seed = config.voiceGender === "female" ? "Camille" : "Laurent";
-    const aiAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+    const isFemale = config.voiceGender === "female";
+    const tutorName = config.tutorName || (isFemale ? "Sophie" : "Laurent");
+    const aiAvatarUrl = isFemale ? "/sprite-f.png" : "/sprite-m.png";
+    const level = config.level || "EASY";
 
-    // 1. Create DB Session & Mint LiveKit Token in parallel!
+    const mission = buildCalibratedMission(
+      config.targetLanguage,
+      level,
+      config.topic,
+      config.mode,
+    );
+
+    const requiredChunks =
+      config.requiredChunks && config.requiredChunks.length > 0
+        ? config.requiredChunks
+        : mission.chunks;
+
+    const topicLabel =
+      config.topic ||
+      (config.mode === "SURPRISE"
+        ? "Spontaneous Real-World Roleplay"
+        : "Live Conversation Practice");
+
+    const personaPrompt = `${tutorName}, a ${
+      config.persona || "warm, patient, and encouraging"
+    } ${isFemale ? "female" : "male"} native conversation partner. LEVEL CALIBRATION: ${
+      LEVEL_INSTRUCTIONS[level]
+    }`;
+
+    const openingLine =
+      config.openingLine ||
+      `Try using your target phrases (${requiredChunks.join(
+        ", "
+      )}) naturally in conversation with ${tutorName}!`;
+
+    // 1. Create DB Session & Mint LiveKit Token with FULL level, persona, and requiredChunks!
     const [createRes, tokenRes] = await Promise.all([
       fetch("/api/freestyle/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...config, aiAvatarUrl }),
+        body: JSON.stringify({
+          ...config,
+          level,
+          topic: topicLabel,
+          aiAvatarUrl,
+          requiredChunks,
+        }),
       }),
       fetch("/api/livekit/token", {
         method: "POST",
@@ -63,10 +171,16 @@ export default function FreestyleWrapper({
         body: JSON.stringify({
           nativeLanguage: config.nativeLanguage,
           targetLanguage: config.targetLanguage,
+          voiceGender: config.voiceGender,
+          level,
           freestyleData: {
-            topic: config.topic || "Daily Speaking Practice",
-            persona: `${config.voiceGender === "female" ? "Female" : "Male"} conversational partner`,
-            openingLine: "Talk freely about your day, travel, or anything on your mind.",
+            mode: config.mode || "SPECIFIC",
+            level,
+            topic: topicLabel,
+            persona: personaPrompt,
+            requiredChunks,
+            openingLine,
+            starterHintTarget: mission.hintTarget,
           },
         }),
       }),
@@ -87,7 +201,14 @@ export default function FreestyleWrapper({
     setActiveSession({
       id: sessionData.sessionId,
       ...config,
+      level,
+      tutorName,
+      topic: topicLabel,
       aiAvatarUrl,
+      requiredChunks,
+      openingLine,
+      starterHintTarget: mission.hintTarget,
+      starterHintNative: mission.hintNative,
     });
   };
 
@@ -108,7 +229,7 @@ export default function FreestyleWrapper({
   return (
     <div className="relative flex min-h-screen w-full flex-1 flex-col bg-slate-100/80">
       <AnimatePresence mode="wait">
-        {/* 1. SETUP SCREEN — Full width so Header & 7xl Grid work properly */}
+        {/* 1. SETUP SCREEN */}
         {!activeSession && !pendingReviewId && !reviewSessionId && (
           <motion.div
             key="setup"
