@@ -1,3 +1,4 @@
+// lib/system-tasks/handlers/handler-freestyle-review.ts
 import { prisma } from "@/lib/prisma";
 import {
   SystemTask,
@@ -9,6 +10,7 @@ import { NextResponse } from "next/server";
 import { FreestyleReviewWebhookSchema } from "@/lib/schema/freestyle-review-schema";
 import z from "zod";
 import { pusherServer } from "@/lib/pusher-server";
+import { invalidateDossierCache } from "@/lib/sprites/get-cached-dossier";
 
 export async function handleFreestyleReview(task: SystemTask, body: unknown) {
   try {
@@ -63,7 +65,6 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       throw new Error("SUCCESS status but no review data");
     }
 
-    // ✅ EXTRACT THE NEW FIELDS HERE
     const {
       mistakes,
       overallFeedback,
@@ -75,7 +76,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
     const jsonOrNull = (v: unknown) =>
       v ? (v as Prisma.InputJsonValue) : Prisma.JsonNull;
 
-    await prisma.$transaction(async (tx) => {
+    const updatedSession = await prisma.$transaction(async (tx) => {
       const data = {
         lambdaStatus: LambdaStatus.SUCCESS,
         mistakes: mistakes as Prisma.InputJsonValue[],
@@ -91,18 +92,125 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
         create: { freestyleSessionId: sessionId, ...data },
       });
 
-      await tx.freestyleSession.update({
+      const sess = await tx.freestyleSession.update({
         where: { id: sessionId },
         data: { status: SessionStatus.REVIEWED },
+        select: { userId: true, targetLanguage: true },
       });
 
       await tx.systemTask.update({
         where: { id: task.id },
         data: { status: "COMPLETED" },
       });
+
+      return sess;
     });
 
-    // Tell the UI that the review is ready!
+    // 3. ENRICH USER'S WORD MATRIX (`WordStat`) & INVALIDATE VOX DOSSIER CACHE
+    try {
+      const meta = (task.metadata as Record<string, any>) || {};
+      const userId = updatedSession?.userId || meta.userId;
+      const rawLang =
+        updatedSession?.targetLanguage || meta.targetLanguage || "fr-FR";
+      const targetLang =
+        rawLang === "fr" ? "fr-FR" : rawLang === "es" ? "es-ES" : rawLang;
+
+      if (userId) {
+        const profile = await prisma.languageProfile.upsert({
+          where: {
+            userId_languageCode: { userId, languageCode: targetLang },
+          },
+          update: {},
+          create: { userId, languageCode: targetLang },
+        });
+
+        // 3a. Add/update vocabulary upgrades in WordStat
+        for (const item of vocabUpgrades ?? []) {
+          const cleanWord = item.better
+            .trim()
+            .toLowerCase()
+            .replace(/[.,!?;:"]+$/g, "")
+            .trim();
+          if (!cleanWord) continue;
+
+          const wordType =
+            cleanWord.includes(" ") || cleanWord.includes("'")
+              ? "PHRASE"
+              : "WORD";
+
+          await prisma.wordStat.upsert({
+            where: {
+              languageProfileId_word: {
+                languageProfileId: profile.id,
+                word: cleanWord,
+              },
+            },
+            update: {
+              translation: item.explanation,
+            },
+            create: {
+              languageProfileId: profile.id,
+              word: cleanWord,
+              wordType,
+              partOfSpeech: wordType === "PHRASE" ? "EXPRESSION" : "NOUN",
+              translation: item.explanation,
+              seenCount: 1,
+              status: "NEW",
+            },
+          });
+        }
+
+        // 3b. Log corrected mistakes into WordStat so Vox prioritizes them for practice
+        for (const m of mistakes ?? []) {
+          const cleanCorrection = m.correction
+            .trim()
+            .toLowerCase()
+            .replace(/[.,!?;:"]+$/g, "")
+            .trim();
+          if (!cleanCorrection || cleanCorrection.split(/\s+/).length > 6) {
+            continue;
+          }
+
+          const wordType =
+            cleanCorrection.includes(" ") || cleanCorrection.includes("'")
+              ? "PHRASE"
+              : "WORD";
+
+          await prisma.wordStat.upsert({
+            where: {
+              languageProfileId_word: {
+                languageProfileId: profile.id,
+                word: cleanCorrection,
+              },
+            },
+            update: {
+              translation: m.explanation,
+              tappedWrong: { increment: 1 },
+            },
+            create: {
+              languageProfileId: profile.id,
+              word: cleanCorrection,
+              wordType,
+              partOfSpeech: wordType === "PHRASE" ? "EXPRESSION" : "NOUN",
+              translation: m.explanation,
+              seenCount: 1,
+              tappedWrong: 1,
+              status: "LEARNING",
+            },
+          });
+        }
+
+        // Refresh Vox/Vivi's cached dossier so new mistakes & words appear in Briefing immediately
+        await invalidateDossierCache(userId);
+      }
+    } catch (matrixErr) {
+      console.error(
+        "[handleFreestyleReview] WordStat/Dossier enrichment error:",
+        matrixErr,
+      );
+    }
+
+    // 4. Tell the UI that the review is ready!
     await pusherServer.trigger(`session-${sessionId}`, "review:completed", {
       sessionId,
       status: "SUCCESS",
