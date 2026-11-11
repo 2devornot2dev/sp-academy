@@ -143,18 +143,14 @@ const LANGUAGE_CODES: Record<string, string> = {
 
 const resolveBcp47Language = (session: any): string => {
   const raw =
-    session?.targetLanguage ||
-    session?.course?.targetLanguage ||
-    "fr-FR";
+    session?.targetLanguage || session?.course?.targetLanguage || "fr-FR";
   if (typeof raw !== "string") return "fr-FR";
   return LANGUAGE_CODES[raw.trim().toUpperCase()] || raw.trim();
 };
 
 const resolveNativeBcp47Language = (session: any): string => {
   const raw =
-    session?.course?.nativeLanguage ||
-    session?.nativeLanguage ||
-    "en-US";
+    session?.course?.nativeLanguage || session?.nativeLanguage || "en-US";
   if (typeof raw !== "string") return "en-US";
   return LANGUAGE_CODES[raw.trim().toUpperCase()] || raw.trim();
 };
@@ -749,6 +745,7 @@ function BossLiveKitInnerProvider({
       }
 
       if (
+        currentItem.audioKey ||
         currentItem.type === "LISTEN_SENTENCE_BUILDER" ||
         currentItem.type === "LISTEN_PICTURE_SELECTOR" ||
         (currentItem.type === "PRONUNCIATION" && currentItem.targetText)

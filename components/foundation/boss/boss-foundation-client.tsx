@@ -21,6 +21,8 @@ import { useS3Media } from "@/context/s3-context";
 import { WordAudioProvider } from "@/context/word-audio-context";
 import { MatrixProvider } from "@/context/matrix-context";
 
+
+
 const FALLBACK_AVATAR =
   "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=boss";
 

@@ -17,10 +17,6 @@ export type SpoonBossTaskMetadata = z.infer<typeof SpoonBossTaskMetadataSchema>;
 // ============================================================================
 // 2. SCENARIO DATA SCHEMAS (Boss, Exercises, Rules)
 // ============================================================================
-
-// ============================================================================
-// 2. SCENARIO DATA SCHEMAS (Boss, Exercises, Rules)
-// ============================================================================
 export const BossAvatarSchema = z.object({
   default: z.string().nullable().optional(),
   happy: z.string().nullable().optional(),
@@ -41,15 +37,13 @@ export const BossPersonaSchema = z.object({
   coverUrl: z.string().nullable().optional(),
   avatar: BossAvatarSchema.nullable().optional(),
 
-  // 🟢 NEW: Add video and audio keys
+  // Video and audio keys
   introAudioKey: z.string().nullable().optional(),
   introVideoKey: z.string().nullable().optional(),
-  introVideoS3Key: z.string().nullable().optional(), // In case Lambda or DB uses this naming
+  introVideoS3Key: z.string().nullable().optional(),
 });
 
-
 export type BossPersona = z.infer<typeof BossPersonaSchema>;
-
 
 export const BossImageOptionSchema = z.object({
   label: z.string().min(1),
@@ -57,6 +51,7 @@ export const BossImageOptionSchema = z.object({
 });
 
 export const BossExerciseTypeSchema = z.enum([
+  "CONVERSATION",
   "MULTIPLE_CHOICE",
   "SENTENCE_BUILDER",
   "PRONUNCIATION",
@@ -70,13 +65,13 @@ export const BossExerciseSchema = z
     type: BossExerciseTypeSchema,
     instruction: z.string().min(1),
     sourceLessonId: z.string().nullable().optional(),
-    question: z.string().nullable(),
-    options: z.array(z.string()).nullable(),
-    correctAnswer: z.union([z.string(), z.array(z.string())]).nullable(),
-    scrambledWords: z.array(z.string()).nullable(),
-    targetText: z.string().nullable(),
-    audioKey: z.string().nullable(),
-    imageOptions: z.array(BossImageOptionSchema).nullable(),
+    question: z.string().nullable().optional(),
+    options: z.array(z.string()).nullable().optional(),
+    correctAnswer: z.union([z.string(), z.array(z.string())]).nullable().optional(),
+    scrambledWords: z.array(z.string()).nullable().optional(),
+    targetText: z.string().nullable().optional(),
+    audioKey: z.string().nullable().optional(),
+    imageOptions: z.array(BossImageOptionSchema).nullable().optional(),
   })
   .superRefine((ex, ctx) => {
     // Type-specific safety checks so broken exercises never reach the UI
@@ -113,10 +108,13 @@ export const BossExerciseSchema = z
       }
     }
 
-    if (ex.type === "PRONUNCIATION" && !ex.targetText) {
+    if (
+      (ex.type === "PRONUNCIATION" || ex.type === "CONVERSATION") &&
+      !ex.targetText
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `PRONUNCIATION (${ex.id}) requires targetText`,
+        message: `${ex.type} (${ex.id}) requires targetText`,
       });
     }
 
@@ -158,6 +156,7 @@ const BossWebhookCompletedSchema = z.object({
   status: z.literal("COMPLETED"),
   data: z.object({
     bossStageId: z.string().min(1),
+    introVideoS3Key: z.string().nullable().optional(),
     scenarioData: BossScenarioDataSchema,
   }),
 });
@@ -179,4 +178,3 @@ export const BossWebhookPayloadSchema = z.discriminatedUnion("status", [
 ]);
 
 export type BossWebhookPayload = z.infer<typeof BossWebhookPayloadSchema>;
-
