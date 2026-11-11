@@ -6,7 +6,7 @@ import { toLanguageCode } from "@/lib/languages";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { triggerMilestoneBossAndNextSpoon } from "@/lib/foundation/trigger-milestone-boss";
 
-export const HARD_MODE_SPOON_OFFSET = 900; // Hard Spoon 1 = orderIndex 901 (Milestone 301)
+const HARD_MODE_SPOON_OFFSET = 900; // Hard Spoon 1 = orderIndex 901 (Milestone 301)
 
 export async function advanceMilestoneBuildChain({
   courseId,
