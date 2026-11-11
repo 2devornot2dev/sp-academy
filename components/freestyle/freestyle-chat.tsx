@@ -1,4 +1,3 @@
-// components/freestyle/freestyle-chat.tsx
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -26,11 +25,18 @@ import { FreestyleTimer } from "./freestyle-timer";
 import { useMatrix } from "@/context/matrix-context";
 import { toast } from "sonner";
 
+type EndResult = {
+  valid: boolean;
+  sessionId?: string;
+  reason?: string;
+  cooldownUntil?: number;
+};
+
 interface FreestyleChatProps {
   session: any;
   livekitToken: string;
   livekitUrl: string;
-  onEnd: () => void;
+  onEnd: (result?: EndResult) => void;
 }
 
 function normalizeForMatch(str: string): string {
@@ -48,7 +54,7 @@ function LiveFreestyleChatInner({
   onEnd,
 }: {
   session: any;
-  onEnd: () => void;
+  onEnd: (result?: EndResult) => void;
 }) {
   const { state: agentState } = useVoiceAssistant();
   const { trackInteraction } = useMatrix();
@@ -67,6 +73,13 @@ function LiveFreestyleChatInner({
 
   const sessionStartTime = useRef(Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<any[]>([]);
+  const isEndingRef = useRef(false);
+
+  // Keep a ref in sync so the timer callback never reads stale messages
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const requiredChunks: string[] = useMemo(
     () => session?.requiredChunks || [],
@@ -82,7 +95,7 @@ function LiveFreestyleChatInner({
 
   const tutorName =
     session?.tutorName ||
-    (session?.voiceGender === "female" ? "Sophie" : "Laurent");
+    (session?.voiceGender === "female" ? "Sophie" : "Antoine");
 
   // Auto scroll
   useEffect(() => {
@@ -118,12 +131,11 @@ function LiveFreestyleChatInner({
         }
       }
 
-      // 2. User spoke -> Azure Pronunciation + Chunk Detection + Banked Words
+      // 2. User spoke -> pronunciation + chunk detection + banked words
       if (payload.type === "TURN_META" && payload.role === "user") {
         const text = payload.originalText || payload.text || "";
         const pron = payload.pronunciation;
 
-        // Check if user said any of the required target chunks!
         if (text && requiredChunks.length > 0) {
           const normSpoken = normalizeForMatch(text);
           setMatchedChunks((prev) => {
@@ -167,12 +179,13 @@ function LiveFreestyleChatInner({
   });
 
   const handleEndSession = async () => {
-    if (isEnding) return;
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
     setIsEnding(true);
 
     const duration = Math.round((Date.now() - sessionStartTime.current) / 1000);
-    const toastId = toast.loading("Saving session...", {
-      description: "Generating your AI review.",
+    const toastId = toast.loading("Validating conversation...", {
+      description: "Checking your speaking turns with AI.",
     });
 
     try {
@@ -186,19 +199,43 @@ function LiveFreestyleChatInner({
           level: session.level,
           nativeLanguage: session.nativeLanguage,
           targetLanguage: session.targetLanguage,
-          messages,
+          messages: messagesRef.current,
           mistakes: [],
           duration,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to submit");
-      toast.success("Session Complete!", { id: toastId });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed to submit");
+
+      if (data.valid === false) {
+        toast.error("Conversation Incomplete", {
+          id: toastId,
+          description: data.reason,
+        });
+        onEnd({ valid: false, reason: data.reason });
+        return;
+      }
+
+      toast.success("Official Session Complete! Boss Unlocked 🎉", {
+        id: toastId,
+      });
+      onEnd({
+        valid: true,
+        sessionId: session.id,
+        cooldownUntil: data.cooldownUntil || Date.now() + 5 * 60 * 1000,
+      });
     } catch (err) {
       console.error("Failed to submit session for review:", err);
-      toast.dismiss(toastId);
-    } finally {
-      onEnd();
+      toast.error("Could not save session", {
+        id: toastId,
+        description: "Please try again.",
+      });
+      onEnd({
+        valid: false,
+        reason: "Could not save session. Please try again.",
+      });
     }
   };
 
@@ -209,11 +246,9 @@ function LiveFreestyleChatInner({
     <div className="flex h-full min-h-0 w-full flex-col gap-5 p-4 sm:p-8 lg:flex-row">
       <RoomAudioRenderer />
 
-      {/* =========================================================
-          MAIN FOUNDATION-STYLE MISSION STAGE
-      ========================================================= */}
+      {/* MAIN MISSION STAGE */}
       <div className="relative flex flex-1 flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-xl">
-        {/* 1. Top Header: Topic + Level Badge + Translation Toggle */}
+        {/* 1. Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
           <div className="flex items-center gap-3.5">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-indigo-100 bg-slate-900 shadow-xs">
@@ -260,11 +295,10 @@ function LiveFreestyleChatInner({
           </div>
         </div>
 
-        {/* 2. Mission Hint Banner + Target Phrases Tracker (Matches Foundation Freestyle) */}
+        {/* 2. Mission hint + target phrases */}
         <div className="space-y-2.5 border-b border-slate-100 bg-slate-50/60 px-6 py-3.5">
-          {/* Blue Mission Hint Bar */}
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200/80 bg-sky-50/90 px-4 py-2.5">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
                 <Lightbulb size={16} />
               </div>
@@ -290,7 +324,6 @@ function LiveFreestyleChatInner({
             </div>
           </div>
 
-          {/* Target Phrases Pill Tracker */}
           {requiredChunks.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2">
               <span className="text-[11px] font-black tracking-wider text-slate-400 uppercase">
@@ -316,8 +349,8 @@ function LiveFreestyleChatInner({
           )}
         </div>
 
-        {/* 3. Conversation Stream Area */}
-        <div className="flex-1 space-y-5 overflow-y-auto p-6 scroll-smooth">
+        {/* 3. Conversation stream */}
+        <div className="flex-1 space-y-5 overflow-y-auto scroll-smooth p-6">
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
@@ -353,7 +386,7 @@ function LiveFreestyleChatInner({
               return (
                 <div
                   key={message.id}
-                  className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  className="flex animate-in items-start gap-3 duration-200 fade-in slide-in-from-bottom-2"
                 >
                   <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-900 shadow-xs">
                     <img
@@ -364,7 +397,7 @@ function LiveFreestyleChatInner({
                   </div>
 
                   <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-slate-200/80 bg-white px-4 py-3 shadow-xs">
-                    <p className="text-sm sm:text-base font-bold text-slate-900 leading-relaxed">
+                    <p className="text-sm leading-relaxed font-bold text-slate-900 sm:text-base">
                       {message.text}
                     </p>
                     {showTranslations && message.translation && (
@@ -377,16 +410,15 @@ function LiveFreestyleChatInner({
               );
             }
 
-            // USER TURN (With Foundation-style Pronunciation Telemetry Pill + Word Underlines)
             return (
               <div
                 key={message.id}
-                className="flex flex-col items-end gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                className="flex animate-in flex-col items-end gap-1.5 duration-200 fade-in slide-in-from-bottom-2"
               >
                 <div className="flex items-end gap-2.5">
                   <div className="max-w-md rounded-2xl rounded-br-sm bg-indigo-600 px-4 py-3 text-white shadow-md">
                     {pron?.words?.length ? (
-                      <p className="flex flex-wrap gap-x-1.5 gap-y-1 text-sm sm:text-base font-bold leading-relaxed">
+                      <p className="flex flex-wrap gap-x-1.5 gap-y-1 text-sm leading-relaxed font-bold sm:text-base">
                         {pron.words.map((w: any, idx: number) => {
                           const score = w.accuracyScore ?? 100;
                           const underlineColor =
@@ -407,7 +439,7 @@ function LiveFreestyleChatInner({
                         })}
                       </p>
                     ) : (
-                      <p className="text-sm sm:text-base font-bold leading-relaxed">
+                      <p className="text-sm leading-relaxed font-bold sm:text-base">
                         {message.text}
                       </p>
                     )}
@@ -420,7 +452,6 @@ function LiveFreestyleChatInner({
                   </div>
                 </div>
 
-                {/* Pronunciation Telemetry Bar (Matches Foundation Freestyle!) */}
                 {overall !== null && (
                   <div
                     className={`inline-flex flex-wrap items-center gap-3 rounded-full border px-3.5 py-1 text-[11px] font-black shadow-2xs ${
@@ -474,7 +505,6 @@ function LiveFreestyleChatInner({
             );
           })}
 
-          {/* AI Speaking / Thinking Indicator */}
           {agentState === "speaking" && (
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 overflow-hidden rounded-full border border-slate-200 bg-slate-900">
@@ -510,7 +540,7 @@ function LiveFreestyleChatInner({
           <div ref={messagesEndRef} className="h-2" />
         </div>
 
-        {/* 4. Bottom Control Bar (Matches Foundation Freestyle) */}
+        {/* 4. Bottom control bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 bg-slate-50/80 px-6 py-4">
           <div className="flex items-center gap-3">
             <span
@@ -545,7 +575,7 @@ function LiveFreestyleChatInner({
               disabled={isEnding}
               className={`inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-xs font-black text-white shadow-md transition active:scale-95 disabled:opacity-50 ${
                 allChunksCompleted
-                  ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                  ? "bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-500"
                   : "bg-slate-900 hover:bg-slate-800"
               }`}
             >
@@ -562,9 +592,7 @@ function LiveFreestyleChatInner({
         </div>
       </div>
 
-      {/* =========================================================
-          RIGHT SIDECAR: LIVE COACHING & SUGGESTED RESPONSES
-      ========================================================= */}
+      {/* RIGHT SIDECAR */}
       <div className="flex w-full flex-col justify-between rounded-[2rem] border border-slate-200/80 bg-white p-6 shadow-xl lg:w-80">
         <div>
           <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
@@ -574,13 +602,12 @@ function LiveFreestyleChatInner({
             </h3>
           </div>
 
-          {/* Suggested Response Card */}
           <div className="mt-5">
             <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase">
               Suggested Next Reply
             </span>
             <div className="mt-2 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-sky-50/50 p-4 shadow-2xs">
-              <p className="text-base font-black text-slate-900 leading-snug">
+              <p className="text-base leading-snug font-black text-slate-900">
                 &ldquo;
                 {suggestions?.starter ||
                   session?.starterHintTarget ||
@@ -595,7 +622,6 @@ function LiveFreestyleChatInner({
             </div>
           </div>
 
-          {/* Checklist of Target Phrases */}
           {requiredChunks.length > 0 && (
             <div className="mt-6">
               <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
@@ -631,7 +657,7 @@ function LiveFreestyleChatInner({
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl bg-slate-50 p-3.5 text-xs font-medium leading-relaxed text-slate-500">
+        <div className="mt-6 rounded-2xl bg-slate-50 p-3.5 text-xs leading-relaxed font-medium text-slate-500">
           <strong className="font-extrabold text-slate-700">Pro Tip:</strong>{" "}
           Speak naturally! Every word you say is scored for accuracy and added
           to your Word Matrix automatically.

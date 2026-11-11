@@ -2,10 +2,14 @@
 import { getUserLanguage } from "@/app/actions/get-user-language";
 import FreestyleWrapper from "@/components/freestyle/freestyle-wrapper";
 import { requireUser } from "@/lib/auth-guard";
+import { getFreestyleRedisState } from "@/lib/upstash";
 
 export default async function ConversationPage() {
   const user = await requireUser();
-  const { lang } = await getUserLanguage(user.id);
+  const [{ lang }, redisState] = await Promise.all([
+    getUserLanguage(user.id),
+    getFreestyleRedisState(user.id),
+  ]);
 
   const defaultNative = lang?.nativeLanguage ?? "ENGLISH";
   const defaultTarget = lang?.targetLanguage ?? "fr-FR";
@@ -17,6 +21,16 @@ export default async function ConversationPage() {
         userName={user.firstName}
         defaultNative={defaultNative}
         defaultTarget={defaultTarget}
+        initialCooldown={
+          redisState.cooldownSessionId
+            ? {
+                sessionId: redisState.cooldownSessionId,
+                remainingSeconds: redisState.cooldownSecondsLeft,
+              }
+            : null
+        }
+        dailySessionsUsed={redisState.dailyUsed}
+        dailySessionsMax={redisState.dailyMax}
       />
     </div>
   );
