@@ -83,8 +83,8 @@ export function SpriteChatMessages({
     liveTask,
     isRetryingTask,
     retryLiveTask,
-    current,          // 🟢 Use 'current' instead of 'notifications'
-    dismissSprite,    // 🟢 Use 'dismissSprite' instead of 'dismissNotification'
+    current,
+    dismissSprite,
   } = useSprite();
 
   const [showErrorDetails, setShowErrorDetails] = useState(false);
@@ -101,29 +101,29 @@ export function SpriteChatMessages({
         isSingleStageActive ? "p-0" : "px-5 py-4"
       }`}
     >
-      {/* ================= LIVE GENERATION / ERROR LOG BANNER ================= */}
+      {/* ================= LIVE GENERATION / ERROR LOG BANNER (LIGHT 3D TACTILE) ================= */}
       {liveTask && activeTab !== "history" && activeTab !== "briefing" && (
         <div
           className={`${
             isSingleStageActive ? "mx-5 mt-4" : "mb-4"
-          } shrink-0 rounded-2xl border p-4 shadow-lg transition ${
+          } shrink-0 rounded-2xl border-2 border-b-4 p-4 shadow-xs transition ${
             liveTask.status === "FAILED"
-              ? "border-rose-500/40 bg-gradient-to-r from-rose-950/75 via-slate-900/90 to-slate-950/90"
-              : "border-indigo-400/35 bg-gradient-to-r from-indigo-950/75 via-teal-950/60 to-slate-900/90"
+              ? "border-rose-300 border-b-rose-400 bg-rose-50"
+              : "border-sky-200 border-b-sky-300 bg-white"
           }`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               {liveTask.status === "FAILED" ? (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
               ) : (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-teal-400" />
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-600" />
               )}
               <span
                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
                   liveTask.status === "FAILED"
-                    ? "border border-rose-500/40 bg-rose-500/20 text-rose-300"
-                    : "border border-teal-400/40 bg-teal-400/20 text-teal-300"
+                    ? "border border-rose-300 bg-rose-100 text-rose-800"
+                    : "border border-sky-200 bg-sky-50 text-blue-700"
                 }`}
               >
                 {liveTask.status === "FAILED"
@@ -136,9 +136,9 @@ export function SpriteChatMessages({
               <button
                 type="button"
                 onClick={() => setShowErrorDetails((prev) => !prev)}
-                className="inline-flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-white/10"
+                className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-100"
               >
-                <Cpu className="h-3 w-3 text-rose-300" />
+                <Cpu className="h-3 w-3 text-rose-600" />
                 <span>{showErrorDetails ? "Hide Log" : "Error Log"}</span>
                 {showErrorDetails ? (
                   <ChevronUp className="h-3 w-3" />
@@ -149,32 +149,32 @@ export function SpriteChatMessages({
             )}
           </div>
 
-          <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-200">
+          <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-700">
             {liveTask.status === "FAILED"
               ? `${spriteName} ran into an issue in the lesson builder. You can retry the generation right here or practice with me while we rebuild it.`
               : `${spriteName} is currently generating your ${liveTask.label.toLowerCase()}. Feel free to chat or warm up with me while it finishes!`}
           </p>
 
           {liveTask.status === "FAILED" && showErrorDetails && (
-            <div className="mt-3 space-y-1 rounded-xl border border-rose-500/30 bg-slate-950/90 p-3 font-mono text-[11px] text-rose-200">
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
+            <div className="mt-3 space-y-1 rounded-xl border border-rose-200 bg-white p-3 font-mono text-[11px] text-rose-800">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
                 <span>
-                  <strong className="text-slate-200">Lambda:</strong>{" "}
+                  <strong className="text-slate-900">Lambda:</strong>{" "}
                   {liveTask.lambdaName || "spoon-edu-builder"}
                 </span>
                 {liveTask.stage && (
                   <span>
-                    <strong className="text-slate-200">Stage:</strong>{" "}
+                    <strong className="text-slate-900">Stage:</strong>{" "}
                     {liveTask.stage}
                   </span>
                 )}
                 <span>
-                  <strong className="text-slate-200">Task ID:</strong>{" "}
+                  <strong className="text-slate-900">Task ID:</strong>{" "}
                   {liveTask.taskId.slice(0, 10)}...
                 </span>
               </div>
               {liveTask.errorMessage && (
-                <p className="border-t border-white/10 pt-1 text-rose-300 break-words">
+                <p className="break-words border-t border-rose-100 pt-1 text-rose-600">
                   {liveTask.errorMessage}
                 </p>
               )}
@@ -187,7 +187,7 @@ export function SpriteChatMessages({
                 type="button"
                 disabled={isRetryingTask}
                 onClick={() => retryLiveTask(liveTask.taskId)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md transition hover:bg-rose-400 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-rose-700 bg-rose-500 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-xs transition hover:bg-rose-600 disabled:opacity-60"
               >
                 {isRetryingTask ? (
                   <>
@@ -207,12 +207,12 @@ export function SpriteChatMessages({
                   type="button"
                   onClick={() =>
                     onQuickPrompt(
-                      `While my ${liveTask.label} is rebuilding, can we do a quick warm-up exercise?`
+                      `While my ${liveTask.label} is rebuilding, can we do a quick warm-up exercise?`,
                     )
                   }
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:bg-white/10"
+                  className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
                 >
-                  <Sparkles className="h-3 w-3 text-teal-300" />
+                  <Sparkles className="h-3 w-3 text-amber-500" />
                   <span>Warm up while waiting</span>
                 </button>
               )}
@@ -226,23 +226,23 @@ export function SpriteChatMessages({
         <div
           className={`${
             isSingleStageActive ? "mx-5 my-3" : "mb-4"
-          } shrink-0 rounded-2xl border border-teal-400/35 bg-gradient-to-r from-teal-950/70 via-indigo-950/70 to-slate-900/90 p-4 shadow-lg`}
+          } shrink-0 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-white p-4 shadow-xs`}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="rounded-full border border-teal-400/40 bg-teal-400/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-teal-300">
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-600">
               {current.badge || `${spriteName} Dispatch`}
             </span>
             <button
               type="button"
               onClick={dismissSprite}
-              className="rounded-lg p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
               title="Dismiss notification"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-100">
+          <p className="mt-2 text-xs font-bold leading-relaxed text-slate-800">
             &ldquo;{current.text}&rdquo;
           </p>
 
@@ -251,14 +251,12 @@ export function SpriteChatMessages({
               <button
                 type="button"
                 onClick={() =>
-                  isPlaying
-                    ? stopAudio()
-                    : playAudioUrl(current.audioUrl!)
+                  isPlaying ? stopAudio() : playAudioUrl(current.audioUrl!)
                 }
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-extrabold transition ${
+                className={`inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] px-3 py-1.5 text-[11px] font-extrabold transition ${
                   isPlaying
-                    ? "bg-teal-400 text-slate-950"
-                    : "bg-white/10 text-white hover:bg-white/20"
+                    ? "border-emerald-700 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-300 hover:bg-sky-50"
                 }`}
               >
                 {isPlaying ? (
@@ -268,7 +266,7 @@ export function SpriteChatMessages({
                   </>
                 ) : (
                   <>
-                    <Volume2 className="h-3.5 w-3.5" />
+                    <Volume2 className="h-3.5 w-3.5 text-blue-600" />
                     <span>Play Voice</span>
                   </>
                 )}
@@ -282,7 +280,7 @@ export function SpriteChatMessages({
                   current.action?.onClick();
                   dismissSprite();
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-3.5 py-1.5 text-[11px] font-extrabold text-white transition hover:bg-indigo-400"
+                className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3.5 py-1.5 text-[11px] font-black text-white transition hover:brightness-105"
               >
                 <span>{current.action.label}</span>
                 <ArrowRight className="h-3 w-3" />

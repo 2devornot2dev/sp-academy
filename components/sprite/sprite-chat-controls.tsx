@@ -22,14 +22,14 @@ export function SpriteChatControls({
   onSubmit,
 }: SpriteChatControlsProps) {
   return (
-    <div className="relative z-10 border-t border-white/10 bg-slate-950/90 px-6 py-4 shrink-0">
+    <div className="relative z-10 shrink-0 border-t-2 border-slate-200 bg-white px-6 py-4">
       <form
         onSubmit={onSubmit}
-        className="flex items-center gap-2 rounded-2xl border border-indigo-500/30 bg-slate-900/90 px-3.5 py-2 transition-colors focus-within:border-teal-400 shadow-inner"
+        className="flex items-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-3.5 py-2 transition-colors focus-within:border-blue-500 focus-within:bg-white"
       >
         <button
           type="button"
-          className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-teal-300"
+          className="rounded-xl p-2 text-slate-400 transition hover:bg-sky-50 hover:text-blue-600"
         >
           <Mic className="h-4 w-4" />
         </button>
@@ -40,12 +40,12 @@ export function SpriteChatControls({
           placeholder={`Ask ${spriteName} in ${targetLang}...`}
           disabled={isLoading}
           maxLength={1000}
-          className="w-full bg-transparent py-1.5 text-sm text-white outline-none placeholder:text-slate-400"
+          className="w-full bg-transparent py-1.5 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400"
         />
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          className="flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-teal-500 p-2.5 text-white shadow-md shadow-indigo-600/30 transition hover:opacity-95 disabled:opacity-40"
+          className="flex items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 p-2.5 text-white shadow-xs transition hover:brightness-105 disabled:opacity-40"
         >
           <Send className="h-4 w-4" />
         </button>

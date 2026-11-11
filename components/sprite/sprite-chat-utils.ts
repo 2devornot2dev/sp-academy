@@ -15,6 +15,10 @@ export interface ChatContextData {
   nativeLang: string;
   targetLang: string;
   currentLessonTitle: string;
+  currentFocusType?: "SPOON" | "BRIDGE" | "BOSS" | null;
+  wakeCycleKey?: string;
+  activeStepHref?: string;
+  activeStepLabel?: string;
   topWord?: {
     word: string;
     translation?: string | null;
@@ -109,7 +113,6 @@ export function parseMessagePayload(m?: UIMessage): ParsedPayload {
 
     const isTranslationRequired = Boolean(translation);
 
-    // 1. Check for a full chalkboard or newly generated step-deck (`newBoard`)
     let resolvedChalkboard: ChalkboardData | null =
       parsed.chalkboard ??
       (parsed.newBoard && Array.isArray(parsed.newBoard.steps)
@@ -126,7 +129,6 @@ export function parseMessagePayload(m?: UIMessage): ParsedPayload {
           }
         : null);
 
-    // 2. If the AI is advancing or giving feedback on an already-cached board
     if (!resolvedChalkboard && (parsed.stepDecision || parsed.feedback)) {
       resolvedChalkboard = {
         title: "__STEP_UPDATE__",
@@ -163,7 +165,7 @@ export function turnsToUIMessages(
     isTranslationRequired?: boolean;
     translation?: string | null;
     chalkboard?: ChalkboardData | null;
-  })[]
+  })[],
 ): UIMessage[] {
   const msgs: UIMessage[] = [];
   for (const t of turns) {
@@ -205,34 +207,4 @@ export function groupUIMessagesIntoTurns(messages: UIMessage[]): UIMessageTurn[]
     }
   }
   return turns;
-}
-
-export interface ChatContextData {
-  userName: string;
-  nativeLang: string;
-  targetLang: string;
-  currentLessonTitle: string;
-  currentFocusType?: "SPOON" | "BRIDGE" | "BOSS" | null; // <--- NEW!
-  /** Identifies the Spoon or Boss unit (e.g., "spoon-15" or "boss-5") so Vox sleeps through the Vocab Bridge too! */
-  wakeCycleKey?: string;
-  /** Direct link to the active Spoon, Vocab Bridge, or Boss Stage */
-  activeStepHref?: string;
-  /** Button label, e.g., "Start Spoon 15" | "Complete Vocab Bridge 15" | "Challenge Boss" */
-  activeStepLabel?: string;
-  topWord?: {
-    word: string;
-    translation?: string | null;
-    avgSpokenScore?: number | null;
-  } | null;
-  topPhrase?: {
-    word: string;
-    translation?: string | null;
-    avgSpokenScore?: number | null;
-  } | null;
-  recentWords?: {
-    word: string;
-    translation?: string | null;
-    status: string;
-  }[] | null;
-  avgPronunciation: number;
 }

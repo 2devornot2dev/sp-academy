@@ -17,6 +17,7 @@ model FoundationCourse {
 
   // Planner-generated day-by-day outline
   outline Json?
+  isHardModeUnlocked Boolean @default(false) 
 
   lessons  FoundationLesson[]
   progress FoundationProgress? // One-to-one link for easy progress fetching

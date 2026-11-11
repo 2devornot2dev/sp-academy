@@ -87,7 +87,7 @@ export function SpriteChatSessionTab({
 
   const getTurnPayload = (
     turn: UIMessageTurn,
-    isLastTurn: boolean
+    isLastTurn: boolean,
   ): ParsedPayload => {
     if (isLastTurn && turn.id === activeTurn?.id) {
       return activeAssistantPayload;
@@ -107,7 +107,7 @@ export function SpriteChatSessionTab({
         p.chalkboard,
         p.contextCard,
         aiBrain.currentLessonTitle,
-        latestFullBoard
+        latestFullBoard,
       );
       if (norm) {
         latestFullBoard = norm;
@@ -124,18 +124,20 @@ export function SpriteChatSessionTab({
   /* ================= 1. EMPTY: NEW SESSION STAGE ================= */
   if (turns.length === 0 || !activeTurn) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto py-6">
+      <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center py-6 text-center">
         <div className="relative mb-5">
           <div
             className={`absolute -inset-2 rounded-3xl blur-lg ${
               isSnoozing
-                ? "bg-gradient-to-r from-indigo-500/30 to-purple-500/30"
-                : "bg-gradient-to-r from-teal-500/30 to-indigo-500/30"
+                ? "bg-gradient-to-r from-indigo-400/25 to-purple-400/25"
+                : "bg-gradient-to-r from-sky-400/30 to-emerald-400/30"
             }`}
           />
           <div
-            className={`relative h-20 w-20 overflow-hidden rounded-3xl border-2 bg-slate-900 shadow-2xl ${
-              isSnoozing ? "border-indigo-400/50 opacity-85" : "border-teal-400/50"
+            className={`relative h-20 w-20 overflow-hidden rounded-3xl border-2 border-b-[5px] bg-white shadow-lg ${
+              isSnoozing
+                ? "border-indigo-300 border-b-indigo-400 opacity-90"
+                : "border-sky-400 border-b-blue-600"
             }`}
           >
             <img
@@ -145,21 +147,20 @@ export function SpriteChatSessionTab({
             />
           </div>
           {isSnoozing && (
-            <span className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-indigo-500 text-xs ring-2 ring-slate-950 shadow-lg">
+            <span className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border-b-2 border-indigo-700 bg-indigo-500 text-xs text-white ring-2 ring-white shadow-md">
               💤
             </span>
           )}
         </div>
 
-       {/* Inside Empty Stage (turns.length === 0) when isSnoozing === true: */}
         {isSnoozing ? (
-          <>
-            <h3 className="text-lg font-extrabold text-white mb-1.5">
+          <div className="w-full rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-xs">
+            <h3 className="mb-1.5 text-lg font-black text-slate-900">
               {spriteName} is resting up! 💤
             </h3>
-            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+            <p className="mb-6 text-xs font-medium leading-relaxed text-slate-500">
               {spriteName} is resting their voice for your lesson! Head into{" "}
-              <span className="text-white font-semibold">
+              <span className="font-extrabold text-slate-900">
                 {aiBrain.activeStepLabel?.replace(/^Start\s+/i, "") ||
                   aiBrain.currentLessonTitle}
               </span>{" "}
@@ -170,22 +171,22 @@ export function SpriteChatSessionTab({
               <button
                 type="button"
                 onClick={() => handleNavigateToLesson(aiBrain.activeStepHref!)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-indigo-400 px-5 py-3 text-xs font-black text-slate-950 shadow-xl hover:brightness-110 transition"
+                className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <span>{aiBrain.activeStepLabel || "Continue Lesson"}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
             )}
-          </>
+          </div>
         ) : (
-          <>
-            <h3 className="text-lg font-extrabold text-white mb-1.5">
+          <div className="w-full rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-xs">
+            <h3 className="mb-1.5 text-lg font-black text-slate-900">
               Ready to practice, {aiBrain.userName}?
             </h3>
-            <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+            <p className="mb-6 text-xs font-medium leading-relaxed text-slate-500">
               Click a guided activity below to launch your interactive
               chalkboard for{" "}
-              <span className="text-white font-semibold">
+              <span className="font-extrabold text-blue-600">
                 {aiBrain.currentLessonTitle}
               </span>
               .
@@ -196,10 +197,10 @@ export function SpriteChatSessionTab({
                 type="button"
                 onClick={() =>
                   onQuickPrompt(
-                    `Give me a grammar breakdown for ${aiBrain.currentLessonTitle}`
+                    `Give me a grammar breakdown for ${aiBrain.currentLessonTitle}`,
                   )
                 }
-                className="rounded-2xl border border-indigo-400/40 bg-indigo-500/15 px-4 py-2.5 text-xs font-bold text-indigo-200 hover:bg-indigo-500/25 transition shadow-sm"
+                className="rounded-2xl border-2 border-b-4 border-indigo-200 border-b-indigo-300 bg-indigo-50/70 px-4 py-2.5 text-xs font-black text-indigo-700 transition hover:-translate-y-0.5 hover:bg-indigo-100 active:translate-y-0.5 active:border-b-2"
               >
                 ✨ Explain Lesson Grammar
               </button>
@@ -208,12 +209,12 @@ export function SpriteChatSessionTab({
                 onClick={() =>
                   onQuickPrompt(`Quiz me on ${aiBrain.currentLessonTitle}`)
                 }
-                className="rounded-2xl border border-teal-400/40 bg-teal-500/15 px-4 py-2.5 text-xs font-bold text-teal-200 hover:bg-teal-500/25 transition shadow-sm"
+                className="rounded-2xl border-2 border-b-4 border-emerald-600 bg-gradient-to-b from-emerald-400 to-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-xs transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-2"
               >
                 🎯 Start 1-on-1 Quiz
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     );
@@ -226,19 +227,19 @@ export function SpriteChatSessionTab({
       activeMultiBoard?.steps?.length || activeMultiBoard?.items?.length || 0;
 
     return (
-      <div className="flex-1 flex flex-col gap-5">
+      <div className="flex flex-1 flex-col gap-5">
         {activeMultiBoard && (
           <div className="sticky top-0 z-20 -mx-2">
-            <div className="overflow-hidden rounded-2xl border border-slate-600/80 bg-[#111827]/95 shadow-2xl backdrop-blur-md">
+            <div className="overflow-hidden rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white/95 shadow-lg backdrop-blur-md">
               <div className="flex items-center justify-between gap-2 px-4 py-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="rounded-md bg-teal-400 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-950 shrink-0">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="shrink-0 rounded-lg border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white">
                     📋 Board
                   </span>
-                  <span className="text-sm font-extrabold text-white truncate">
+                  <span className="truncate text-sm font-black text-slate-900">
                     {cleanDisplayString(activeMultiBoard.title)}
                   </span>
-                  <span className="text-xs font-bold text-slate-300 shrink-0">
+                  <span className="shrink-0 text-xs font-bold text-slate-400">
                     · Step {(activeMultiBoard.currentStepIndex ?? 0) + 1} of{" "}
                     {Math.max(1, activeStepCount)}
                   </span>
@@ -247,7 +248,7 @@ export function SpriteChatSessionTab({
                 <button
                   type="button"
                   onClick={() => setIsMultiBoardOpen((prev) => !prev)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-slate-800 border border-slate-600 px-3 py-1 text-xs font-extrabold text-white hover:bg-slate-700 transition shrink-0"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-blue-600"
                 >
                   <span>
                     {isMultiBoardOpen ? "Close Board" : "View Board"}
@@ -266,7 +267,7 @@ export function SpriteChatSessionTab({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="border-t border-slate-600/60 overflow-hidden"
+                    className="overflow-hidden border-t border-slate-100"
                   >
                     <SpriteChatChalkboard
                       board={activeMultiBoard}
@@ -286,7 +287,7 @@ export function SpriteChatSessionTab({
             payload.chalkboard,
             payload.contextCard,
             aiBrain.currentLessonTitle,
-            resolvedChalkboard?.board
+            resolvedChalkboard?.board,
           );
           const previewTarget =
             turnBoard?.steps?.[turnBoard.currentStepIndex ?? 0]?.targetPhrase ||
@@ -302,14 +303,14 @@ export function SpriteChatSessionTab({
             <div key={turn.id} className="space-y-3.5">
               {userText && (
                 <div className="flex justify-end">
-                  <div className="max-w-[82%] rounded-2xl rounded-tr-sm border border-indigo-400/35 bg-indigo-600/30 px-4 py-2.5 text-sm font-bold text-white shadow-md">
+                  <div className="max-w-[82%] rounded-2xl rounded-tr-sm border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-xs">
                     {userText}
                   </div>
                 </div>
               )}
 
               <div className="flex items-start gap-3">
-                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-teal-400/50 bg-slate-800 shadow-md">
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-sky-300 bg-white shadow-xs">
                   <img
                     src={avatarSrc}
                     alt={spriteName}
@@ -317,40 +318,40 @@ export function SpriteChatSessionTab({
                   />
                 </div>
 
-                <div className="flex-1 max-w-[88%] space-y-3 rounded-2xl rounded-tl-sm border border-slate-600/60 bg-[#182234] p-4 shadow-lg">
-                  <span className="text-xs font-extrabold tracking-wide text-teal-300 flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> {spriteName}
+                <div className="max-w-[88%] flex-1 space-y-3 rounded-2xl rounded-tl-sm border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-4 shadow-xs">
+                  <span className="flex items-center gap-1 text-xs font-black tracking-wide text-blue-600">
+                    <Sparkles className="h-3 w-3 text-amber-500" /> {spriteName}
                   </span>
 
                   {payload.spokenText ? (
-                    <p className="text-sm font-semibold text-white leading-relaxed">
+                    <p className="text-sm font-bold leading-relaxed text-slate-800">
                       {payload.spokenText}
                     </p>
                   ) : isLastTurn && isLoading ? (
                     <div className="flex items-center gap-2 py-1.5">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.3s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
-                      <span className="text-xs font-medium text-slate-300 ml-1">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-sky-500 [animation-delay:-0.3s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-500" />
+                      <span className="ml-1 text-xs font-bold text-slate-400">
                         {spriteName} is thinking...
                       </span>
                     </div>
                   ) : isLastTurn && error ? (
-                    <p className="text-xs font-medium text-rose-300">
+                    <p className="text-xs font-bold text-rose-600">
                       {spriteName} couldn&apos;t respond right now. Please try
                       asking again.
                     </p>
                   ) : (
-                    <p className="text-xs font-medium text-slate-200">
+                    <p className="text-xs font-medium text-slate-500">
                       Could you rephrase that? Let&apos;s keep practicing{" "}
                       {aiBrain.currentLessonTitle}.
                     </p>
                   )}
 
                   {payload.translation && (
-                    <div className="flex items-start gap-2 rounded-xl border border-indigo-400/30 bg-indigo-950/50 px-3.5 py-2.5">
-                      <Languages className="h-3.5 w-3.5 text-indigo-300 shrink-0 mt-0.5" />
-                      <p className="text-xs font-medium text-indigo-100 leading-relaxed">
+                    <div className="flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3.5 py-2.5">
+                      <Languages className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                      <p className="text-xs font-semibold leading-relaxed text-indigo-900">
                         {payload.translation}
                       </p>
                     </div>
@@ -363,20 +364,20 @@ export function SpriteChatSessionTab({
                         setMultiBoardOverride(turnBoard);
                         setIsMultiBoardOpen(true);
                       }}
-                      className="w-full flex items-center justify-between gap-2 rounded-xl border border-slate-500/50 bg-[#24324B] px-3.5 py-2.5 text-left hover:border-teal-300 transition group"
+                      className="group flex w-full items-center justify-between gap-2 rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition hover:border-sky-300 hover:bg-sky-50/60"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <BookOpen className="h-4 w-4 text-teal-300 shrink-0" />
-                        <span className="text-xs font-extrabold text-white truncate">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <BookOpen className="h-4 w-4 shrink-0 text-blue-600" />
+                        <span className="truncate text-xs font-black text-slate-900">
                           {cleanDisplayString(turnBoard.title)}
                         </span>
                         {previewTarget && (
-                          <span className="hidden sm:inline-block rounded-md bg-slate-900/80 px-2 py-0.5 text-[11px] font-bold text-teal-300 truncate max-w-[160px]">
+                          <span className="hidden max-w-[160px] truncate rounded-md border border-sky-200 bg-white px-2 py-0.5 text-[11px] font-bold text-blue-700 sm:inline-block">
                             {cleanDisplayString(previewTarget)}
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] font-black uppercase tracking-wider text-teal-300 group-hover:underline shrink-0">
+                      <span className="shrink-0 text-[11px] font-black uppercase tracking-wider text-blue-600 group-hover:underline">
                         View Step ↗
                       </span>
                     </button>
@@ -389,20 +390,20 @@ export function SpriteChatSessionTab({
 
         {/* Snooze Banner at the bottom of Multi Mode */}
         {isSnoozing && (
-          <div className="mt-2 rounded-2xl border border-indigo-400/35 bg-gradient-to-r from-indigo-950 via-[#111827] to-slate-900 p-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="mt-2 rounded-2xl border-2 border-b-4 border-indigo-200 border-b-indigo-300 bg-white p-4 shadow-xs">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-400/40 bg-indigo-500/20 text-base">
-                  <Moon className="h-5 w-5 text-indigo-300" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-base">
+                  <Moon className="h-5 w-5 text-indigo-600" />
                 </div>
-               <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                <div>
+                  <h5 className="text-xs font-black uppercase tracking-wider text-indigo-600">
                     {spriteName} is resting up! 💤
                   </h5>
-                  <p className="text-xs font-semibold text-slate-300 mt-0.5">
+                  <p className="mt-0.5 text-xs font-semibold text-slate-600">
                     {spriteName} is resting their voice for your lesson! Head
                     into{" "}
-                    <span className="text-white font-bold">
+                    <span className="font-black text-slate-900">
                       {aiBrain.activeStepLabel?.replace(/^Start\s+/i, "") ||
                         aiBrain.currentLessonTitle}
                     </span>{" "}
@@ -415,7 +416,7 @@ export function SpriteChatSessionTab({
                 <button
                   type="button"
                   onClick={() => handleNavigateToLesson(aiBrain.activeStepHref!)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-400 to-indigo-400 px-4 py-2 text-xs font-black text-slate-950 shadow-lg hover:brightness-110 transition shrink-0"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2 text-xs font-black text-white shadow-xs transition hover:brightness-105"
                 >
                   <span>{aiBrain.activeStepLabel || "Continue Lesson"}</span>
                   <ArrowRight className="h-4 w-4" />

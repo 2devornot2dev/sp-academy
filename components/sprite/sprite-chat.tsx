@@ -26,7 +26,6 @@ import {
 } from "./sprite-chat-utils";
 import type { SpriteSessionData } from "@/lib/schema/sprite-schema";
 
-
 export type { ChatContextData } from "./sprite-chat-utils";
 
 interface SpriteChatProps {
@@ -50,8 +49,8 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
     clearPendingPrompt,
     deleteSession,
     isShowing,
-    playAudioUrl, // <--- Used to play the TTS audio blob
-    stopAudio, // <--- Used to stop audio when user replies or closes chat
+    playAudioUrl,
+    stopAudio,
   } = useSprite();
   const router = useRouter();
 
@@ -142,14 +141,9 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       const cleanText = cleanDisplayString(spokenText);
       if (!cleanText || cleanText.length < 4) return;
 
-      // Smart Weight:
-      // - 85% chance when a new Chalkboard opens or when a Chalkboard completes
-      // - 35% chance on middle step updates
       const weight = isNewBoard || boardStatus === "COMPLETED" ? 0.85 : 0.35;
-
       if (Math.random() > weight) return;
 
-      // Abort any previous in-flight TTS request
       ttsAbortRef.current?.abort();
       const controller = new AbortController();
       ttsAbortRef.current = controller;
@@ -200,7 +194,6 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
       if (message.role !== "assistant") return;
       const parsed = parseMessagePayload(message);
 
-      // 1. Trigger non-sequential weighted voice in the background (do NOT await so UI never blocks!)
       const isNewBoard = Boolean(
         parsed.chalkboard && parsed.chalkboard.title !== "__STEP_UPDATE__",
       );
@@ -211,7 +204,6 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
         isNewBoard,
       );
 
-      // 2. Persist turn to session history
       const turnPayload = {
         id: message.id || crypto.randomUUID(),
         userPrompt: cleanDisplayString(lastUserPromptRef.current || "Practice"),
@@ -282,7 +274,6 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
   const sendWithSessionBody = useCallback(
     (text: string) => {
       if (isSnoozing) return;
-      // Stop any playing or loading TTS when the user sends a new message
       ttsAbortRef.current?.abort();
       stopAudio();
 
@@ -386,11 +377,11 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
 
   const energyCount = profile?.energy ?? 0;
   const maxEnergy = profile?.maxEnergy ?? 3;
-  const unreadCount = 0
+  const unreadCount = 0;
 
   return (
     <>
-      {/* FLOATING TRIGGER BUTTON */}
+      {/* FLOATING TRIGGER BUTTON (3D Tactile Light Mode Pill) */}
       <AnimatePresence>
         {!isChatOpen && (
           <motion.div
@@ -410,12 +401,12 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 12, scale: 0.92 }}
                   transition={{ duration: 0.22, ease: "easeOut" }}
-                  className="hidden sm:flex flex-col items-end rounded-2xl border border-teal-500/30 bg-slate-950/90 px-4 py-2.5 text-right shadow-xl backdrop-blur-md overflow-hidden whitespace-nowrap"
+                  className="hidden sm:flex flex-col items-end rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-2.5 text-right shadow-xl overflow-hidden whitespace-nowrap"
                 >
-                  <span className="text-[10px] font-black uppercase tracking-wider text-teal-400 max-w-[260px] truncate">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 max-w-[260px] truncate">
                     Current: {aiBrain.currentLessonTitle}
                   </span>
-                  <span className="text-xs font-bold text-white">
+                  <span className="text-xs font-extrabold text-slate-900">
                     {isSnoozing
                       ? `💤 ${spriteName} is Napping`
                       : `Open ${spriteName} Assistant`}
@@ -426,10 +417,10 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
 
             <div className="relative h-14 w-14 shrink-0">
               <div
-                className={`h-full w-full overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-2xl transition-transform group-hover:scale-105 ${
+                className={`h-full w-full overflow-hidden rounded-2xl border-2 border-b-4 bg-white shadow-xl transition-transform group-hover:-translate-y-0.5 ${
                   isSnoozing
-                    ? "border-indigo-400/50 opacity-85"
-                    : "border-teal-400/50"
+                    ? "border-indigo-300 border-b-indigo-400 opacity-90"
+                    : "border-sky-400 border-b-blue-600"
                 }`}
               >
                 <img
@@ -440,11 +431,11 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
               </div>
 
               {isSnoozing ? (
-                <span className="absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-indigo-500/50 px-1.5 text-[11px] font-black text-white ring-2 ring-slate-950 shadow-md">
+                <span className="absolute -top-1.5 -right-1.5 flex h-6 min-w-6 items-center justify-center rounded-full border-b-2 border-indigo-700 bg-indigo-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white shadow-md">
                   💤
                 </span>
               ) : unreadCount > 0 ? (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white ring-2 ring-slate-950 shadow-md">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white ring-2 ring-white shadow-md">
                   {unreadCount}
                 </span>
               ) : null}
@@ -453,7 +444,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
         )}
       </AnimatePresence>
 
-      {/* FULL HEIGHT (100VH) DOCKED ASSISTANT DRAWER */}
+      {/* FULL HEIGHT (100VH) DOCKED ASSISTANT DRAWER (LIGHT TACTILE MODE) */}
       <AnimatePresence>
         {isChatOpen && (
           <>
@@ -462,7 +453,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeChat}
-              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 bg-slate-900/25 backdrop-blur-[2px]"
             />
 
             <motion.div
@@ -470,95 +461,70 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed top-0 bottom-0 right-0 z-50 flex h-screen w-full sm:w-[580px] md:w-[660px] flex-col overflow-hidden border-l border-teal-500/30 bg-[#070B14] shadow-[-24px_0_80px_rgba(0,0,0,0.85)]"
+              className="fixed top-0 bottom-0 right-0 z-50 flex h-screen w-full sm:w-[580px] md:w-[660px] flex-col overflow-hidden border-l-2 border-slate-200 bg-slate-100/95 font-sans text-slate-900 shadow-[-20px_0_60px_rgba(15,23,42,0.16)]"
             >
-              {/* VECTOR ORBITS BACKGROUND */}
+              {/* SUBTLE LIGHT VECTOR ORBITS BACKGROUND */}
               <svg
-                className="pointer-events-none absolute inset-0 h-full w-full opacity-55"
+                className="pointer-events-none absolute inset-0 h-full w-full opacity-45"
                 viewBox="0 0 660 900"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
                   <linearGradient
-                    id="spoonGradWave"
+                    id="spoonLightWave"
                     x1="0%"
                     y1="0%"
                     x2="100%"
                     y2="100%"
                   >
-                    <stop offset="0%" stopColor="#14B8A6" stopOpacity="0.4" />
-                    <stop offset="55%" stopColor="#6366F1" stopOpacity="0.28" />
+                    <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.16" />
+                    <stop offset="55%" stopColor="#6366F1" stopOpacity="0.10" />
                     <stop
                       offset="100%"
-                      stopColor="#A855F7"
-                      stopOpacity="0.08"
+                      stopColor="#10B981"
+                      stopOpacity="0.05"
                     />
                   </linearGradient>
                   <linearGradient
-                    id="spoonOrbitBright"
+                    id="spoonLightOrbit"
                     x1="0%"
                     y1="0%"
                     x2="100%"
                     y2="100%"
                   >
-                    <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.65" />
-                    <stop offset="50%" stopColor="#818CF8" stopOpacity="0.45" />
-                    <stop offset="100%" stopColor="#C084FC" stopOpacity="0.2" />
+                    <stop offset="0%" stopColor="#0284C7" stopOpacity="0.22" />
+                    <stop offset="50%" stopColor="#4F46E5" stopOpacity="0.16" />
+                    <stop offset="100%" stopColor="#10B981" stopOpacity="0.12" />
                   </linearGradient>
-                  <radialGradient id="spoonGlowOrb" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#2DD4BF" stopOpacity="0" />
-                  </radialGradient>
                 </defs>
                 <path
                   d="M-80 190 C 160 80, 420 290, 720 130 L 720 0 L -80 0 Z"
-                  fill="url(#spoonGradWave)"
+                  fill="url(#spoonLightWave)"
                 />
                 <circle
                   cx="560"
                   cy="240"
                   r="210"
-                  stroke="url(#spoonOrbitBright)"
-                  strokeWidth="1.75"
+                  stroke="url(#spoonLightOrbit)"
+                  strokeWidth="1.5"
                   strokeDasharray="8 8"
                 />
                 <circle
                   cx="560"
                   cy="240"
                   r="145"
-                  stroke="url(#spoonOrbitBright)"
-                  strokeWidth="1.5"
-                />
-                <circle
-                  cx="560"
-                  cy="240"
-                  r="85"
-                  stroke="url(#spoonOrbitBright)"
-                  strokeWidth="1"
-                  strokeDasharray="4 6"
-                />
-                <circle cx="415" cy="240" r="5" fill="#2DD4BF" />
-                <circle cx="415" cy="240" r="16" fill="url(#spoonGlowOrb)" />
-                <circle cx="560" cy="385" r="4" fill="#818CF8" />
-                <circle
-                  cx="90"
-                  cy="680"
-                  r="240"
-                  stroke="url(#spoonOrbitBright)"
-                  strokeWidth="1.75"
+                  stroke="url(#spoonLightOrbit)"
+                  strokeWidth="1.25"
                 />
                 <circle
                   cx="90"
                   cy="680"
-                  r="165"
-                  stroke="url(#spoonOrbitBright)"
+                  r="220"
+                  stroke="url(#spoonLightOrbit)"
                   strokeWidth="1.5"
                   strokeDasharray="10 8"
                 />
-                <circle cx="255" cy="680" r="5" fill="#2DD4BF" />
-                <circle cx="255" cy="680" r="18" fill="url(#spoonGlowOrb)" />
-                <circle cx="260" cy="510" r="4" fill="#A855F7" />
               </svg>
 
               {/* PART 1: HEADER */}
@@ -581,6 +547,7 @@ export function SpriteChat({ userId, initialContext }: SpriteChatProps) {
                   if (activeTab !== "session") setActiveTab("session");
                 }}
               />
+
               {/* PART 2: MESSAGES / STAGE / BRIEFING / HISTORY */}
               <SpriteChatMessages
                 activeTab={activeTab}

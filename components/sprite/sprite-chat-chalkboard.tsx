@@ -85,8 +85,8 @@ function extractTrackableTokens(text?: string | null): string[] {
       text
         .split(/\s+/)
         .map(cleanToken)
-        .filter((w) => w.length >= 2)
-    )
+        .filter((w) => w.length >= 2),
+    ),
   );
 }
 
@@ -169,7 +169,7 @@ function ChalkboardWaveform() {
             barRefs.current[i] = el;
           }}
           style={{ height: "6px" }}
-          className="w-1.5 rounded-full bg-teal-400 transition-[height] duration-75 ease-out"
+          className="w-1.5 rounded-full bg-emerald-500 transition-[height] duration-75 ease-out"
         />
       ))}
     </div>
@@ -180,14 +180,14 @@ export function normalizeBoardData(
   board?: ChalkboardData | null,
   contextCard?: ContextCardData | null,
   fallbackTitle = "Lesson Board",
-  previousBoard?: ChalkboardData | null
+  previousBoard?: ChalkboardData | null,
 ): ChalkboardData | null {
   if (board && board.title === "__STEP_UPDATE__" && previousBoard) {
     const delta = board.currentStepIndex || 0;
     const total = previousBoard.steps.length;
     const nextIdx = Math.min(
       Math.max(0, total - 1),
-      previousBoard.currentStepIndex + delta
+      previousBoard.currentStepIndex + delta,
     );
     const isCompleted =
       board.status === "COMPLETED" ||
@@ -256,7 +256,7 @@ export function normalizeBoardData(
         struggled: false,
         correctionGiven: null,
         completedAt: null,
-      })
+      }),
     );
 
     return {
@@ -282,21 +282,23 @@ function renderFormulaTiles(formula: string) {
   const tokens = formulaPart.split(/\s*\+\s*/).filter(Boolean);
 
   if (tokens.length < 2) {
-    return <p className="text-sm font-semibold text-slate-200">{cleaned}</p>;
+    return <p className="text-sm font-bold text-slate-700">{cleaned}</p>;
   }
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 py-2">
       {prefix && (
-        <span className="text-xs font-bold text-slate-300 mr-1">{prefix}</span>
+        <span className="mr-1 text-xs font-extrabold text-slate-500">
+          {prefix}
+        </span>
       )}
       {tokens.map((tok, idx) => (
         <div key={idx} className="flex items-center gap-2">
-          <span className="rounded-xl bg-white px-3.5 py-1.5 text-sm font-black text-slate-950 shadow-md">
+          <span className="rounded-xl border-2 border-b-[3px] border-sky-200 border-b-sky-300 bg-white px-3.5 py-1.5 text-sm font-black text-slate-900 shadow-2xs">
             {tok}
           </span>
           {idx < tokens.length - 1 && (
-            <span className="text-base font-black text-teal-300">+</span>
+            <span className="text-base font-black text-blue-600">+</span>
           )}
         </div>
       ))}
@@ -316,7 +318,6 @@ export function SpriteChatChalkboard({
   const { profile, playAudioUrl } = useSprite();
   const userId = profile?.userId;
 
-  // Word Matrix & Azure Pronunciation Hooks
   const { trackInteraction } = useMatrix();
   const {
     status: pronStatus,
@@ -330,18 +331,16 @@ export function SpriteChatChalkboard({
   const activeBoard = normalizeBoardData(board, contextCard);
 
   const [viewingStepIdx, setViewingStepIdx] = useState<number>(
-    activeBoard?.currentStepIndex ?? 0
+    activeBoard?.currentStepIndex ?? 0,
   );
   const [hintRevealed, setHintRevealed] = useState(false);
   const [assessedPhrase, setAssessedPhrase] = useState<string | null>(null);
   const [isLoadingPhraseTTS, setIsLoadingPhraseTTS] = useState(false);
 
-  // Dedupe tracking sets per board session
   const trackedSeenStepsRef = useRef<Set<string>>(new Set());
   const trackedHeardStepsRef = useRef<Set<string>>(new Set());
   const lastTrackedScoreRef = useRef<unknown>(null);
 
-  // Cache generated prunaai/p-image URLs per step
   const imageCacheRef = useRef<Record<string, string>>({});
   const [stepImageUrl, setStepImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -360,7 +359,7 @@ export function SpriteChatChalkboard({
   const totalSteps = activeBoard?.steps.length ?? 0;
   const safeStepIdx = Math.min(
     Math.max(0, viewingStepIdx),
-    Math.max(0, totalSteps - 1)
+    Math.max(0, totalSteps - 1),
   );
   const currentStep: BoardStep | null =
     activeBoard && totalSteps > 0 ? activeBoard.steps[safeStepIdx] : null;
@@ -372,22 +371,17 @@ export function SpriteChatChalkboard({
     if (trackedSeenStepsRef.current.has(stepKey)) return;
 
     const wordsToTrack = extractTrackableTokens(
-      currentStep.targetPhrase || currentStep.correctAnswer
+      currentStep.targetPhrase || currentStep.correctAnswer,
     );
     if (wordsToTrack.length > 0) {
       wordsToTrack.forEach((w) => trackInteraction(w, { seen: 1 }));
       trackedSeenStepsRef.current.add(stepKey);
     }
-  }, [
-    currentStep,
-    safeStepIdx,
-    activeBoard?.boardId,
-    trackInteraction,
-  ]);
+  }, [currentStep, safeStepIdx, activeBoard?.boardId, trackInteraction]);
 
   // ================= 2. WORD MATRIX: TRACK "SPOKEN" WHEN AZURE SCORE ARRIVES =================
   const phraseToSpeak = cleanDisplayString(
-    currentStep?.targetPhrase || currentStep?.correctAnswer || ""
+    currentStep?.targetPhrase || currentStep?.correctAnswer || "",
   );
   const scoreMatchesStep =
     Boolean(pronScore) && assessedPhrase === phraseToSpeak;
@@ -401,7 +395,6 @@ export function SpriteChatChalkboard({
       const omitted = w.errorType === "Omission";
       map.set(k, { score: omitted ? 0 : w.accuracyScore, omitted });
     }
-    return map;
   }, [pronScore]);
 
   useEffect(() => {
@@ -411,13 +404,19 @@ export function SpriteChatChalkboard({
 
     const tokens = extractTrackableTokens(phraseToSpeak);
     tokens.forEach((tok) => {
-      const r = wordScoreMap.get(tok);
+      const r = wordScoreMap?.get(tok);
       trackInteraction(tok, {
         spokenAttempt: true,
         spokenScore: r ? r.score : pronScore.pronunciationScore,
       });
     });
-  }, [pronScore, scoreMatchesStep, phraseToSpeak, wordScoreMap, trackInteraction]);
+  }, [
+    pronScore,
+    scoreMatchesStep,
+    phraseToSpeak,
+    wordScoreMap,
+    trackInteraction,
+  ]);
 
   // ================= 3. PRE-FETCH & LOAD "SEE_IT" STEP IMAGES =================
   useEffect(() => {
@@ -524,14 +523,13 @@ export function SpriteChatChalkboard({
     userId,
   ]);
 
-  // Play target phrase audio via Sprite TTS & track "heard: 1" in Word Matrix
   const handleListenToTargetPhrase = async (phrase: string) => {
     if (!phrase || !userId || isLoadingPhraseTTS) return;
 
     const stepKey = `${activeBoard?.boardId || "b"}-${safeStepIdx}-${phrase}`;
     if (!trackedHeardStepsRef.current.has(stepKey)) {
       extractTrackableTokens(phrase).forEach((w) =>
-        trackInteraction(w, { heard: 1 })
+        trackInteraction(w, { heard: 1 }),
       );
       trackedHeardStepsRef.current.add(stepKey);
     }
@@ -559,7 +557,6 @@ export function SpriteChatChalkboard({
     }
   };
 
-  // Start real Azure Pronunciation Recording on the Chalkboard
   const handleStartPronunciation = async () => {
     if (pronStatus !== "idle" || !phraseToSpeak) return;
     const targetLangCode =
@@ -568,7 +565,6 @@ export function SpriteChatChalkboard({
     await assessSpeech(phraseToSpeak, targetLangCode);
   };
 
-  // Handle Multiple Choice Option Tap + Word Matrix tracking
   const handleMultipleChoiceTap = (opt: string) => {
     const cleanOpt = cleanDisplayString(opt);
     const expected = cleanDisplayString(currentStep?.correctAnswer || "");
@@ -577,7 +573,7 @@ export function SpriteChatChalkboard({
     if (expected) {
       const isRight = cleanOpt.toLowerCase() === expected.toLowerCase();
       tokens.forEach((w) =>
-        trackInteraction(w, isRight ? { tappedCorrect: 1 } : { tappedWrong: 1 })
+        trackInteraction(w, isRight ? { tappedCorrect: 1 } : { tappedWrong: 1 }),
       );
     } else {
       tokens.forEach((w) => trackInteraction(w, { tappedCorrect: 1 }));
@@ -586,7 +582,6 @@ export function SpriteChatChalkboard({
     interactiveInput?.onQuickAction?.(cleanOpt);
   };
 
-  // Handle Written Form Submit + Word Matrix tracking
   const handleFormSubmitWithTracking = (e: FormEvent) => {
     if (interactiveInput?.value.trim()) {
       const userTyped = interactiveInput.value.trim();
@@ -594,13 +589,12 @@ export function SpriteChatChalkboard({
       const typedTokens = extractTrackableTokens(userTyped);
 
       if (expected) {
-        const isMatch =
-          cleanToken(userTyped) === cleanToken(expected);
+        const isMatch = cleanToken(userTyped) === cleanToken(expected);
         typedTokens.forEach((w) =>
           trackInteraction(
             w,
-            isMatch ? { tappedCorrect: 1 } : { tappedWrong: 1 }
-          )
+            isMatch ? { tappedCorrect: 1 } : { tappedWrong: 1 },
+          ),
         );
       } else {
         typedTokens.forEach((w) => trackInteraction(w, { seen: 1 }));
@@ -634,56 +628,56 @@ export function SpriteChatChalkboard({
 
   return (
     <div
-      className={`relative flex flex-col justify-between overflow-hidden bg-[#182234] ${
+      className={`relative flex flex-col justify-between overflow-hidden bg-slate-50/90 ${
         fullStage
-          ? "flex-1 rounded-none border-t-2 border-teal-400/50"
+          ? "flex-1 rounded-none border-t border-slate-200"
           : "rounded-b-2xl"
       }`}
     >
-      {/* Chalkboard Grid Texture */}
+      {/* Subtle Light Dot Grid Texture */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.1]"
+        className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.8) 1px, transparent 1px)",
+            "radial-gradient(rgba(148, 163, 184, 0.35) 1px, transparent 1px)",
           backgroundSize: "20px 20px",
         }}
       />
 
       {/* ================= 1. TOP TUTOR HEADER ================= */}
       {tutorHeader && (
-        <div className="relative z-10 border-b border-slate-600/70 bg-[#111827] px-6 py-3.5 space-y-2.5 shrink-0">
+        <div className="relative z-10 shrink-0 space-y-2.5 border-b border-slate-200 bg-white px-6 py-3.5 shadow-2xs">
           <div className="flex items-center justify-between gap-2">
             {tutorHeader.userPrompt ? (
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="rounded-md bg-indigo-500/30 border border-indigo-400/40 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-200 shrink-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-700">
                   You
                 </span>
-                <span className="text-xs font-bold text-slate-200 truncate">
+                <span className="truncate text-xs font-bold text-slate-600">
                   &ldquo;{tutorHeader.userPrompt}&rdquo;
                 </span>
               </div>
             ) : (
-              <span className="text-[11px] font-bold text-slate-400">
+              <span className="text-[11px] font-extrabold text-slate-400">
                 1-on-1 Session
               </span>
             )}
 
             {tutorHeader.totalTurns > 1 && (
-              <div className="flex items-center gap-1 rounded-lg bg-slate-800 border border-slate-600 px-2 py-0.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-0.5">
                 <button
                   type="button"
                   disabled={tutorHeader.currentTurnIdx === 0}
                   onClick={() =>
                     tutorHeader.onSelectTurnIndex(
-                      Math.max(0, tutorHeader.currentTurnIdx - 1)
+                      Math.max(0, tutorHeader.currentTurnIdx - 1),
                     )
                   }
-                  className="p-0.5 text-slate-200 hover:text-teal-300 disabled:opacity-30"
+                  className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-30"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-[11px] font-black text-teal-300 px-1.5">
+                <span className="px-1.5 text-[11px] font-black text-blue-600">
                   Turn {tutorHeader.currentTurnIdx + 1}/{tutorHeader.totalTurns}
                 </span>
                 <button
@@ -695,11 +689,11 @@ export function SpriteChatChalkboard({
                     tutorHeader.onSelectTurnIndex(
                       Math.min(
                         tutorHeader.totalTurns - 1,
-                        tutorHeader.currentTurnIdx + 1
-                      )
+                        tutorHeader.currentTurnIdx + 1,
+                      ),
                     )
                   }
-                  className="p-0.5 text-slate-200 hover:text-teal-300 disabled:opacity-30"
+                  className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-30"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
@@ -708,7 +702,7 @@ export function SpriteChatChalkboard({
           </div>
 
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border-2 border-teal-400/60 bg-slate-800 shadow-md">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-sky-400 border-b-blue-600 bg-slate-100 shadow-xs">
               <img
                 src={tutorHeader.avatarSrc}
                 alt={tutorHeader.spriteName}
@@ -716,30 +710,31 @@ export function SpriteChatChalkboard({
               />
             </div>
 
-            <div className="flex-1 min-w-0 space-y-1">
-              <span className="text-[11px] font-extrabold tracking-wide text-teal-300 flex items-center gap-1">
-                <Sparkles className="h-3 w-3" /> {tutorHeader.spriteName}
+            <div className="min-w-0 flex-1 space-y-1">
+              <span className="flex items-center gap-1 text-[11px] font-black tracking-wide text-blue-600">
+                <Sparkles className="h-3 w-3 text-amber-500" />{" "}
+                {tutorHeader.spriteName}
               </span>
 
               {tutorHeader.spokenText ? (
-                <p className="text-sm font-bold text-white leading-snug">
+                <p className="text-sm font-bold leading-snug text-slate-900">
                   {tutorHeader.spokenText}
                 </p>
               ) : tutorHeader.isLoading ? (
                 <div className="flex items-center gap-2 py-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.3s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
-                  <span className="text-xs font-medium text-slate-300 ml-1">
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-sky-500 [animation-delay:-0.3s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-500" />
+                  <span className="ml-1 text-xs font-bold text-slate-400">
                     {tutorHeader.spriteName} is updating the step...
                   </span>
                 </div>
               ) : null}
 
               {tutorHeader.translation && (
-                <div className="flex items-start gap-2 rounded-lg bg-indigo-950/60 border border-indigo-400/30 px-2.5 py-1">
-                  <Languages className="h-3 w-3 text-indigo-300 shrink-0 mt-0.5" />
-                  <p className="text-xs font-medium text-indigo-100 leading-snug">
+                <div className="flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-1">
+                  <Languages className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" />
+                  <p className="text-xs font-semibold leading-snug text-indigo-900">
                     {tutorHeader.translation}
                   </p>
                 </div>
@@ -750,33 +745,33 @@ export function SpriteChatChalkboard({
       )}
 
       {/* ================= 2. SINGLE-STEP STAGE SURFACE ================= */}
-      <div className="relative z-10 flex-1 flex flex-col justify-between overflow-y-auto px-6 py-5">
+      <div className="relative z-10 flex flex-1 flex-col justify-between overflow-y-auto px-6 py-5">
         {activeBoard && currentStep ? (
           <>
             {!hideHeader && (
-              <div className="space-y-2.5 pb-4 border-b border-slate-600/60 shrink-0">
+              <div className="shrink-0 space-y-2.5 border-b border-slate-200/80 pb-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="rounded-md bg-teal-300 px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-950 shrink-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 rounded-lg border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white">
                       {cleanDisplayString(currentStep.badge || "Step")}
                     </span>
-                    <h4 className="text-sm font-black text-white truncate">
+                    <h4 className="truncate text-sm font-black text-slate-900">
                       {cleanDisplayString(activeBoard.title)}
                     </h4>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <button
                       type="button"
                       disabled={safeStepIdx === 0}
                       onClick={() =>
                         setViewingStepIdx((i) => Math.max(0, i - 1))
                       }
-                      className="rounded-md bg-slate-800 border border-slate-600 p-1 text-slate-200 hover:text-teal-300 disabled:opacity-30"
+                      className="rounded-lg border-2 border-b-[3px] border-slate-200 bg-white p-1 text-slate-600 hover:border-sky-300 hover:text-blue-600 disabled:opacity-30"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
-                    <span className="text-xs font-black text-teal-300 px-1">
+                    <span className="px-1 text-xs font-black text-blue-600">
                       Step {safeStepIdx + 1} of {totalSteps}
                     </span>
                     <button
@@ -784,10 +779,10 @@ export function SpriteChatChalkboard({
                       disabled={safeStepIdx === totalSteps - 1}
                       onClick={() =>
                         setViewingStepIdx((i) =>
-                          Math.min(totalSteps - 1, i + 1)
+                          Math.min(totalSteps - 1, i + 1),
                         )
                       }
-                      className="rounded-md bg-slate-800 border border-slate-600 p-1 text-slate-200 hover:text-teal-300 disabled:opacity-30"
+                      className="rounded-lg border-2 border-b-[3px] border-slate-200 bg-white p-1 text-slate-600 hover:border-sky-300 hover:text-blue-600 disabled:opacity-30"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -800,13 +795,13 @@ export function SpriteChatChalkboard({
                       key={s.id || idx}
                       type="button"
                       onClick={() => setViewingStepIdx(idx)}
-                      className={`h-1.5 flex-1 rounded-full transition-all ${
+                      className={`h-2 flex-1 rounded-full transition-all ${
                         idx < activeBoard.currentStepIndex ||
                         activeBoard.status === "COMPLETED"
-                          ? "bg-teal-400"
+                          ? "bg-emerald-500"
                           : idx === safeStepIdx
-                            ? "bg-amber-300"
-                            : "bg-slate-700"
+                            ? "bg-amber-400"
+                            : "bg-slate-200"
                       }`}
                     />
                   ))}
@@ -818,39 +813,39 @@ export function SpriteChatChalkboard({
             {activeBoard.lastFeedback &&
               (activeBoard.lastFeedback.correctionTo ||
                 activeBoard.lastFeedback.note) && (
-                <div className="mt-3 rounded-xl border border-amber-300/40 bg-amber-400/15 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     {activeBoard.lastFeedback.correctionFrom && (
                       <>
-                        <span className="text-sm font-extrabold text-rose-300 line-through">
+                        <span className="text-sm font-extrabold text-rose-600 line-through">
                           {cleanDisplayString(
-                            activeBoard.lastFeedback.correctionFrom
+                            activeBoard.lastFeedback.correctionFrom,
                           )}
                         </span>
-                        <span className="text-amber-300 font-black">➜</span>
+                        <span className="font-black text-amber-600">➜</span>
                       </>
                     )}
                     {activeBoard.lastFeedback.correctionTo && (
-                      <span className="rounded-md bg-teal-400/25 border border-teal-300 px-2 py-0.5 text-sm font-black text-white">
+                      <span className="rounded-lg border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-sm font-black text-emerald-900">
                         {cleanDisplayString(
-                          activeBoard.lastFeedback.correctionTo
+                          activeBoard.lastFeedback.correctionTo,
                         )}
                       </span>
                     )}
                   </div>
                   {activeBoard.lastFeedback.note && (
-                    <span className="text-xs font-bold text-amber-100">
+                    <span className="text-xs font-bold text-amber-900">
                       {cleanDisplayString(activeBoard.lastFeedback.note)}
                     </span>
                   )}
                 </div>
               )}
 
-            {/* CENTER STAGE: Dedicated Full-Screen Step Card */}
-            <div className="my-auto py-4 flex flex-col items-center justify-center text-center space-y-4">
-              {/* 🖼️ VISUAL FLASHCARD (prunaai/p-image) */}
+            {/* CENTER STAGE: Dedicated Step Card */}
+            <div className="my-auto flex flex-col items-center justify-center space-y-4 py-4 text-center">
+              {/* 🖼️ VISUAL FLASHCARD */}
               {(stepImageUrl || isGeneratingImage) && (
-                <div className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-slate-500/50 bg-[#111827] shadow-xl">
+                <div className="w-full max-w-md overflow-hidden rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white shadow-md">
                   {stepImageUrl ? (
                     <img
                       src={stepImageUrl}
@@ -858,10 +853,10 @@ export function SpriteChatChalkboard({
                       className="aspect-video w-full object-cover animate-in fade-in duration-300"
                     />
                   ) : (
-                    <div className="aspect-video w-full flex flex-col items-center justify-center gap-2 bg-slate-900/80 text-slate-300">
-                      <Loader2 className="h-6 w-6 animate-spin text-teal-300" />
-                      <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                        <ImageIcon className="h-3.5 w-3.5 text-teal-300" />
+                    <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-slate-100 text-slate-500">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                        <ImageIcon className="h-3.5 w-3.5 text-blue-600" />
                         Sketching visual on the board...
                       </span>
                     </div>
@@ -869,55 +864,55 @@ export function SpriteChatChalkboard({
                 </div>
               )}
 
-              <p className="text-base font-extrabold text-slate-200 max-w-md leading-relaxed">
+              <p className="max-w-md text-base font-extrabold leading-relaxed text-slate-700">
                 {cleanDisplayString(currentStep.prompt)}
               </p>
 
-              {/* Big Target Phrase Card (With Word-by-Word Azure Score Coloring on Pronunciation Steps!) */}
+              {/* Big Target Phrase Card */}
               {currentStep.targetPhrase && (
-                <div className="w-full max-w-md rounded-2xl border border-slate-500/50 bg-[#24324B] px-6 py-4 shadow-lg space-y-2">
-                  <div className="flex items-center justify-center gap-2.5 flex-wrap text-2xl sm:text-3xl font-black tracking-tight">
+                <div className="w-full max-w-md space-y-2 rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-6 py-5 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 text-2xl font-black tracking-tight sm:text-3xl">
                     {cleanDisplayString(currentStep.targetPhrase)
                       .split(/\s+/)
                       .map((tok, i) => {
                         const r = scoreMatchesStep
-                          ? wordScoreMap.get(cleanToken(tok))
+                          ? wordScoreMap?.get(cleanToken(tok))
                           : null;
                         if (!r) {
                           return (
-                            <span key={i} className="text-white">
+                            <span key={i} className="text-slate-900">
                               {tok}
                             </span>
                           );
                         }
                         const badgeColor =
                           r.omitted || r.score < 60
-                            ? "bg-rose-500/30 text-rose-200 border border-rose-400/50"
+                            ? "bg-rose-100 text-rose-800 border border-rose-300"
                             : r.score < 80
-                              ? "bg-amber-400/30 text-amber-100 border border-amber-300/50"
-                              : "bg-teal-400/30 text-teal-100 border border-teal-300/50";
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : "bg-emerald-100 text-emerald-900 border border-emerald-300";
                         return (
                           <span
                             key={i}
                             title={`${Math.round(r.score)}%`}
-                            className={`rounded-lg px-2 py-0.5 ${badgeColor}`}
+                            className={`rounded-xl px-2.5 py-0.5 ${badgeColor}`}
                           >
                             {tok}
                           </span>
                         );
                       })}
 
-                    {/* Listen Button right inside the Target Phrase card */}
+                    {/* Listen Button */}
                     <button
                       type="button"
                       disabled={isLoadingPhraseTTS}
                       onClick={() =>
                         handleListenToTargetPhrase(
-                          cleanDisplayString(currentStep.targetPhrase!)
+                          cleanDisplayString(currentStep.targetPhrase!),
                         )
                       }
                       title="Listen to phrase"
-                      className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-500 bg-slate-800/90 text-teal-300 hover:border-teal-300 hover:bg-slate-700 transition"
+                      className="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 border-b-sky-300 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
                     >
                       {isLoadingPhraseTTS ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -928,7 +923,7 @@ export function SpriteChatChalkboard({
                   </div>
 
                   {currentStep.translation && (
-                    <div className="text-sm font-bold text-teal-300">
+                    <div className="text-sm font-extrabold text-blue-600">
                       &ldquo;{cleanDisplayString(currentStep.translation)}&rdquo;
                     </div>
                   )}
@@ -941,7 +936,7 @@ export function SpriteChatChalkboard({
               {currentStep.type === "multiple_choice" &&
                 Array.isArray(currentStep.options) &&
                 currentStep.options.length > 0 && (
-                  <div className="w-full max-w-md grid grid-cols-1 gap-2.5 pt-1">
+                  <div className="grid w-full max-w-md grid-cols-1 gap-2.5 pt-1">
                     {currentStep.options.map((opt, i) => (
                       <button
                         key={i}
@@ -950,10 +945,10 @@ export function SpriteChatChalkboard({
                           interactiveInput?.isLoading || snoozeState?.isSnoozing
                         }
                         onClick={() => handleMultipleChoiceTap(opt)}
-                        className="flex items-center justify-between rounded-xl border border-slate-500/60 bg-[#24324B] hover:border-teal-300 hover:bg-teal-500/20 px-4 py-3 text-left text-sm font-extrabold text-white transition shadow-sm group disabled:opacity-50"
+                        className="group flex items-center justify-between rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 text-left text-sm font-extrabold text-slate-800 shadow-2xs transition hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/50 active:translate-y-0.5 active:border-b-2 disabled:opacity-50"
                       >
                         <span>{cleanDisplayString(opt)}</span>
-                        <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-300 group-hover:translate-x-0.5 transition" />
+                        <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
                       </button>
                     ))}
                   </div>
@@ -970,7 +965,7 @@ export function SpriteChatChalkboard({
                     onClick={() =>
                       interactiveInput.onQuickAction?.("Got it, next step!")
                     }
-                    className="inline-flex items-center gap-2 rounded-xl bg-teal-400 px-5 py-2.5 text-xs font-black text-slate-950 hover:bg-teal-300 transition shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Got It · Next Step</span>
@@ -987,7 +982,7 @@ export function SpriteChatChalkboard({
                         <button
                           type="button"
                           onClick={handleStartPronunciation}
-                          className="inline-flex items-center gap-2 rounded-xl bg-teal-400 px-6 py-3 text-sm font-black text-slate-950 hover:bg-teal-300 transition shadow-lg active:scale-95"
+                          className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                         >
                           {scoreMatchesStep ? (
                             <>
@@ -1009,11 +1004,11 @@ export function SpriteChatChalkboard({
                             onClick={() =>
                               interactiveInput?.onQuickAction?.(
                                 `${phraseToSpeak} (Pronunciation score: ${Math.round(
-                                  pronScore.pronunciationScore
-                                )}%)`
+                                  pronScore.pronunciationScore,
+                                )}%)`,
                               )
                             }
-                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-3 text-sm font-black text-white hover:bg-indigo-400 transition shadow-lg"
+                            className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                           >
                             <span>
                               Submit {Math.round(pronScore.pronunciationScore)}%
@@ -1026,15 +1021,15 @@ export function SpriteChatChalkboard({
                     )}
 
                     {isListeningMic && (
-                      <div className="rounded-2xl border border-teal-400/50 bg-[#111827] p-4 space-y-2">
+                      <div className="space-y-2 rounded-2xl border-2 border-emerald-300 bg-white p-4 shadow-sm">
                         <ChalkboardWaveform />
-                        <p className="text-xs font-extrabold text-teal-300">
+                        <p className="text-xs font-extrabold text-emerald-700">
                           Listening... Say &ldquo;{phraseToSpeak}&rdquo; clearly!
                         </p>
                         <button
                           type="button"
                           onClick={cancelAssessment}
-                          className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300 hover:bg-white/20"
+                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-200"
                         >
                           <X className="h-3 w-3" /> Cancel
                         </button>
@@ -1042,35 +1037,35 @@ export function SpriteChatChalkboard({
                     )}
 
                     {isAnalyzingMic && (
-                      <div className="rounded-2xl border border-amber-300/40 bg-[#111827] p-4 flex items-center justify-center gap-2.5 text-xs font-bold text-amber-200">
-                        <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
+                      <div className="flex items-center justify-center gap-2.5 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800">
+                        <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
                         <span>Scoring your pronunciation...</span>
                       </div>
                     )}
 
                     {pronError && (
-                      <p className="text-xs font-bold text-rose-300">
+                      <p className="text-xs font-bold text-rose-600">
                         {pronError}
                       </p>
                     )}
 
                     {scoreMatchesStep && pronScore && pronStatus === "idle" && (
-                      <div className="rounded-xl border border-slate-600 bg-[#111827]/90 px-4 py-2.5 flex items-center justify-around text-xs font-bold">
-                        <span className="text-slate-300">
+                      <div className="flex items-center justify-around rounded-2xl border-2 border-slate-200 bg-white px-4 py-2.5 text-xs font-bold shadow-2xs">
+                        <span className="text-slate-500">
                           Overall:{" "}
-                          <strong className="text-teal-300">
+                          <strong className="text-emerald-600">
                             {Math.round(pronScore.pronunciationScore)}%
                           </strong>
                         </span>
-                        <span className="text-slate-300">
+                        <span className="text-slate-500">
                           Accuracy:{" "}
-                          <strong className="text-white">
+                          <strong className="text-slate-900">
                             {Math.round(pronScore.accuracyScore)}%
                           </strong>
                         </span>
-                        <span className="text-slate-300">
+                        <span className="text-slate-500">
                           Fluency:{" "}
-                          <strong className="text-white">
+                          <strong className="text-slate-900">
                             {Math.round(pronScore.fluencyScore)}%
                           </strong>
                         </span>
@@ -1086,18 +1081,18 @@ export function SpriteChatChalkboard({
                     <button
                       type="button"
                       onClick={() => setHintRevealed(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300/40 bg-sky-400/15 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-sky-400/25 transition"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-sky-100"
                     >
                       <Eye className="h-3.5 w-3.5" />
                       <span>Need a hint? Tap to peek</span>
                     </button>
                   ) : (
-                    <div className="rounded-xl border border-sky-300/40 bg-slate-900/70 px-4 py-2.5 text-xs font-bold text-sky-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-xs font-bold text-blue-700 shadow-2xs">
                       <span>💡 {cleanDisplayString(currentStep.hint)}</span>
                       <button
                         type="button"
                         onClick={() => setHintRevealed(false)}
-                        className="text-slate-400 hover:text-white"
+                        className="text-slate-400 hover:text-slate-700"
                       >
                         <EyeOff className="h-3.5 w-3.5" />
                       </button>
@@ -1109,31 +1104,31 @@ export function SpriteChatChalkboard({
 
             {/* Bottom Grammar Tip or Deck Completion Banner */}
             {activeBoard.status === "COMPLETED" ? (
-              <div className="rounded-xl border border-teal-300/50 bg-teal-400/15 px-4 py-3 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3">
                 <div className="flex items-center gap-2.5">
-                  <Trophy className="h-5 w-5 text-amber-300 shrink-0" />
-                  <span className="text-xs font-extrabold text-white">
+                  <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
+                  <span className="text-xs font-extrabold text-emerald-950">
                     Deck Complete!{" "}
                     {cleanDisplayString(
-                      activeBoard.takeaway || "Great job mastering every step."
+                      activeBoard.takeaway || "Great job mastering every step.",
                     )}
                   </span>
                 </div>
               </div>
             ) : currentStep.grammarTip || activeBoard.takeaway ? (
-              <div className="flex items-center gap-2.5 rounded-xl bg-amber-400/15 border border-amber-300/40 px-4 py-2.5 text-xs font-bold text-amber-100 shrink-0">
-                <Sparkles className="h-4 w-4 text-amber-300 shrink-0" />
+              <div className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900">
+                <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
                 <span className="leading-snug">
                   {cleanDisplayString(
-                    currentStep.grammarTip || activeBoard.takeaway || ""
+                    currentStep.grammarTip || activeBoard.takeaway || "",
                   )}
                 </span>
               </div>
             ) : null}
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8 text-slate-200">
-            <p className="text-sm font-semibold">
+          <div className="flex h-full flex-col items-center justify-center py-8 text-center text-slate-500">
+            <p className="text-sm font-bold">
               Write on the board below to start your next step with{" "}
               {tutorHeader?.spriteName || "Vox"}.
             </p>
@@ -1143,21 +1138,21 @@ export function SpriteChatChalkboard({
 
       {/* ================= 3. BOTTOM DOCKED BAR: SNOOZE BANNER vs INPUT BAR ================= */}
       {snoozeState?.isSnoozing ? (
-        <div className="relative z-10 mt-auto border-t border-indigo-400/35 bg-gradient-to-r from-indigo-950 via-[#111827] to-slate-900 px-6 py-4 shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative z-10 mt-auto shrink-0 border-t-2 border-indigo-200 bg-white px-6 py-4">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-400/40 bg-indigo-500/20 text-lg">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-lg">
                 💤
               </div>
               <div>
-                <h5 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                <h5 className="text-xs font-black uppercase tracking-wider text-indigo-600">
                   {tutorHeader?.spriteName || "Vox"} is resting up for your
                   lesson!
                 </h5>
-                <p className="text-xs font-semibold text-slate-300 mt-0.5 leading-relaxed">
+                <p className="mt-0.5 text-xs font-semibold leading-relaxed text-slate-600">
                   {tutorHeader?.spriteName || "Vox"} is resting their voice for
                   your lesson! Head into{" "}
-                  <span className="text-white font-bold">
+                  <span className="font-black text-slate-900">
                     {snoozeState.actionLabel?.replace(/^Start\s+/i, "") ||
                       snoozeState.lessonTitle}
                   </span>{" "}
@@ -1172,7 +1167,7 @@ export function SpriteChatChalkboard({
                 onClick={() =>
                   snoozeState.onNavigate?.(snoozeState.actionHref!)
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-400 to-indigo-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg hover:brightness-110 transition shrink-0"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-xs transition hover:brightness-105"
               >
                 <span>{snoozeState.actionLabel || "Continue Lesson"}</span>
                 <ArrowRight className="h-4 w-4" />
@@ -1184,10 +1179,10 @@ export function SpriteChatChalkboard({
         interactiveInput && (
           <form
             onSubmit={handleFormSubmitWithTracking}
-            className="relative z-10 mt-auto border-t border-slate-600/70 bg-[#111827] px-6 py-3.5 space-y-2.5 shrink-0"
+            className="relative z-10 mt-auto shrink-0 space-y-2.5 border-t-2 border-slate-200 bg-white px-6 py-3.5"
           >
-            <div className="flex items-center gap-2.5 rounded-xl bg-[#1E293B] border-2 border-slate-500/60 focus-within:border-teal-400 px-4 py-2.5 transition">
-              <PenTool className="h-4 w-4 text-teal-300 shrink-0" />
+            <div className="flex items-center gap-2.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-4 py-2 transition focus-within:border-blue-500 focus-within:bg-white">
+              <PenTool className="h-4 w-4 shrink-0 text-blue-600" />
               <input
                 ref={inputRef}
                 type="text"
@@ -1195,14 +1190,14 @@ export function SpriteChatChalkboard({
                 onChange={(e) => interactiveInput.onChange(e.target.value)}
                 disabled={interactiveInput.isLoading}
                 placeholder={`Write your answer for Step ${safeStepIdx + 1}...`}
-                className="flex-1 bg-transparent text-sm font-bold text-white placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
+                className="flex-1 bg-transparent text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
               />
               <button
                 type="submit"
                 disabled={
                   interactiveInput.isLoading || !interactiveInput.value.trim()
                 }
-                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-400 px-4 py-1.5 text-xs font-black text-slate-950 hover:bg-teal-300 disabled:opacity-40 transition shrink-0"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-1.5 text-xs font-black text-white transition hover:brightness-105 disabled:opacity-40"
               >
                 {interactiveInput.isLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1217,7 +1212,7 @@ export function SpriteChatChalkboard({
 
             <div className="flex items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-300 mr-1">
+                <span className="mr-1 text-[11px] font-extrabold text-slate-400">
                   Accents:
                 </span>
                 {ACCENT_KEYS.map((char) => (
@@ -1225,17 +1220,17 @@ export function SpriteChatChalkboard({
                     key={char}
                     type="button"
                     onClick={() => insertAccent(char)}
-                    className="h-7 min-w-7 rounded-md border border-slate-500/60 bg-[#24324B] px-2 font-mono text-xs font-bold text-white hover:border-teal-300 hover:bg-teal-400/25 transition"
+                    className="h-7 min-w-7 rounded-lg border-2 border-b-[3px] border-slate-200 bg-white px-2 font-mono text-xs font-black text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-blue-600"
                   >
                     {char}
                   </button>
                 ))}
               </div>
 
-              <div className="hidden sm:flex items-center gap-1.5">
-                <span className="h-1.5 w-5 rounded-full bg-amber-300" />
+              <div className="hidden items-center gap-1.5 sm:flex">
+                <span className="h-1.5 w-5 rounded-full bg-amber-400" />
                 <span className="h-1.5 w-4 rounded-full bg-rose-400" />
-                <span className="h-1.5 w-6 rounded-full bg-teal-300" />
+                <span className="h-1.5 w-6 rounded-full bg-emerald-400" />
               </div>
             </div>
           </form>

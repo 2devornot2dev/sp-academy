@@ -68,12 +68,12 @@ export function SpriteChatHistoryTab({
       </div>
 
       {sessionsList.length === 0 ? (
-        <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-10 text-center my-auto">
-          <MessageSquare className="h-10 w-10 text-teal-400/60 mx-auto mb-3" />
-          <p className="text-base font-bold text-white">
+        <div className="my-auto rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-10 text-center shadow-xs">
+          <MessageSquare className="mx-auto mb-3 h-10 w-10 text-blue-500" />
+          <p className="text-base font-black text-slate-900">
             No saved sessions yet
           </p>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+          <p className="mx-auto mt-1 max-w-xs text-xs font-medium text-slate-500">
             Start a conversation in the Session tab to save your first session.
           </p>
         </div>
@@ -86,41 +86,41 @@ export function SpriteChatHistoryTab({
           return (
             <div
               key={sess.id}
-              className={`flex items-stretch rounded-2xl border transition ${
+              className={`flex items-stretch rounded-2xl border-2 border-b-4 transition ${
                 isCurrentSession
-                  ? "border-teal-500/60 bg-gradient-to-r from-teal-950/50 to-indigo-950/50"
-                  : "border-white/10 bg-slate-900/70 hover:border-indigo-500/40 hover:bg-slate-900"
+                  ? "border-sky-400 border-b-blue-600 bg-gradient-to-r from-sky-50/80 to-white shadow-xs"
+                  : "border-slate-200 border-b-slate-300 bg-white hover:border-sky-300 hover:bg-slate-50/50"
               }`}
             >
               <button
                 type="button"
                 onClick={() => onSelectSession(sess)}
-                className="min-w-0 flex-1 text-left p-4"
+                className="min-w-0 flex-1 p-4 text-left"
               >
-                <div className="flex items-center justify-between mb-1.5 gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-extrabold text-white truncate max-w-[340px]">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="max-w-[340px] truncate text-sm font-black text-slate-900">
                       {cleanDisplayString(sess.title)}
                     </span>
                     {isCurrentSession && (
-                      <span className="rounded-md bg-teal-500/20 border border-teal-500/40 px-2 py-0.5 text-[9px] font-black uppercase text-teal-300 shrink-0">
+                      <span className="shrink-0 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-800">
                         Open
                       </span>
                     )}
                   </div>
-                  <span className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-0.5 text-[10px] font-bold text-slate-300 shrink-0">
+                  <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
                     {turnCount} {turnCount === 1 ? "turn" : "turns"}
                   </span>
                 </div>
 
                 {sess.lessonTitle && (
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-indigo-400 mb-1">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-blue-600">
                     Current: {sess.lessonTitle}
                   </span>
                 )}
 
                 {lastTurn && (
-                  <p className="text-xs text-slate-300 line-clamp-1">
+                  <p className="line-clamp-1 text-xs font-medium text-slate-500">
                     {spriteName}: {cleanDisplayString(lastTurn.assistantReply)}
                   </p>
                 )}
@@ -134,7 +134,7 @@ export function SpriteChatHistoryTab({
                 }}
                 title="Delete session"
                 aria-label={`Delete session ${cleanDisplayString(sess.title)}`}
-                className="flex w-12 shrink-0 items-center justify-center rounded-r-2xl border-l border-white/10 text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300"
+                className="flex w-12 shrink-0 items-center justify-center rounded-r-2xl border-l border-slate-200 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -151,19 +151,19 @@ export function SpriteChatHistoryTab({
         dismissible={!isDeleting}
       >
         {sessionToDelete && (
-          <div className="rounded-3xl border border-rose-500/30 bg-gradient-to-b from-slate-900 to-slate-950 p-6 shadow-2xl shadow-rose-950/40">
+          <div className="rounded-3xl border-2 border-b-[6px] border-rose-200 border-b-rose-300 bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-500/15">
-                <AlertTriangle className="h-5 w-5 text-rose-300" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50">
+                <AlertTriangle className="h-5 w-5 text-rose-600" />
               </div>
               <div className="min-w-0">
                 <h3
                   id="delete-session-title"
-                  className="text-lg font-extrabold text-white"
+                  className="text-lg font-black text-slate-900"
                 >
                   Delete this session?
                 </h3>
-                <p className="mt-0.5 truncate text-xs font-bold text-slate-400">
+                <p className="mt-0.5 truncate text-xs font-bold text-slate-500">
                   {cleanDisplayString(sessionToDelete.title)}
                   {deleteTurnCount > 0 &&
                     ` · ${deleteTurnCount} ${
@@ -173,16 +173,16 @@ export function SpriteChatHistoryTab({
               </div>
             </div>
 
-            <p className="mt-4 text-sm leading-relaxed text-slate-300">
+            <p className="mt-4 text-sm font-medium leading-relaxed text-slate-600">
               Please review this session before deleting it. Once it&apos;s gone,{" "}
-              <span className="font-bold text-white">{spriteName}</span>{" "}
+              <span className="font-black text-slate-900">{spriteName}</span>{" "}
               won&apos;t be able to recall this conversation, pick up where you
               left off, or build on it in future practice. This can&apos;t be
               undone.
             </p>
 
             {deleteError && (
-              <p className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300">
+              <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
                 {deleteError}
               </p>
             )}
@@ -192,7 +192,7 @@ export function SpriteChatHistoryTab({
                 type="button"
                 onClick={closeDeleteModal}
                 disabled={isDeleting}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 Keep session
               </button>
@@ -200,7 +200,7 @@ export function SpriteChatHistoryTab({
                 type="button"
                 onClick={confirmDelete}
                 disabled={isDeleting}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-rose-400 disabled:opacity-70"
+                className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-rose-800 bg-rose-600 px-4 py-2 text-xs font-black text-white transition hover:bg-rose-500 disabled:opacity-70"
               >
                 {isDeleting ? (
                   <>

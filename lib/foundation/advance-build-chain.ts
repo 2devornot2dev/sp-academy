@@ -6,6 +6,9 @@ import { toLanguageCode } from "@/lib/languages";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { triggerMilestoneBossAndNextSpoon } from "@/lib/foundation/trigger-milestone-boss";
 
+const STANDARD_TRACK_MAX_SPOON = 30;
+const STANDARD_TRACK_MAX_MILESTONE = 10;
+
 /**
  * Called automatically when a Spoon or Vocab Bridge webhook completes.
  * - If subStep 1 (e.g. Spoon 1) finished -> Bakes subStep 2 (Spoon 2)
@@ -40,7 +43,6 @@ export async function advanceMilestoneBuildChain({
     // CASE A: subStep 1 or 2 just finished -> Daisy-chain the next Spoon in this unit!
     // -----------------------------------------------------------------------
     if (subStep === 1 || subStep === 2) {
-      // Wait until the current lesson actually has its lessonHandoff saved
       const currentLesson = await prisma.foundationLesson.findUnique({
         where: {
           foundationCourseId_orderIndex: {
@@ -52,14 +54,11 @@ export async function advanceMilestoneBuildChain({
       });
 
       if (!currentLesson?.lessonHandoff) {
-        // Spoon webhook hasn't written lessonHandoff yet (e.g., Bridge finished first);
-        // when Spoon webhook finishes a moment later, it will call this again and proceed.
         return;
       }
 
       const nextSpoonNumber = completedSpoonNumber + 1;
 
-      // Idempotency check: Has nextSpoonNumber already been created?
       const existingNextLesson = await prisma.foundationLesson.findUnique({
         where: {
           foundationCourseId_orderIndex: {
@@ -71,11 +70,11 @@ export async function advanceMilestoneBuildChain({
       });
 
       if (existingNextLesson) {
-        return; // Already building or ready!
+        return;
       }
 
       console.log(
-        `⛓️ [DaisyChain] Spoon ${completedSpoonNumber} ready -> Auto-baking Spoon ${nextSpoonNumber} (Milestone ${milestoneIndex}, Step ${subStep + 1}/3)`
+        `⛓️ [DaisyChain] Spoon ${completedSpoonNumber} ready -> Auto-baking Spoon ${nextSpoonNumber} (Milestone ${milestoneIndex}, Step ${subStep + 1}/3)`,
       );
 
       await invokeEduBuilder({
@@ -86,7 +85,7 @@ export async function advanceMilestoneBuildChain({
         spoon: nextSpoonNumber,
         nativeLanguage,
         targetLanguage,
-        levelBand: "unspecified", // Automatically resolved from LanguageProfile / Spoon 1 inside invokeEduBuilder
+        levelBand: "unspecified",
         goal: "unspecified",
         scriptComfort: "unspecified",
         type: "lang",
@@ -97,7 +96,7 @@ export async function advanceMilestoneBuildChain({
     }
 
     // -----------------------------------------------------------------------
-    // CASE B: subStep 3 (e.g. Spoon 3, 6, 9...) finished -> Check if all 3 Spoons & 3 Bridges are ready, then bake BOSS!
+    // CASE B: subStep 3 finished -> Check if all 3 Spoons & 3 Bridges are ready, then bake BOSS!
     // -----------------------------------------------------------------------
     if (subStep === 3) {
       const startIndex = (milestoneIndex - 1) * 3 + 1;
@@ -127,15 +126,13 @@ export async function advanceMilestoneBuildChain({
         bridges.length === 3 && bridges.every((b) => Boolean(b.vocabMoment));
 
       if (!allLessonsReady || !allBridgesReady) {
-        // If Spoon 3 finished before Bridge 3 (or vice versa), the second webhook will trigger this!
         return;
       }
 
       console.log(
-        `⛓️ [DaisyChain] All 3 Spoons & Bridges ready for Milestone ${milestoneIndex} -> Auto-baking Boss ${milestoneIndex}!`
+        `⛓️ [DaisyChain] All 3 Spoons & Bridges ready for Milestone ${milestoneIndex} -> Auto-baking Boss ${milestoneIndex}!`,
       );
 
-      // Build the Boss NOW, but wait until the user starts the Boss to prebake the next unit's Spoon 4/7/10!
       await triggerMilestoneBossAndNextSpoon({
         userId,
         courseId,
@@ -149,8 +146,9 @@ export async function advanceMilestoneBuildChain({
 }
 
 /**
- * Call this when the user STARTS the Boss Stage (e.g. Boss 1 -> Spoon 4 -> 5 -> 6 -> Boss 2).
- * It kicks off the first Spoon of the next milestone, which then daisy-chains all the way to the next Boss!
+ * Call this when the user STARTS the Boss Stage.
+ * IMPORTANT: Stops at Milestone 10 (Spoon 30) so Hard Mode Spoon 1 (orderIndex 31)
+ * is ONLY generated when the user explicitly clicks "Activate Hard Mode"!
  */
 export async function startNextMilestoneDaisyChain({
   courseId,
@@ -160,7 +158,16 @@ export async function startNextMilestoneDaisyChain({
   currentMilestoneIndex: number;
 }) {
   try {
-    const nextSpoonNumber = currentMilestoneIndex * 3 + 1; // e.g. Milestone 1 -> Spoon 4
+    // Do NOT auto-start Hard Mode (Spoon 31) when entering Boss 10!
+    // Hard Mode starts only when the user clicks "Activate Hard Mode".
+    if (currentMilestoneIndex === STANDARD_TRACK_MAX_MILESTONE) {
+      console.log(
+        `🛑 [DaisyChain] Reached Standard Track Finale (Milestone 10). Waiting for user to activate Hard Mode!`,
+      );
+      return;
+    }
+
+    const nextSpoonNumber = currentMilestoneIndex * 3 + 1;
 
     const existingNextSpoon = await prisma.foundationLesson.findUnique({
       where: {
@@ -182,7 +189,7 @@ export async function startNextMilestoneDaisyChain({
     if (!course) return;
 
     console.log(
-      `🔥 [DaisyChain] User entered Boss ${currentMilestoneIndex} -> Kicking off Next Unit Daisy-Chain starting at Spoon ${nextSpoonNumber}!`
+      `🔥 [DaisyChain] User entered Boss ${currentMilestoneIndex} -> Kicking off Next Unit Daisy-Chain starting at Spoon ${nextSpoonNumber}!`,
     );
 
     await invokeEduBuilder({
@@ -201,5 +208,69 @@ export async function startNextMilestoneDaisyChain({
     });
   } catch (err) {
     console.error("❌ [DaisyChain] startNextMilestoneDaisyChain failed:", err);
+  }
+}
+
+/**
+ * Explicitly triggered when the user clicks "Activate Hard Mode" after Spoon 30.
+ * Kicks off Hard Mode Spoon 1 (stored at orderIndex 31 -> Unit 1 Part IV),
+ * which then daisy-chains Hard Spoon 2 (Part V) -> Hard Spoon 3 (Part VI) -> Hard Boss 1!
+ */
+export async function activateHardModeTrack(
+  courseId: string,
+): Promise<{ ok: boolean; alreadyActive?: boolean; error?: string }> {
+  try {
+    const hardSpoon1OrderIndex = STANDARD_TRACK_MAX_SPOON + 1; // 31
+
+    const existingHardSpoon1 = await prisma.foundationLesson.findUnique({
+      where: {
+        foundationCourseId_orderIndex: {
+          foundationCourseId: courseId,
+          orderIndex: hardSpoon1OrderIndex,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingHardSpoon1) {
+      return { ok: true, alreadyActive: true };
+    }
+
+    const course = await prisma.foundationCourse.findUnique({
+      where: { id: courseId },
+      include: { user: { select: { firstName: true, gender: true } } },
+    });
+
+    if (!course) {
+      return { ok: false, error: "Course not found" };
+    }
+
+    console.log(
+      `🔥🔥 [HardMode] Activating Hard Mode Track (Hard Spoon 1 / orderIndex ${hardSpoon1OrderIndex}) for course ${courseId}!`,
+    );
+
+    const res = await invokeEduBuilder({
+      userId: course.userId,
+      firstName: course.user?.firstName || "Learner",
+      gender: course.user?.gender || "N",
+      foundationCourseId: courseId,
+      spoon: hardSpoon1OrderIndex,
+      nativeLanguage: toLanguageCode(course.nativeLanguage),
+      targetLanguage: toLanguageCode(course.targetLanguage),
+      levelBand: "unspecified",
+      goal: "unspecified",
+      scriptComfort: "unspecified",
+      type: "lang",
+      isOnboarding: false,
+    });
+
+    if (!res.ok) {
+      return { ok: false, error: res.error };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.error("❌ [HardMode] activateHardModeTrack failed:", err);
+    return { ok: false, error: "Failed to activate Hard Mode" };
   }
 }

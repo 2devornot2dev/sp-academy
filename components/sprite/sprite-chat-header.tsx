@@ -59,7 +59,7 @@ export function SpriteChatHeader({
     activeTab === "session" && isSessionActive && !manualExpand;
 
   return (
-    <div className="relative z-20 overflow-hidden border-b border-white/10 bg-gradient-to-r from-teal-950/90 via-indigo-950/90 to-slate-950/95 px-4 py-2.5 shrink-0 transition-all">
+    <div className="relative z-20 shrink-0 overflow-hidden border-b-2 border-slate-200 bg-white px-4 py-3 shadow-xs transition-all">
       {/* EXPANDED ROW 1 */}
       <AnimatePresence initial={false}>
         {!isCollapsed && (
@@ -71,14 +71,14 @@ export function SpriteChatHeader({
             transition={{ type: "spring", stiffness: 360, damping: 32 }}
             className="overflow-hidden"
           >
-            <div className="flex items-start justify-between gap-4 pb-3.5 pt-1 px-1 border-b border-white/10 mb-2.5">
+            <div className="mb-2.5 flex items-start justify-between gap-4 border-b border-slate-100 px-1 pt-0.5 pb-3">
               <div className="flex items-center gap-3.5">
                 <div className="relative h-12 w-12 shrink-0">
                   <div
-                    className={`h-full w-full overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-lg ${
+                    className={`h-full w-full overflow-hidden rounded-2xl border-2 border-b-4 bg-slate-100 shadow-xs ${
                       isSnoozing
-                        ? "border-indigo-400/50 shadow-indigo-500/20"
-                        : "border-teal-400/50 shadow-teal-500/20"
+                        ? "border-indigo-300 border-b-indigo-400"
+                        : "border-sky-400 border-b-blue-600"
                     }`}
                   >
                     <img
@@ -97,10 +97,10 @@ export function SpriteChatHeader({
                         ? `${spriteName} is napping until you finish your lesson!`
                         : "Start New Session"
                     }
-                    className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-slate-950 shadow-md transition ${
+                    className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-white shadow-sm transition ${
                       isSnoozing
                         ? "bg-indigo-500 text-white cursor-not-allowed"
-                        : "bg-teal-400 text-slate-950 hover:scale-110 hover:bg-teal-300"
+                        : "bg-emerald-500 text-white hover:scale-110 hover:bg-emerald-600"
                     }`}
                   >
                     {isSnoozing ? (
@@ -112,28 +112,28 @@ export function SpriteChatHeader({
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-base font-extrabold text-white tracking-tight">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black tracking-tight text-slate-900">
                       {spriteName}
                     </h3>
 
                     {/* Status Badge */}
                     {isSnoozing ? (
-                      <span className="rounded-full bg-indigo-500/20 border border-indigo-400/40 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-indigo-200">
+                      <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-600">
                         💤 Snoozing
                       </span>
                     ) : (
-                      <span className="rounded-full bg-teal-400/15 border border-teal-400/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-teal-300">
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-600">
                         AI Tutor
                       </span>
                     )}
 
-                    {/* ⚡ 3-Slot Energy Meter (e.g. ⚡ ⚡ ⚪) */}
+                    {/* ⚡ 3-Slot Energy Meter */}
                     <div
-                      className="flex items-center gap-1 rounded-full bg-slate-950/80 border border-amber-300/30 px-2.5 py-0.5"
+                      className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5"
                       title={`${energyCount} of ${maxEnergy} Energy Charges available`}
                     >
-                      <span className="text-[10px] font-black text-amber-300 mr-0.5">
+                      <span className="mr-0.5 text-[10px] font-black text-amber-700">
                         {energyCount}/{maxEnergy}
                       </span>
                       {Array.from({ length: maxEnergy }).map((_, idx) => {
@@ -144,8 +144,8 @@ export function SpriteChatHeader({
                             key={slot}
                             className={`h-3 w-3 transition-all ${
                               isCharged
-                                ? "text-amber-300 fill-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]"
-                                : "text-slate-600 fill-slate-800/80"
+                                ? "fill-amber-400 text-amber-500"
+                                : "fill-slate-200 text-slate-300"
                             }`}
                           />
                         );
@@ -153,11 +153,9 @@ export function SpriteChatHeader({
                     </div>
                   </div>
 
-                  <p className="text-xs font-semibold text-indigo-200/90 mt-0.5">
-                    <span className="text-teal-400 font-extrabold">
-                      Current:
-                    </span>{" "}
-                    {currentLessonTitle}
+                  <p className="mt-0.5 text-xs font-bold text-slate-500">
+                    <span className="font-black text-blue-600">Current:</span>{" "}
+                    <span className="text-slate-700">{currentLessonTitle}</span>
                   </p>
                 </div>
               </div>
@@ -168,7 +166,7 @@ export function SpriteChatHeader({
 
       {/* SLEEK SINGLE-LINE COMMAND BAR */}
       <div className="flex flex-nowrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           {isCollapsed && (
             <button
               type="button"
@@ -179,10 +177,10 @@ export function SpriteChatHeader({
                   ? `${spriteName} is napping`
                   : "Start New Chalkboard Session"
               }
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] transition ${
                 isSnoozing
-                  ? "border-indigo-400/30 bg-indigo-500/20 text-indigo-300 cursor-not-allowed"
-                  : "border-teal-400/40 bg-teal-400/15 text-teal-300 hover:bg-teal-400 hover:text-slate-950"
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-400 cursor-not-allowed"
+                  : "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
               }`}
             >
               {isSnoozing ? (
@@ -193,7 +191,8 @@ export function SpriteChatHeader({
             </button>
           )}
 
-          <div className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-950/70 p-1 border border-white/10">
+          {/* 3D Tactile Tab Switcher */}
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
             {(
               [
                 { id: "session", label: "Session", Icon: MessageSquare },
@@ -208,10 +207,10 @@ export function SpriteChatHeader({
               <button
                 key={id}
                 onClick={() => onSelectTab(id)}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
                   activeTab === id
-                    ? "bg-gradient-to-r from-indigo-600 to-teal-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -220,20 +219,20 @@ export function SpriteChatHeader({
             ))}
           </div>
 
-          {/* Compact Energy Pill in 44px Mode */}
+          {/* Compact Energy Pill in Collapsed Mode */}
           {isCollapsed && (
             <div
-              className="hidden sm:flex items-center gap-1 rounded-xl bg-slate-950/80 border border-amber-300/30 px-2 py-1"
+              className="hidden sm:flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1"
               title={`${energyCount} of ${maxEnergy} Energy Charges`}
             >
               <Zap
                 className={`h-3 w-3 ${
                   energyCount > 0
-                    ? "text-amber-300 fill-amber-300"
-                    : "text-slate-600 fill-slate-800"
+                    ? "fill-amber-400 text-amber-500"
+                    : "fill-slate-200 text-slate-300"
                 }`}
               />
-              <span className="text-[10px] font-black text-amber-300">
+              <span className="text-[10px] font-black text-amber-700">
                 {energyCount}/{maxEnergy}
               </span>
             </div>
@@ -241,15 +240,16 @@ export function SpriteChatHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <div className="flex items-center gap-1 rounded-xl bg-slate-950/70 p-1 border border-white/10">
+          {/* Single / Multi View Switcher */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => onChangeViewMode("single")}
               title="Single Stage View"
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
                 viewMode === "single"
-                  ? "bg-gradient-to-r from-indigo-600 to-teal-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
               }`}
             >
               <RectangleHorizontal className="h-3.5 w-3.5" />
@@ -260,10 +260,10 @@ export function SpriteChatHeader({
               type="button"
               onClick={() => onChangeViewMode("multi")}
               title="Multi Thread View"
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
                 viewMode === "multi"
-                  ? "bg-gradient-to-r from-indigo-600 to-teal-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
               }`}
             >
               <MessagesSquare className="h-3.5 w-3.5" />
@@ -276,7 +276,7 @@ export function SpriteChatHeader({
               type="button"
               onClick={() => setManualExpand((prev) => !prev)}
               title={isCollapsed ? "Show Lesson Info" : "Compact Fullscreen"}
-              className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-white/15 hover:text-white transition"
+              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-blue-600 transition"
             >
               {isCollapsed ? (
                 <ChevronDown className="h-4 w-4" />
@@ -289,7 +289,7 @@ export function SpriteChatHeader({
           <button
             onClick={onClose}
             title="Close Assistant"
-            className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-200 transition"
+            className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition"
           >
             <X className="h-4 w-4" />
           </button>

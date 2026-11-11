@@ -114,7 +114,7 @@ export function SpriteChatBriefingTab({
     activeExercise.content
   ) {
     return (
-      <div className="-mx-5 -my-4 flex-1 flex flex-col">
+      <div className="-mx-5 -my-4 flex flex-1 flex-col">
         <SpriteExerciseArcade
           userId={userId}
           exerciseId={activeExercise.id}
@@ -143,7 +143,7 @@ export function SpriteChatBriefingTab({
     activeExercise?.status === "COMPLETED" && Boolean(activeExercise.content);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto custom-scrollbar">
+    <div className="custom-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto">
       {/* 1. DB-BACKED SYSTEM NOTIFICATIONS (Errors, Alerts) */}
       {dbNotifications.map((notif) => {
         const isErrorKind =
@@ -154,19 +154,19 @@ export function SpriteChatBriefingTab({
         return (
           <div
             key={notif.id}
-            className={`relative overflow-hidden rounded-3xl border p-5 shadow-lg shrink-0 ${
+            className={`relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[5px] p-5 shadow-xs ${
               isErrorKind
-                ? "border-rose-500/30 bg-rose-950/40"
-                : "border-sky-500/30 bg-sky-950/40"
+                ? "border-rose-300 border-b-rose-400 bg-rose-50"
+                : "border-sky-200 border-b-sky-300 bg-white"
             }`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-b-2 text-white shadow-2xs ${
                     isErrorKind
-                      ? "bg-gradient-to-b from-rose-500 to-rose-700"
-                      : "bg-gradient-to-b from-sky-400 to-blue-600"
+                      ? "border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600"
+                      : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600"
                   }`}
                 >
                   {isErrorKind ? (
@@ -178,12 +178,12 @@ export function SpriteChatBriefingTab({
                 <div>
                   <h3
                     className={`text-sm font-black uppercase tracking-wider ${
-                      isErrorKind ? "text-rose-400" : "text-sky-400"
+                      isErrorKind ? "text-rose-700" : "text-blue-600"
                     }`}
                   >
                     {notif.title || "System Alert"}
                   </h3>
-                  <p className="text-sm font-medium text-white mt-0.5">
+                  <p className="mt-0.5 text-sm font-bold text-slate-800">
                     {notif.body}
                   </p>
                 </div>
@@ -192,7 +192,7 @@ export function SpriteChatBriefingTab({
               <button
                 type="button"
                 onClick={() => dismissDbNotification(notif.id)}
-                className="rounded-full p-1.5 text-slate-400 transition hover:bg-white/10"
+                className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
               >
                 <X size={16} />
               </button>
@@ -209,7 +209,7 @@ export function SpriteChatBriefingTab({
                     }
                     await dismissDbNotification(notif.id);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-900/50 transition hover:bg-rose-500"
+                  className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-rose-800 bg-rose-600 px-4 py-2 text-xs font-extrabold text-white shadow-xs transition hover:bg-rose-500"
                 >
                   <RotateCcw size={14} /> Retry Generation
                 </button>
@@ -223,7 +223,7 @@ export function SpriteChatBriefingTab({
                       expandedLogId === notif.id ? null : notif.id,
                     )
                   }
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 transition hover:text-white"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 transition hover:text-slate-900"
                 >
                   View Error Log{" "}
                   <ChevronDown
@@ -235,8 +235,8 @@ export function SpriteChatBriefingTab({
             </div>
 
             {expandedLogId === notif.id && notif.detail && (
-              <div className="mt-3 rounded-xl border border-white/5 bg-slate-950/80 p-3">
-                <pre className="custom-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-[10px] text-slate-400">
+              <div className="mt-3 rounded-xl border border-rose-200 bg-white p-3">
+                <pre className="custom-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-[10px] text-rose-800">
                   {notif.detail}
                 </pre>
               </div>
@@ -246,14 +246,14 @@ export function SpriteChatBriefingTab({
       })}
 
       {/* 2. Active Lesson Objective Card */}
-      <div className="relative shrink-0 overflow-hidden rounded-3xl border border-teal-500/30 bg-gradient-to-br from-teal-950/60 via-indigo-950/50 to-slate-900/80 p-5 shadow-lg">
-        <span className="mb-1 block text-[10px] font-black tracking-widest text-teal-400 uppercase">
+      <div className="relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[5px] border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50/80 via-white to-indigo-50/40 p-5 shadow-xs">
+        <span className="mb-1 block text-[10px] font-black tracking-widest text-blue-600 uppercase">
           Active Lesson Objective
         </span>
-        <h2 className="text-lg font-extrabold text-white">
+        <h2 className="text-lg font-black text-slate-900">
           {aiBrain.currentLessonTitle}
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">
+        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
           Click any priority target below to immediately launch a 1-on-1
           practice session with {spriteName}.
         </p>
@@ -261,19 +261,19 @@ export function SpriteChatBriefingTab({
 
       {/* 3. 3-ROUND SPRITE EXERCISE CARD */}
       <div
-        className={`relative shrink-0 overflow-hidden rounded-3xl border p-5 shadow-lg transition ${
+        className={`relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[5px] p-5 shadow-xs transition ${
           isCompletedWorkout
-            ? "border-teal-500/35 bg-gradient-to-r from-teal-950/50 via-slate-900/90 to-slate-950/90"
-            : "border-amber-400/35 bg-gradient-to-r from-amber-950/40 via-indigo-950/60 to-slate-900/90"
+            ? "border-emerald-200 border-b-emerald-300 bg-gradient-to-r from-emerald-50/70 via-white to-teal-50/50"
+            : "border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/70 via-white to-orange-50/40"
         }`}
       >
-        <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center justify-between">
+        <div className="flex flex-col justify-between gap-3.5 sm:flex-row sm:items-center">
           <div className="flex items-start gap-3.5">
             <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-md ${
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-[3px] shadow-2xs ${
                 isCompletedWorkout
-                  ? "border-teal-400/40 bg-teal-400/15 text-teal-300"
-                  : "border-amber-300/40 bg-amber-400/15 text-amber-300"
+                  ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                  : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
               }`}
             >
               {isCompletedWorkout ? (
@@ -285,23 +285,23 @@ export function SpriteChatBriefingTab({
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-black text-white">
+                <h3 className="text-sm font-black text-slate-900">
                   {isCompletedWorkout
                     ? "Sprite Exercise Completed!"
                     : "3-Round Mistake Repair Arcade"}
                 </h3>
                 {isCompletedWorkout ? (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-teal-400/40 bg-teal-400/20 px-2 py-0.5 text-[9px] font-black text-teal-300 uppercase">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[9px] font-black text-emerald-800 uppercase">
                     ✓ +1 ⚡ Claimed
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-300 px-2 py-0.5 text-[9px] font-black text-slate-950 uppercase">
-                    +1 <Zap className="h-2.5 w-2.5 fill-current" /> Reward
+                  <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-900 uppercase">
+                    +1 <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-500" /> Reward
                   </span>
                 )}
               </div>
 
-              <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
+              <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
                 {isCompletedWorkout
                   ? `Milestone ${
                       activeExercise?.currentMilestone ?? ""
@@ -320,7 +320,7 @@ export function SpriteChatBriefingTab({
               <button
                 type="button"
                 onClick={() => setIsPlayingArcade(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-teal-400/40 bg-teal-500/15 px-3.5 py-2 text-xs font-extrabold text-teal-200 transition hover:bg-teal-500/25"
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-emerald-200 bg-white px-3.5 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Replay Practice</span>
@@ -329,7 +329,7 @@ export function SpriteChatBriefingTab({
               <button
                 type="button"
                 onClick={() => setIsPlayingArcade(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-teal-300 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg transition hover:brightness-110"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <Zap className="h-3.5 w-3.5 fill-current" />
                 <span>Play 3-Round Workout</span>
@@ -340,7 +340,7 @@ export function SpriteChatBriefingTab({
                 type="button"
                 disabled={isBuildingNow || isLoadingExercise}
                 onClick={handleBuildNewWorkout}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-black text-white shadow-lg transition hover:bg-indigo-400 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-60"
               >
                 {isBuildingNow ? (
                   <>
@@ -358,7 +358,7 @@ export function SpriteChatBriefingTab({
           </div>
         </div>
         {genError && (
-          <p className="mt-2.5 rounded-xl border border-rose-500/30 bg-rose-950/50 px-3 py-1.5 text-xs font-semibold text-rose-200">
+          <p className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">
             {genError}
           </p>
         )}
@@ -367,31 +367,31 @@ export function SpriteChatBriefingTab({
       {/* 4. Priority Targets Row */}
       {(aiBrain.topWord || aiBrain.topPhrase) && (
         <div className="shrink-0 space-y-2">
-          <span className="block text-[11px] font-black tracking-wider text-slate-300 uppercase">
+          <span className="block text-[11px] font-black tracking-wider text-slate-400 uppercase">
             Priority Targets (Click to Launch in Session)
           </span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {aiBrain.topWord && (
               <button
                 onClick={() => onTriggerPractice(aiBrain.topWord!.word)}
-                className="group relative flex overflow-hidden items-center justify-between rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-slate-900/90 to-indigo-950/50 p-4 text-left shadow-md transition hover:border-indigo-400"
+                className="group relative flex items-center justify-between overflow-hidden rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white p-4 text-left shadow-2xs transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50/40"
               >
                 <div>
-                  <span className="block text-base font-extrabold text-white transition group-hover:text-indigo-300">
+                  <span className="block text-base font-black text-slate-900 transition group-hover:text-blue-600">
                     {aiBrain.topWord.word}
                   </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500">
                     {aiBrain.topWord.translation || "Vocabulary word"}
                   </span>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
                   {aiBrain.topWord.avgSpokenScore != null && (
-                    <span className="rounded-md border border-rose-500/30 bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-300">
+                    <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
                       <Mic2 className="mr-1 inline h-3 w-3" />
                       {aiBrain.topWord.avgSpokenScore}%
                     </span>
                   )}
-                  <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-indigo-300" />
+                  <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
                 </div>
               </button>
             )}
@@ -399,24 +399,24 @@ export function SpriteChatBriefingTab({
             {aiBrain.topPhrase && (
               <button
                 onClick={() => onTriggerPractice(aiBrain.topPhrase!.word)}
-                className="group relative flex overflow-hidden items-center justify-between rounded-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/90 to-teal-950/50 p-4 text-left shadow-md transition hover:border-teal-400"
+                className="group relative flex items-center justify-between overflow-hidden rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white p-4 text-left shadow-2xs transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/40"
               >
                 <div>
-                  <span className="block text-base font-extrabold text-white transition group-hover:text-teal-300">
+                  <span className="block text-base font-black text-slate-900 transition group-hover:text-emerald-600">
                     {aiBrain.topPhrase.word}
                   </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500">
                     {aiBrain.topPhrase.translation || "Key phrase"}
                   </span>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
                   {aiBrain.topPhrase.avgSpokenScore != null && (
-                    <span className="rounded-md border border-teal-500/30 bg-teal-500/20 px-2 py-0.5 text-[10px] font-black text-teal-300">
+                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
                       <Mic2 className="mr-1 inline h-3 w-3" />
                       {aiBrain.topPhrase.avgSpokenScore}%
                     </span>
                   )}
-                  <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-teal-300" />
+                  <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-emerald-600" />
                 </div>
               </button>
             )}
@@ -424,52 +424,52 @@ export function SpriteChatBriefingTab({
         </div>
       )}
 
-      {/* 5. FLEX-1 COSMETIC TELEMETRY & VECTOR RADAR DECK */}
-      <div className="relative flex min-h-[220px] flex-1 flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900/75 via-[#090E1A]/90 to-indigo-950/40 p-5 shadow-xl">
+      {/* 5. FLEX-1 LIGHT TELEMETRY & VECTOR RADAR DECK */}
+      <div className="relative flex min-h-[220px] flex-1 flex-col justify-between overflow-hidden rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-5 shadow-xs">
         <svg
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-40"
+          className="pointer-events-none absolute inset-0 h-full w-full opacity-55"
           viewBox="0 0 600 340"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            <linearGradient id="briefingWave" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.05" />
-              <stop offset="50%" stopColor="#2DD4BF" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#818CF8" stopOpacity="0.05" />
+            <linearGradient id="briefingLightWave" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0284C7" stopOpacity="0.06" />
+              <stop offset="50%" stopColor="#0284C7" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#10B981" stopOpacity="0.06" />
             </linearGradient>
-            <radialGradient id="radarCore" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.22" />
-              <stop offset="60%" stopColor="#6366F1" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#0F172A" stopOpacity="0" />
+            <radialGradient id="lightRadarCore" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.16" />
+              <stop offset="60%" stopColor="#6366F1" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
             </radialGradient>
           </defs>
 
-          <circle cx="300" cy="170" r="150" fill="url(#radarCore)" />
-          <circle cx="300" cy="170" r="130" stroke="#334155" strokeWidth="1" strokeDasharray="4 6" />
-          <circle cx="300" cy="170" r="90" stroke="#2DD4BF" strokeOpacity="0.25" strokeWidth="1" />
-          <circle cx="300" cy="170" r="50" stroke="#818CF8" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="2 4" />
+          <circle cx="300" cy="170" r="150" fill="url(#lightRadarCore)" />
+          <circle cx="300" cy="170" r="130" stroke="#CBD5E1" strokeWidth="1" strokeDasharray="4 6" />
+          <circle cx="300" cy="170" r="90" stroke="#0284C7" strokeOpacity="0.2" strokeWidth="1" />
+          <circle cx="300" cy="170" r="50" stroke="#6366F1" strokeOpacity="0.25" strokeWidth="1" strokeDasharray="2 4" />
 
-          <line x1="80" y1="170" x2="520" y2="170" stroke="#1E293B" strokeWidth="1" />
-          <line x1="300" y1="20" x2="300" y2="320" stroke="#1E293B" strokeWidth="1" />
+          <line x1="80" y1="170" x2="520" y2="170" stroke="#E2E8F0" strokeWidth="1" />
+          <line x1="300" y1="20" x2="300" y2="320" stroke="#E2E8F0" strokeWidth="1" />
 
-          <path d="M 40 170 Q 105 90, 170 170 T 300 170 T 430 170 T 560 170" stroke="url(#briefingWave)" strokeWidth="2.5" fill="none" />
-          <path d="M 40 170 Q 105 230, 170 170 T 300 170 T 430 170 T 560 170" stroke="url(#briefingWave)" strokeWidth="1.25" strokeDasharray="3 3" fill="none" />
+          <path d="M 40 170 Q 105 90, 170 170 T 300 170 T 430 170 T 560 170" stroke="url(#briefingLightWave)" strokeWidth="2.5" fill="none" />
+          <path d="M 40 170 Q 105 230, 170 170 T 300 170 T 430 170 T 560 170" stroke="url(#briefingLightWave)" strokeWidth="1.25" strokeDasharray="3 3" fill="none" />
 
-          <circle cx="210" cy="145" r="4" fill="#2DD4BF" />
-          <circle cx="390" cy="195" r="4" fill="#818CF8" />
-          <circle cx="335" cy="115" r="3" fill="#F472B6" />
-          <circle cx="245" cy="215" r="3" fill="#38BDF8" />
+          <circle cx="210" cy="145" r="4" fill="#0284C7" />
+          <circle cx="390" cy="195" r="4" fill="#6366F1" />
+          <circle cx="335" cy="115" r="3" fill="#10B981" />
+          <circle cx="245" cy="215" r="3" fill="#F59E0B" />
         </svg>
 
         <div className="relative z-10 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 animate-ping rounded-full bg-teal-400" />
-            <span className="text-[10px] font-black tracking-widest text-teal-300 uppercase">
+            <span className="h-2 w-2 animate-ping rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
               {spriteName} Neural Acoustic Sync
             </span>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 font-mono text-[10px] font-bold text-slate-400">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[10px] font-bold text-slate-500">
             {aiBrain.targetLang.toUpperCase()} · LIVE
           </span>
         </div>
@@ -482,25 +482,25 @@ export function SpriteChatBriefingTab({
                 style={{ height: `${h}%` }}
                 className={`w-1.5 rounded-full ${
                   i % 2 === 0
-                    ? "bg-gradient-to-t from-teal-500/40 to-teal-300"
-                    : "bg-gradient-to-t from-indigo-500/40 to-indigo-300"
+                    ? "bg-gradient-to-t from-sky-300 to-blue-600"
+                    : "bg-gradient-to-t from-emerald-300 to-emerald-500"
                 }`}
               />
             ))}
           </div>
 
-          <p className="text-sm font-extrabold tracking-tight text-white">
+          <p className="text-sm font-black tracking-tight text-slate-900">
             {aiBrain.avgPronunciation > 0
               ? `${aiBrain.avgPronunciation}% Spoken Resonance Index`
               : "Calibrated for 1-on-1 Chalkboard Drills"}
           </p>
-          <p className="mt-0.5 max-w-xs text-[11px] font-medium text-slate-400">
+          <p className="mt-0.5 max-w-xs text-[11px] font-medium text-slate-500">
             {spriteName} adapts grammar hints, accent checks, and chalkboard
             drills in real time as you answer.
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-[10px] font-black tracking-wider text-slate-400 uppercase">
               Active Bank:
@@ -511,14 +511,14 @@ export function SpriteChatBriefingTab({
             ).map((word, idx) => (
               <span
                 key={idx}
-                className="rounded-lg border border-white/10 bg-slate-950/70 px-2.5 py-1 text-[11px] font-bold text-slate-200"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700"
               >
                 {word}
               </span>
             ))}
           </div>
 
-          <span className="text-[10px] font-bold text-teal-400/90">
+          <span className="text-[10px] font-black text-emerald-600">
             ⚡ Chalkboard Ready
           </span>
         </div>

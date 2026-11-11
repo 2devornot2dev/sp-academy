@@ -299,8 +299,8 @@ export function PrimaryHeroCard({
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-                  <Mic className="h-4 w-4 text-amber-400" />
+                <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                  <Mic className="h-4 w-4 text-rose-400" />
                   <span>
                     🔒 Complete 1 Live 3-Min AI Conversation to Unlock Boss
                   </span>
@@ -308,7 +308,7 @@ export function PrimaryHeroCard({
 
                 <Link
                   href="/conversation"
-                  className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                  className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-rose-900 bg-gradient-to-b from-rose-500 to-pink-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-rose-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
                 >
                   <Mic className="h-4 w-4" />
                   <span>Unlock Boss: Start 3-Min AI Chat</span>
@@ -321,6 +321,7 @@ export function PrimaryHeroCard({
       </div>
     );
   }
+
   // =========================================================================
   // 3. VOCAB BRIDGE READY (3D Split Cinema Card with Accent Amber Theme!)
   // =========================================================================
