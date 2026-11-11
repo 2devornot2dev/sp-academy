@@ -2,6 +2,7 @@
 "use server";
 import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
+import { getFreestyleRedisState } from "@/lib/upstash";
 
 type VisualContent = { imageS3Key?: string; altText?: string } | null;
 
@@ -45,51 +46,43 @@ async function safePresign(key?: string | null): Promise<string | null> {
   }
 }
 
-export async function getLearningPath(userId: string) {
-  const course = await prisma.foundationCourse.findFirst({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      targetLanguage: true,
-      nativeLanguage: true,
-      lessons: {
-        orderBy: { orderIndex: "asc" },
-        select: {
-          visualContent: true,
-          title: true,
-          id: true,
-          orderIndex: true,
-          completedAt: true,
-          feedback: true,
-          createdAt: true,
-        },
-      },
-      user: { select: { firstName: true, username: true, id: true } },
-    },
-  });
-
+/**
+ * Hydrates all Bridges, Boss Stages, and the Next Focused Step for a single FoundationCourse track.
+ */
+async function hydrateTrack(
+  course: {
+    id: string;
+    lessons: Array<{
+      id: string;
+      title: string | null;
+      orderIndex: number;
+      visualContent: any;
+      completedAt: Date | null;
+      feedback: any;
+      createdAt: Date;
+    }>;
+  },
+  userId: string,
+  freestyleSessions: Array<{ id: string; milestoneIndex: number | null }>,
+  hitDailyCap: boolean,
+) {
   if (!course) return null;
 
-  // 1. Fetch Bridges
-  const bridges = await prisma.foundationBridge.findMany({
-    where: { foundationCourseId: course.id, userId },
-    orderBy: { bridgeIndex: "asc" },
-    select: {
-      id: true,
-      bridgeIndex: true,
-      vocabMoment: true,
-      passed: true,
-      score: true,
-      attempts: true,
-      completedAt: true,
-      createdAt: true,
-    },
-  });
-  const bridgeByIndex = new Map(bridges.map((b) => [b.bridgeIndex, b]));
-
-  // 2. Fetch Boss Stages & Completed Freestyle Conversations
-  const [bossStages, freestyleSessions] = await Promise.all([
+  const [bridges, bossStages] = await Promise.all([
+    prisma.foundationBridge.findMany({
+      where: { foundationCourseId: course.id, userId },
+      orderBy: { bridgeIndex: "asc" },
+      select: {
+        id: true,
+        bridgeIndex: true,
+        vocabMoment: true,
+        passed: true,
+        score: true,
+        attempts: true,
+        completedAt: true,
+        createdAt: true,
+      },
+    }),
     prisma.foundationBossStage.findMany({
       where: { foundationCourseId: course.id, userId },
       select: {
@@ -103,28 +96,9 @@ export async function getLearningPath(userId: string) {
         completedAt: true,
       },
     }),
-    prisma.freestyleSession.findMany({
-      where: {
-        userId,
-        status: { in: ["REVIEW_PENDING", "COMPLETED"] },
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        milestoneIndex: true,
-        duration: true,
-        createdAt: true,
-      },
-    }),
   ]);
 
-  // Check if user has already hit the 5-per-day cap today so we never lock them out of a Boss
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const todaySessionCount = freestyleSessions.filter(
-    (s) => new Date(s.createdAt) >= startOfToday,
-  ).length;
-  const hitDailyCap = todaySessionCount >= 5;
+  const bridgeByIndex = new Map(bridges.map((b) => [b.bridgeIndex, b]));
 
   const resolvedBossStages = await Promise.all(
     bossStages.map(async (b) => {
@@ -165,7 +139,6 @@ export async function getLearningPath(userId: string) {
           }
         : null;
 
-      // Unlock if Boss already passed, OR user completed a convo for this milestoneIndex, OR hit 5/day cap
       const mIndex = b.milestoneIndex ?? 1;
       const milestoneSessions = freestyleSessions.filter(
         (s) => s.milestoneIndex === mIndex,
@@ -189,7 +162,6 @@ export async function getLearningPath(userId: string) {
     resolvedBossStages.map((b) => [b.milestoneIndex, b]),
   );
 
-  // 3. Map everything into the Lessons array
   const lessons = await Promise.all(
     course.lessons.map(async ({ visualContent, ...lesson }) => {
       const visual = visualContent as unknown as VisualContent;
@@ -208,7 +180,6 @@ export async function getLearningPath(userId: string) {
     }),
   );
 
-  // 4. Calculate Current Focus & Next Locked
   let currentFocus: {
     type: "SPOON" | "BRIDGE" | "BOSS";
     data: (typeof lessons)[0];
@@ -250,20 +221,93 @@ export async function getLearningPath(userId: string) {
     }
   }
 
-  const wordMatrix = await prisma.languageProfile.findUnique({
-    where: {
-      userId_languageCode: { userId, languageCode: course.targetLanguage },
-    },
-    include: {
-      wordStats: {
-        orderBy: [
-          { spokenAttempts: "desc" },
-          { masteryScore: "desc" },
-          { seenCount: "desc" },
-        ],
+  return {
+    courseId: course.id,
+    lessons,
+    currentFocus,
+    nextLocked,
+  };
+}
+
+export async function getLearningPath(userId: string) {
+  // Fetch ALL courses for this user (Standard Track & Hard Mode Track)
+  const courses = await prisma.foundationCourse.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      targetLanguage: true,
+      nativeLanguage: true,
+      isHardMode: true,
+      lessons: {
+        orderBy: { orderIndex: "asc" },
+        select: {
+          visualContent: true,
+          title: true,
+          id: true,
+          orderIndex: true,
+          completedAt: true,
+          feedback: true,
+          createdAt: true,
+        },
       },
+      user: { select: { firstName: true, username: true, id: true } },
     },
   });
+
+  const standardCourse = courses.find((c) => !c.isHardMode);
+  const hardCourse = courses.find((c) => c.isHardMode);
+
+  if (!standardCourse) return null;
+
+  const [freestyleSessions, redisState, wordMatrix] = await Promise.all([
+    prisma.freestyleSession.findMany({
+      where: {
+        userId,
+        status: { in: ["REVIEW_PENDING", "COMPLETED"] },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        milestoneIndex: true,
+      },
+    }),
+    getFreestyleRedisState(userId),
+    prisma.languageProfile.findUnique({
+      where: {
+        userId_languageCode: {
+          userId,
+          languageCode: standardCourse.targetLanguage,
+        },
+      },
+      include: {
+        wordStats: {
+          orderBy: [
+            { spokenAttempts: "desc" },
+            { masteryScore: "desc" },
+            { seenCount: "desc" },
+          ],
+        },
+      },
+    }),
+  ]);
+
+  const standardTrack = await hydrateTrack(
+    standardCourse,
+    userId,
+    freestyleSessions,
+    redisState.hitDailyCap,
+  );
+  const hardTrack = hardCourse
+    ? await hydrateTrack(
+        hardCourse,
+        userId,
+        freestyleSessions,
+        redisState.hitDailyCap,
+      )
+    : null;
+
+  if (!standardTrack) return null;
 
   const allStats = wordMatrix?.wordStats ?? [];
 
@@ -357,13 +401,20 @@ export async function getLearningPath(userId: string) {
   };
 
   return {
-    courseId: course.id,
-    targetLanguage: course.targetLanguage,
-    nativeLanguage: course.nativeLanguage,
-    lessons,
-    currentFocus,
-    nextLocked,
-    user: course.user,
+    standardTrack: {
+      ...standardTrack,
+      targetLanguage: standardCourse.targetLanguage,
+      nativeLanguage: standardCourse.nativeLanguage,
+      user: standardCourse.user,
+    },
+    hardTrack: hardTrack && hardCourse
+      ? {
+          ...hardTrack,
+          targetLanguage: hardCourse.targetLanguage,
+          nativeLanguage: hardCourse.nativeLanguage,
+          user: hardCourse.user,
+        }
+      : null,
     matrix: wordMatrix
       ? {
           id: wordMatrix.id,
@@ -375,6 +426,6 @@ export async function getLearningPath(userId: string) {
   };
 }
 
-export type LearningPath = NonNullable<
+export type LearningPathData = NonNullable<
   Awaited<ReturnType<typeof getLearningPath>>
 >;

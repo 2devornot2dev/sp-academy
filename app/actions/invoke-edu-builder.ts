@@ -176,12 +176,13 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
 }
 
 // ---------------------------------------------------------------------------
-// HELPER 2: Resolve Historical Context & Fallbacks for Returning Users
+// HELPER 2: Resolve Historical Context & Fallbacks (With Hard Mode Support)
 // ---------------------------------------------------------------------------
 async function resolveHistoricalContext(
   courseId: string,
   currentLessonId: string,
-  payload: InvokeEduBuilderPayload
+  payload: InvokeEduBuilderPayload,
+  isHardModeCourse: boolean
 ) {
   let previous_lessons: any[] = [];
   let yesterdayLanded: string[] = [];
@@ -191,7 +192,35 @@ async function resolveHistoricalContext(
   let resolvedGender = normalizeGender(payload.gender);
   let resolvedFirstName = payload.firstName;
 
-  const [pastLessons, firstTask, langProfile] = await Promise.all([
+  // If we are building a Hard Mode lesson, we need to pass the corresponding Standard Mode lessons 
+  // for that unit so the LLM mirrors the topic and upgrades it to Part IV, V, VI
+  const standardCourse = isHardModeCourse 
+    ? await prisma.foundationCourse.findFirst({
+        where: { 
+          userId: payload.userId, 
+          targetLanguage: payload.targetLanguage, 
+          isHardMode: false 
+        },
+        select: { id: true }
+      })
+    : null;
+
+  const standardUnitLessonsPromise = isHardModeCourse && standardCourse
+    ? prisma.foundationLesson.findMany({
+        where: {
+          foundationCourseId: standardCourse.id,
+          orderIndex: {
+            gte: (Math.ceil(payload.spoon / 3) - 1) * 3 + 1,
+            lte: Math.ceil(payload.spoon / 3) * 3,
+          },
+          NOT: { lessonHandoff: { equals: Prisma.DbNull } },
+        },
+        orderBy: { orderIndex: "asc" },
+        select: { orderIndex: true, title: true, lessonHandoff: true },
+      })
+    : Promise.resolve([]);
+
+  const [pastLessonsInThisCourse, standardUnitLessons, firstTask, langProfile] = await Promise.all([
     prisma.foundationLesson.findMany({
       where: {
         foundationCourseId: courseId,
@@ -202,34 +231,32 @@ async function resolveHistoricalContext(
       orderBy: { orderIndex: "asc" },
       select: { orderIndex: true, title: true, lessonHandoff: true },
     }),
-
+    standardUnitLessonsPromise,
     prisma.systemTask.findFirst({
       where: {
         type: "SPOON_GENERATION",
         metadata: {
           path: ["foundationCourseId"],
-          equals: courseId,
+          equals: standardCourse?.id || courseId,
         },
       },
       orderBy: { createdAt: "asc" },
       select: { payload: true },
     }),
-
-    // Fetch saved per-language levelBand & goal from LanguageProfile
-    prisma.languageProfile
-      .findUnique({
-        where: {
-          userId_languageCode: {
-            userId: payload.userId,
-            languageCode: payload.targetLanguage,
-          },
+    prisma.languageProfile.findUnique({
+      where: {
+        userId_languageCode: {
+          userId: payload.userId,
+          languageCode: payload.targetLanguage,
         },
-      })
-      .catch(() => null),
+      },
+    }).catch(() => null),
   ]);
 
-  // Strip heavy S3 audio paths and intro/outro strings right here so SystemTask payloads stay tiny
-  previous_lessons = pastLessons.map((l) => {
+  // Combine standard unit lessons (so LLM sees Parts I, II, III) + past hard mode lessons
+  const combinedRawLessons = [...standardUnitLessons, ...pastLessonsInThisCourse];
+
+  previous_lessons = combinedRawLessons.map((l) => {
     const {
       wordAudio,
       wordLexicon,
@@ -251,8 +278,8 @@ async function resolveHistoricalContext(
     };
   });
 
-  if (pastLessons.length > 0) {
-    const lastHandoff = pastLessons[pastLessons.length - 1]
+  if (combinedRawLessons.length > 0) {
+    const lastHandoff = combinedRawLessons[combinedRawLessons.length - 1]
       .lessonHandoff as any;
     if (lastHandoff) {
       yesterdayLanded =
@@ -275,7 +302,6 @@ async function resolveHistoricalContext(
     }
   }
 
-  // ✅ Always prioritize saved LanguageProfile -> Onboarding Task #1 over generic "beginner"/"general" fallbacks!
   const dbLevel = (langProfile as any)?.levelBand || initialData?.levelBand;
   if (
     dbLevel &&
@@ -467,7 +493,6 @@ export async function invokeEduBuilder(
     goal: (payload.goal || "general").toLowerCase(),
   };
 
-  // Persist levelBand & goal to LanguageProfile during Onboarding (or when explicitly provided)
   if (normalizedPayload.isOnboarding && normalizedPayload.targetLanguage) {
     await prisma.languageProfile
       .upsert({
@@ -493,7 +518,6 @@ export async function invokeEduBuilder(
       );
   }
 
-  // 1. Setup Lesson, Course, & SpriteProfile in Postgres
   let dbContext: LessonDbContext;
   try {
     dbContext = normalizedPayload.isOnboarding
@@ -507,10 +531,16 @@ export async function invokeEduBuilder(
     };
   }
 
+  // 🔴 Check if this course is Hard Mode
+  const courseMeta = await prisma.foundationCourse.findUnique({
+    where: { id: dbContext.courseId },
+    select: { isHardMode: true }
+  });
+  const isHardModeCourse = courseMeta?.isHardMode ?? false;
+
   const milestoneIndex = Math.ceil(normalizedPayload.spoon / 3);
   const milestoneSubStep = ((normalizedPayload.spoon - 1) % 3) + 1;
 
-  // 2. Resolve Historical Context & Fallbacks for returning users
   let previous_lessons: any[] = [];
   let yesterdayLanded: string[] = [];
   let resolvedLevelBand = normalizedPayload.levelBand;
@@ -522,7 +552,8 @@ export async function invokeEduBuilder(
     const hist = await resolveHistoricalContext(
       dbContext.courseId,
       dbContext.lessonId,
-      normalizedPayload
+      normalizedPayload,
+      isHardModeCourse
     );
     previous_lessons = hist.previous_lessons;
     yesterdayLanded = hist.yesterdayLanded;
@@ -532,7 +563,6 @@ export async function invokeEduBuilder(
     resolvedFirstName = hist.resolvedFirstName;
   }
 
-  // 3. Resolve Voice IDs & Sprite Metadata
   const resolvedSpriteSlug =
     dbContext.spriteSlug || normalizedPayload.spriteSlug || "vox";
   const resolvedSpriteName = dbContext.spriteName || "Vox";
@@ -542,13 +572,14 @@ export async function invokeEduBuilder(
   const resolvedTargetVoiceId =
     dbContext.targetVoiceId || normalizedPayload.targetVoiceId;
 
-  // 4. Assemble main spoon-edu-builder payload
+  // 🔴 Pass isHardMode to Python
   const lambdaPayload = {
     ...normalizedPayload,
     type: "lang",
     day: normalizedPayload.spoon,
     milestoneIndex,
     subStep: milestoneSubStep,
+    isHardMode: isHardModeCourse,
     foundationCourseId: dbContext.courseId,
     foundationLessonId: dbContext.lessonId,
     webhookUrl: dbContext.webhookUrl,
@@ -577,7 +608,6 @@ export async function invokeEduBuilder(
         : normalizedPayload.yesterdayLanded,
   };
 
-  // 5. Construct Sprite Payloads if not cached
   let spriteSpoonPayload: any = null;
   if (
     dbContext.spriteWebhookUrl &&
@@ -622,7 +652,6 @@ export async function invokeEduBuilder(
     );
   }
 
-  // 6. Dispatch Lambdas
   try {
     await dispatchEduAndSpriteLambdas(
       dbContext,

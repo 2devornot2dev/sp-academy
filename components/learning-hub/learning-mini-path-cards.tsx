@@ -1,4 +1,3 @@
-// components/learning-hub/learning-mini-path-cards.tsx
 "use client";
 
 import { useState } from "react";
@@ -17,15 +16,13 @@ import {
   Shield,
   Loader2,
 } from "lucide-react";
-import type { LearningPath } from "@/app/actions/get-learning-path";
+import type { LearningPathData } from "@/app/actions/get-learning-path";
 import { activateHardModeTrack } from "@/lib/foundation/advance-build-chain";
 import { useSprite } from "@/context/sprite-context";
 
-type FocusState = LearningPath["currentFocus"];
-type Lesson = LearningPath["lessons"][number];
+type Lesson = NonNullable<LearningPathData["standardTrack"]>["lessons"][number];
 
 const HARD_MODE_UNLOCK_SPOON = 30;
-const HARD_MODE_SPOON_OFFSET = 900; // Hard Spoon 1 = orderIndex 901
 
 const STANDARD_NODE_3D_STYLES = {
   SPOON: {
@@ -106,109 +103,46 @@ const HARD_NODE_3D_STYLES = {
 } as const;
 
 export function LearningPathMiniCards({
-  courseId,
-  currentFocus,
-  nextLocked,
-  lessons = [],
-  getLessonHref,
-  getBossHref,
+  data,
   displayTitles,
+  activeTrack,
+  setActiveTrack,
 }: {
-  courseId: string;
-  currentFocus: FocusState;
-  nextLocked: FocusState;
-  lessons?: Lesson[];
-  getLessonHref?: (lessonId: string) => string;
-  getBossHref?: (bossId: string, lessonId: string) => string;
+  data: LearningPathData;
   displayTitles?: Map<string, string>;
+  activeTrack: "STANDARD" | "HARD";
+  setActiveTrack: (track: "STANDARD" | "HARD") => void;
 }) {
   const router = useRouter();
   const { openChat, spriteName, setLiveTask } = useSprite();
 
-  const standardLessons = lessons.filter(
-    (l) => l.orderIndex <= HARD_MODE_SPOON_OFFSET,
-  );
-  const hardLessons = lessons.filter(
-    (l) => l.orderIndex > HARD_MODE_SPOON_OFFSET,
-  );
+  const standardTrack = data.standardTrack;
+  const hardTrack = data.hardTrack;
 
-  const completedStandardSpoonsCount = standardLessons.filter((l) =>
+  if (!standardTrack) return null;
+
+  const completedStandardSpoonsCount = standardTrack.lessons.filter((l) =>
     Boolean(l.completedAt),
   ).length;
+
   const hardModeUnlocked =
     completedStandardSpoonsCount >= HARD_MODE_UNLOCK_SPOON;
-  const hasHardModeLessons = hardLessons.length > 0;
 
-  const [viewTrack, setViewTrack] = useState<"STANDARD" | "HARD">("STANDARD");
   const [isActivatingHardMode, setIsActivatingHardMode] = useState(false);
 
-  if (!currentFocus) return null;
-
-  const isHardView = viewTrack === "HARD" && hardModeUnlocked;
+  const isHardView = activeTrack === "HARD" && hardModeUnlocked;
+  
+  const currentTrackData = isHardView && hardTrack ? hardTrack : standardTrack;
   const nodeStyles = isHardView ? HARD_NODE_3D_STYLES : STANDARD_NODE_3D_STYLES;
 
-  const resolveLessonHref = (lessonId: string) =>
-    getLessonHref
-      ? getLessonHref(lessonId)
-      : `/foundation/${lessonId}/${courseId}`;
+  const currentFocus = currentTrackData.currentFocus;
+  const nextLocked = currentTrackData.nextLocked;
+  const lessons = currentTrackData.lessons;
+  const courseId = currentTrackData.courseId;
 
-  const resolveBossHref = (bossId: string, lessonId: string) =>
-    getBossHref
-      ? getBossHref(bossId, lessonId)
-      : `/foundation/boss/${bossId}`;
-
-  // Compute Focus & Active Order Index per Track (Standard vs Hard Mode)
-  let trackActiveOrderIndex = currentFocus.data.orderIndex ?? 1;
-  let trackFocusType: "SPOON" | "BRIDGE" | "BOSS" = currentFocus.type;
-
-  if (isHardView) {
-    // Find current active step on the Hard Mode track (starts at 901 = Hard Spoon 1)
-    let foundHardFocus = false;
-    for (const hl of hardLessons) {
-      if (!hl.completedAt) {
-        trackActiveOrderIndex = hl.orderIndex;
-        trackFocusType = "SPOON";
-        foundHardFocus = true;
-        break;
-      }
-      if (!hl.bridge || !hl.bridge.passed) {
-        trackActiveOrderIndex = hl.orderIndex;
-        trackFocusType = "BRIDGE";
-        foundHardFocus = true;
-        break;
-      }
-      if (hl.orderIndex % 3 === 0 && (!hl.bossStage || !hl.bossStage.passed)) {
-        trackActiveOrderIndex = hl.orderIndex;
-        trackFocusType = "BOSS";
-        foundHardFocus = true;
-        break;
-      }
-    }
-    if (!foundHardFocus) {
-      trackActiveOrderIndex =
-        hardLessons.length > 0
-          ? hardLessons[hardLessons.length - 1].orderIndex
-          : HARD_MODE_SPOON_OFFSET + 1;
-      trackFocusType = "SPOON";
-    }
-  } else if (trackActiveOrderIndex > HARD_MODE_SPOON_OFFSET) {
-    // If currentFocus is in Hard Mode but user is viewing Standard Track
-    const firstIncompleteStd =
-      standardLessons.find(
-        (l) =>
-          !l.completedAt ||
-          !l.bridge?.passed ||
-          (l.orderIndex % 3 === 0 && !l.bossStage?.passed),
-      ) ?? standardLessons[standardLessons.length - 1];
-    trackActiveOrderIndex = firstIncompleteStd?.orderIndex ?? 1;
-  }
-
-  const rawMilestoneNum = Math.ceil(trackActiveOrderIndex / 3);
-  const displayUnitNum = isHardView
-    ? Math.max(1, rawMilestoneNum - HARD_MODE_SPOON_OFFSET / 3)
-    : rawMilestoneNum;
-
-  const unitStartOrder = (rawMilestoneNum - 1) * 3 + 1;
+  const activeOrderIndex = currentFocus?.data.orderIndex ?? 1;
+  const milestoneNum = Math.ceil(activeOrderIndex / 3);
+  const unitStartOrder = (milestoneNum - 1) * 3 + 1;
   const unitSpoonNumbers = [
     unitStartOrder,
     unitStartOrder + 1,
@@ -237,7 +171,7 @@ export function LearningPathMiniCards({
       prompt: `I just activated Hard Mode! Tell me how Hard Mode Parts IV, V, and VI work while you set up my Hard Spoon 1.`,
     });
 
-    const res = await activateHardModeTrack(courseId);
+    const res = await activateHardModeTrack(standardTrack.courseId);
     setIsActivatingHardMode(false);
 
     if (res.ok) {
@@ -275,28 +209,20 @@ export function LearningPathMiniCards({
     );
 
     const isSpoonCurrent =
-      hasHardModeLessons || !isHardView
-        ? trackFocusType === "SPOON" && trackActiveOrderIndex === dbSpoonNum
-        : idx === 0;
+      currentFocus?.type === "SPOON" && activeOrderIndex === dbSpoonNum;
     const isBridgeCurrent =
-      trackFocusType === "BRIDGE" && trackActiveOrderIndex === dbSpoonNum;
-
-    const displaySpoonNum = isHardView
-      ? dbSpoonNum - HARD_MODE_SPOON_OFFSET
-      : dbSpoonNum;
+      currentFocus?.type === "BRIDGE" && activeOrderIndex === dbSpoonNum;
 
     mapNodes.push({
       id: `spoon-${dbSpoonNum}`,
       kind: "SPOON",
-      label: `${displaySpoonNum}`,
-      subLabel: isHardView
-        ? `Hard Spoon ${displaySpoonNum}`
-        : `Spoon ${displaySpoonNum}`,
+      label: `${dbSpoonNum}`,
+      subLabel: isHardView ? `Hard Spoon ${dbSpoonNum}` : `Spoon ${dbSpoonNum}`,
       isDone: spoonDone,
       isCurrent: isSpoonCurrent,
       href:
         (spoonDone || isSpoonCurrent) && matched
-          ? resolveLessonHref(matched.id)
+          ? `/foundation/${matched.id}/${courseId}`
           : undefined,
       yOffsetClass: waveOffsets[idx * 2],
     });
@@ -306,8 +232,8 @@ export function LearningPathMiniCards({
       kind: "BRIDGE",
       label: "⚡",
       subLabel: isHardView
-        ? `Hard Bridge ${displaySpoonNum}`
-        : `Bridge ${displaySpoonNum}`,
+        ? `Hard Bridge ${dbSpoonNum}`
+        : `Bridge ${dbSpoonNum}`,
       isDone: bridgeDone,
       isCurrent: isBridgeCurrent,
       href:
@@ -319,25 +245,23 @@ export function LearningPathMiniCards({
   });
 
   const isBossCurrent =
-    trackFocusType === "BOSS" &&
-    Math.ceil(trackActiveOrderIndex / 3) === rawMilestoneNum;
+    currentFocus?.type === "BOSS" &&
+    Math.ceil(activeOrderIndex / 3) === milestoneNum;
   const bossLesson = lessons.find((l) => l.orderIndex === unitSpoonNumbers[2]);
   const isBossFreestyleUnlocked =
     (bossLesson?.bossStage as any)?.freestyleUnlocked ?? true;
 
   mapNodes.push({
-    id: `boss-${rawMilestoneNum}`,
+    id: `boss-${milestoneNum}`,
     kind: "BOSS",
-    label: `B${displayUnitNum}`,
-    subLabel: isHardView
-      ? `Hard Boss ${displayUnitNum}`
-      : `Boss ${displayUnitNum}`,
+    label: `B${milestoneNum}`,
+    subLabel: isHardView ? `Hard Boss ${milestoneNum}` : `Boss ${milestoneNum}`,
     isDone: Boolean(bossLesson?.bossStage?.passed),
     isCurrent: isBossCurrent,
     href:
       isBossCurrent && bossLesson?.bossStage
         ? isBossFreestyleUnlocked
-          ? resolveBossHref(bossLesson.bossStage.id, bossLesson.id)
+          ? `/foundation/boss/${bossLesson.bossStage.id}`
           : "/conversation"
         : undefined,
     yOffsetClass: waveOffsets[6],
@@ -351,9 +275,8 @@ export function LearningPathMiniCards({
     (currentIdx / (mapNodes.length - 1)) * 100,
   );
 
-  // Standard Mode Up Next vs Hard Mode Unit 1 Up Next
-  const mirroredStandardUnit1Lesson = standardLessons.find(
-    (l) => l.orderIndex === (displayUnitNum - 1) * 3 + 1,
+  const mirroredStandardUnit1Lesson = standardTrack.lessons.find(
+    (l) => l.orderIndex === 1,
   );
 
   return (
@@ -364,11 +287,8 @@ export function LearningPathMiniCards({
           : "bg-white text-slate-900 ring-1 ring-slate-200/70"
       }`}
     >
-      {/* =====================================================================
-          1. SINGLE-ROW TOP HEADER + TRACK FLIPPER
-          ===================================================================== */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
               isHardView
@@ -390,8 +310,8 @@ export function LearningPathMiniCards({
                 }`}
               >
                 {isHardView
-                  ? `🔥 Hard Mode · Unit ${displayUnitNum} (Parts IV–VI)`
-                  : `Unit ${displayUnitNum} Adventure Map`}
+                  ? `🔥 Hard Mode · Unit ${milestoneNum} (Parts IV–VI)`
+                  : `Unit ${milestoneNum} Adventure Map`}
               </h3>
 
               <div className="hidden items-center gap-2 text-[10px] font-extrabold md:flex">
@@ -435,13 +355,12 @@ export function LearningPathMiniCards({
             </div>
             <p className="truncate text-[11px] font-semibold text-slate-400">
               {isHardView
-                ? `Master Parts IV, V & VI in Hard Mode to challenge Hard Boss ${displayUnitNum}`
-                : `Complete each blue Spoon & amber Vocab Bridge to unlock Boss ${displayUnitNum}`}
+                ? `Master Parts IV, V & VI in Hard Mode to challenge Hard Boss ${milestoneNum}`
+                : `Complete each blue Spoon & amber Vocab Bridge to unlock Boss ${milestoneNum}`}
             </p>
           </div>
         </div>
 
-        {/* Right-Aligned Track Switcher Pill */}
         {hardModeUnlocked ? (
           <div
             className={`inline-flex shrink-0 items-center gap-1 self-start rounded-2xl p-1 sm:self-center ${
@@ -452,7 +371,7 @@ export function LearningPathMiniCards({
           >
             <button
               type="button"
-              onClick={() => setViewTrack("STANDARD")}
+              onClick={() => setActiveTrack("STANDARD")}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black whitespace-nowrap transition ${
                 !isHardView
                   ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
@@ -465,7 +384,7 @@ export function LearningPathMiniCards({
 
             <button
               type="button"
-              onClick={() => setViewTrack("HARD")}
+              onClick={() => setActiveTrack("HARD")}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black whitespace-nowrap transition ${
                 isHardView
                   ? "border-b-2 border-red-950 bg-gradient-to-r from-rose-500 via-red-600 to-amber-500 text-white shadow-md shadow-rose-500/30"
@@ -496,223 +415,206 @@ export function LearningPathMiniCards({
         )}
       </div>
 
-      {/* =====================================================================
-          2. STEPPING-STONE VISUAL MAP (Standard or Hard Mode Starting at 1!)
-          ===================================================================== */}
-      <div
-        className={`relative overflow-x-auto rounded-3xl px-4 pt-10 pb-7 ring-1 transition-colors duration-500 ${
-          isHardView
-            ? "bg-gradient-to-b from-slate-900 via-rose-950/35 to-slate-900 ring-rose-500/25"
-            : "bg-gradient-to-b from-slate-50/90 via-sky-50/25 to-purple-50/20 ring-slate-100"
-        }`}
-      >
+      {isHardView && !hardTrack ? (
+        <div className="relative overflow-hidden rounded-3xl border-2 border-rose-500/40 bg-gradient-to-br from-rose-950/60 via-slate-900 to-amber-950/40 p-7 text-center shadow-inner">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border-b-4 border-rose-900 bg-gradient-to-b from-rose-500 to-red-700 text-white shadow-lg">
+            <Flame className="h-7 w-7 fill-amber-300 text-amber-300" />
+          </div>
+          <h4 className="text-xl font-black text-white sm:text-2xl">
+            Ready for Hard Mode (Parts IV, V &amp; VI)?
+          </h4>
+          <p className="mx-auto mt-1.5 max-w-lg text-xs font-medium leading-relaxed text-slate-300 sm:text-sm">
+            You conquered all 30 Standard Spoons! Hard Mode starts back at{" "}
+            <strong className="text-amber-300">Hard Spoon 1</strong>—revisiting
+            each unit for <strong className="text-rose-300">Parts IV, V, and VI</strong>{" "}
+            with longer sentences, faster native audio, and deeper idioms.
+          </p>
+
+          <button
+            type="button"
+            disabled={isActivatingHardMode}
+            onClick={handleActivateHardMode}
+            className="mt-5 inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-red-950 bg-gradient-to-r from-rose-500 via-red-600 to-amber-500 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-rose-600/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:opacity-60"
+          >
+            {isActivatingHardMode ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{spriteName} is Setting Up Hard Mode...</span>
+              </>
+            ) : (
+              <>
+                <Flame className="h-4 w-4 fill-amber-300 text-amber-300" />
+                <span>Activate Hard Mode · Start Hard Spoon 1</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </div>
+      ) : (
         <div
-          className={`pointer-events-none absolute top-[48%] right-12 left-12 h-2.5 -translate-y-1/2 rounded-full shadow-inner ${
-            isHardView ? "bg-slate-800" : "bg-slate-200/80"
+          className={`relative overflow-x-auto rounded-3xl px-4 pt-10 pb-7 ring-1 transition-colors duration-500 ${
+            isHardView
+              ? "bg-gradient-to-b from-slate-900 via-rose-950/35 to-slate-900 ring-rose-500/25"
+              : "bg-gradient-to-b from-slate-50/90 via-sky-50/25 to-purple-50/20 ring-slate-100"
           }`}
         >
           <div
-            className={`h-full rounded-full transition-all duration-700 ${
-              isHardView
-                ? "bg-gradient-to-r from-rose-500 via-fuchsia-500 to-amber-400"
-                : "bg-gradient-to-r from-blue-500 via-amber-400 to-purple-500"
+            className={`pointer-events-none absolute top-[48%] right-12 left-12 h-2.5 -translate-y-1/2 rounded-full shadow-inner ${
+              isHardView ? "bg-slate-800" : "bg-slate-200/80"
             }`}
-            style={{ width: `${trackProgressPct}%` }}
-          />
-        </div>
+          >
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${
+                isHardView
+                  ? "bg-gradient-to-r from-rose-500 via-fuchsia-500 to-amber-400"
+                  : "bg-gradient-to-r from-blue-500 via-amber-400 to-purple-500"
+              }`}
+              style={{ width: `${trackProgressPct}%` }}
+            />
+          </div>
 
-        <div className="relative z-10 flex min-w-[540px] items-center justify-between px-2">
-          {mapNodes.map((node) => {
-            const styles = nodeStyles[node.kind];
-            const buttonStyle = node.isCurrent
-              ? styles.active
-              : node.isDone
-                ? styles.done
-                : styles.locked;
+          <div className="relative z-10 flex min-w-[540px] items-center justify-between px-2">
+            {mapNodes.map((node) => {
+              const styles = nodeStyles[node.kind];
+              const buttonStyle = node.isCurrent
+                ? styles.active
+                : node.isDone
+                  ? styles.done
+                  : styles.locked;
 
-            const pedestalColor = node.isCurrent
-              ? styles.pedestalActive
-              : node.isDone
-                ? styles.pedestalDone
-                : styles.pedestalLocked;
+              const pedestalColor = node.isCurrent
+                ? styles.pedestalActive
+                : node.isDone
+                  ? styles.pedestalDone
+                  : styles.pedestalLocked;
 
-            const isBridge = node.kind === "BRIDGE";
-            const isBoss = node.kind === "BOSS";
+              const isBridge = node.kind === "BRIDGE";
+              const isBoss = node.kind === "BOSS";
 
-            const sizeClasses = isBoss
-              ? "h-16 w-16 rounded-[1.4rem] text-base"
-              : isBridge
-                ? "h-11 w-11 rounded-2xl text-sm"
-                : "h-14 w-14 rounded-[1.25rem] text-lg";
+              const sizeClasses = isBoss
+                ? "h-16 w-16 rounded-[1.4rem] text-base"
+                : isBridge
+                  ? "h-11 w-11 rounded-2xl text-sm"
+                  : "h-14 w-14 rounded-[1.25rem] text-lg";
 
-            const innerNodeContent = (
-              <>
-                {node.isCurrent && (
-                  <span
-                    className={`pointer-events-none absolute -inset-2 animate-pulse rounded-3xl blur-md ${styles.halo}`}
-                  />
-                )}
-
-                <div
-                  className={`relative z-10 flex items-center justify-center font-black transition-all duration-150 ${sizeClasses} ${buttonStyle} ${
-                    node.href
-                      ? "group-hover:-translate-y-1 group-active:translate-y-1 group-active:border-b-2"
-                      : ""
-                  }`}
-                >
-                  {isBoss ? (
-                    <div className="flex flex-col items-center leading-none">
-                      <Crown
-                        className={`mb-0.5 h-4 w-4 ${
-                          isHardView
-                            ? "fill-slate-950 text-slate-950"
-                            : "fill-amber-300 text-amber-300"
-                        }`}
-                      />
-                      <Swords className="h-5 w-5" />
-                    </div>
-                  ) : isBridge ? (
-                    <Zap className="h-5 w-5 fill-current" />
-                  ) : (
-                    <span>{node.label}</span>
+              const innerNodeContent = (
+                <>
+                  {node.isCurrent && (
+                    <span
+                      className={`pointer-events-none absolute -inset-2 animate-pulse rounded-3xl blur-md ${styles.halo}`}
+                    />
                   )}
 
-                  {node.isDone ? (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs ring-2 ring-white">
-                      <Check className="h-3 w-3 stroke-[3.5]" />
-                    </span>
-                  ) : !node.isCurrent ? (
-                    <span
-                      className={`absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full shadow-xs ring-1 ${
-                        isHardView
-                          ? "bg-slate-900 text-slate-500 ring-slate-700"
-                          : "bg-white text-slate-400 ring-slate-200"
-                      }`}
-                    >
-                      <Lock className="h-2.5 w-2.5" />
-                    </span>
-                  ) : null}
-                </div>
-
-                <div
-                  className={`mt-1.5 rounded-full transition-all ${
-                    isBoss
-                      ? "h-2.5 w-14"
-                      : isBridge
-                        ? "h-2 w-9"
-                        : "h-2.5 w-12"
-                  } ${pedestalColor}`}
-                />
-
-                <span
-                  className={`mt-1.5 text-[10px] font-extrabold tracking-tight ${
-                    node.isCurrent
-                      ? isHardView
-                        ? "font-black text-white"
-                        : "font-black text-slate-900"
-                      : styles.labelColor
-                  }`}
-                >
-                  {node.subLabel}
-                </span>
-              </>
-            );
-
-            return (
-              <div
-                key={node.id}
-                className={`flex flex-col items-center ${node.yOffsetClass} transition-transform duration-300`}
-              >
-                {node.isCurrent && (
                   <div
-                    className={`-mt-7 mb-1.5 animate-bounce rounded-full px-2.5 py-0.5 text-[9px] font-black tracking-wider uppercase shadow-md ${
-                      isHardView
-                        ? "bg-rose-500 text-white"
-                        : "bg-slate-900 text-amber-300"
+                    className={`relative z-10 flex items-center justify-center font-black transition-all duration-150 ${sizeClasses} ${buttonStyle} ${
+                      node.href
+                        ? "group-hover:-translate-y-1 group-active:translate-y-1 group-active:border-b-2"
+                        : ""
                     }`}
                   >
-                    Active
-                  </div>
-                )}
+                    {isBoss ? (
+                      <div className="flex flex-col items-center leading-none">
+                        <Crown
+                          className={`mb-0.5 h-4 w-4 ${
+                            isHardView
+                              ? "fill-slate-950 text-slate-950"
+                              : "fill-amber-300 text-amber-300"
+                          }`}
+                        />
+                        <Swords className="h-5 w-5" />
+                      </div>
+                    ) : isBridge ? (
+                      <Zap className="h-5 w-5 fill-current" />
+                    ) : (
+                      <span>{node.label}</span>
+                    )}
 
-                {node.href ? (
-                  <Link
-                    href={node.href}
-                    className="group relative flex cursor-pointer flex-col items-center focus:outline-none"
+                    {node.isDone ? (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs ring-2 ring-white">
+                        <Check className="h-3 w-3 stroke-[3.5]" />
+                      </span>
+                    ) : !node.isCurrent ? (
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full shadow-xs ring-1 ${
+                          isHardView
+                            ? "bg-slate-900 text-slate-500 ring-slate-700"
+                            : "bg-white text-slate-400 ring-slate-200"
+                        }`}
+                      >
+                        <Lock className="h-2.5 w-2.5" />
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className={`mt-1.5 rounded-full transition-all ${
+                      isBoss
+                        ? "h-2.5 w-14"
+                        : isBridge
+                          ? "h-2 w-9"
+                          : "h-2.5 w-12"
+                    } ${pedestalColor}`}
+                  />
+
+                  <span
+                    className={`mt-1.5 text-[10px] font-extrabold tracking-tight ${
+                      node.isCurrent
+                        ? isHardView
+                          ? "font-black text-white"
+                          : "font-black text-slate-900"
+                        : styles.labelColor
+                    }`}
                   >
-                    {innerNodeContent}
-                  </Link>
-                ) : (
-                  <div className="group relative flex cursor-default flex-col items-center">
-                    {innerNodeContent}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* =====================================================================
-          3. BOTTOM BANNER: HARD MODE ACTIVATION CTA OR UP NEXT BANNER
-          ===================================================================== */}
-      {isHardView && !hasHardModeLessons ? (
-        <div className="relative overflow-hidden rounded-2xl bg-slate-900/95 p-4 ring-1 ring-rose-500/40 sm:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-4 border-rose-950 bg-gradient-to-b from-rose-500 to-red-700 text-white shadow-sm">
-                <Flame className="h-5 w-5 fill-amber-300 text-amber-300" />
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-black tracking-wider text-rose-400 uppercase">
-                    Start Hard Mode Track
+                    {node.subLabel}
                   </span>
-                  <span className="rounded-full bg-rose-500/20 px-2.5 py-0.5 text-[10px] font-black text-rose-200 uppercase">
-                    Hard Spoon 1 · Part IV
-                  </span>
+                </>
+              );
+
+              return (
+                <div
+                  key={node.id}
+                  className={`flex flex-col items-center ${node.yOffsetClass} transition-transform duration-300`}
+                >
+                  {node.isCurrent && (
+                    <div
+                      className={`-mt-7 mb-1.5 animate-bounce rounded-full px-2.5 py-0.5 text-[9px] font-black tracking-wider uppercase shadow-md ${
+                        isHardView
+                          ? "bg-rose-500 text-white"
+                          : "bg-slate-900 text-amber-300"
+                      }`}
+                    >
+                      Active
+                    </div>
+                  )}
+
+                  {node.href ? (
+                    <Link
+                      href={node.href}
+                      className="group relative flex cursor-pointer flex-col items-center focus:outline-none"
+                    >
+                      {innerNodeContent}
+                    </Link>
+                  ) : (
+                    <div className="group relative flex cursor-default flex-col items-center">
+                      {innerNodeContent}
+                    </div>
+                  )}
                 </div>
-                <h4 className="mt-0.5 truncate text-sm font-black text-white sm:text-base">
-                  {mirroredStandardUnit1Lesson?.title
-                    ? `${mirroredStandardUnit1Lesson.title} IV`
-                    : "Unit 1: Greetings & Introductions IV"}
-                </h4>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              disabled={isActivatingHardMode}
-              onClick={handleActivateHardMode}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-red-950 bg-gradient-to-r from-rose-500 via-red-600 to-amber-500 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-rose-600/30 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:opacity-60"
-            >
-              {isActivatingHardMode ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>{spriteName} is Setting Up...</span>
-                </>
-              ) : (
-                <>
-                  <Flame className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
-                  <span>Generate Hard Spoon 1</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </>
-              )}
-            </button>
+              );
+            })}
           </div>
         </div>
-      ) : (
-        nextLocked && (
-          <UpNextWideBanner
-            type={nextLocked.type}
-            lesson={nextLocked.data}
-            milestoneNum={displayUnitNum}
-            isHardView={isHardView}
-            displayTitles={displayTitles}
-          />
-        )
       )}
+
+      {isHardView && !hardTrack ? null : nextLocked ? (
+        <UpNextWideBanner
+          type={nextLocked.type}
+          lesson={nextLocked.data}
+          milestoneNum={milestoneNum}
+          isHardView={isHardView}
+          displayTitles={displayTitles}
+        />
+      ) : null}
     </div>
   );
 }
@@ -731,10 +633,7 @@ function UpNextWideBanner({
   displayTitles?: Map<string, string>;
 }) {
   const formattedTitle = displayTitles?.get(lesson.id) || lesson.title;
-  const displaySpoonNum =
-    isHardView && lesson.orderIndex > HARD_MODE_SPOON_OFFSET
-      ? lesson.orderIndex - HARD_MODE_SPOON_OFFSET
-      : lesson.orderIndex;
+  const displaySpoonNum = lesson.orderIndex;
 
   const title =
     type === "SPOON"

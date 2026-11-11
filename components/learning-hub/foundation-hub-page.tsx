@@ -1,10 +1,9 @@
-// components/learning-hub/foundation-hub-page.tsx
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, Dumbbell, Sparkles, ArrowRight } from "lucide-react";
-import type { LearningPath } from "@/app/actions/get-learning-path";
+import type { LearningPathData } from "@/app/actions/get-learning-path";
 import type { UserGenerationData } from "@/lib/upstash";
 import { useSprite } from "@/context/sprite-context";
 import {
@@ -25,7 +24,7 @@ import { WordMatrixCard } from "./word-matrix-card";
 import { SpriteChat } from "@/components/sprite/sprite-chat";
 
 type Props = {
-  path: LearningPath | null;
+  path: LearningPathData | null;
   lang: { nativeLanguage: string; targetLanguage: string | null | any };
   generationData?: UserGenerationData | null;
 };
@@ -46,9 +45,28 @@ export default function FoundationHubPage({
     avatarSrc,
   } = useSprite();
 
-  const lessons = path?.lessons ?? [];
-  const courseId = path?.courseId ?? (path as any)?.id ?? "default";
-  const user = path?.user;
+  const standardTrack = path?.standardTrack;
+  const hardTrack = path?.hardTrack;
+
+  // Track State hoisted so the whole page (Hero Card + Map + History) syncs!
+  const [activeTrack, setActiveTrack] = useState<"STANDARD" | "HARD">(() => {
+    return hardTrack &&
+      hardTrack.currentFocus?.data.orderIndex &&
+      hardTrack.currentFocus.data.orderIndex > 0
+      ? "HARD"
+      : "STANDARD";
+  });
+
+  const completedStandardSpoonsCount =
+    standardTrack?.lessons.filter((l) => Boolean(l.completedAt)).length || 0;
+  const hardModeUnlocked = completedStandardSpoonsCount >= 30;
+  const isHardView = activeTrack === "HARD" && hardModeUnlocked;
+  
+  const currentTrackData = isHardView && hardTrack ? hardTrack : standardTrack;
+
+  const lessons = currentTrackData?.lessons ?? [];
+  const courseId = currentTrackData?.courseId ?? "default";
+  const user = currentTrackData?.user;
 
   const displayTitles = useMemo(
     () => generateDisplayTitles(lessons),
@@ -56,8 +74,8 @@ export default function FoundationHubPage({
   );
 
   // --- ENGINE STATE ---
-  const currentFocus = path?.currentFocus ?? null;
-  const nextLocked = path?.nextLocked ?? null;
+  const currentFocus = currentTrackData?.currentFocus ?? null;
+  const nextLocked = currentTrackData?.nextLocked ?? null;
 
   const vocabDue =
     currentFocus?.type === "BRIDGE" ? currentFocus.data : undefined;
@@ -249,7 +267,7 @@ export default function FoundationHubPage({
             ) : (
               <>
                 <PrimaryHeroCard
-                  path={path}
+                  path={currentTrackData as any}
                   vocabDue={vocabDue}
                   nextLesson={nextLesson}
                   bossDue={bossDue}
@@ -261,7 +279,7 @@ export default function FoundationHubPage({
                   displayTitles={displayTitles}
                 />
 
-                {/* WHILE BAKING ACTION BAR (Shows whenever Spoon, Bridge, or Boss is generating) */}
+                {/* WHILE BAKING ACTION BAR */}
                 {isGenerating && (
                   <div className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-xl">
                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -318,18 +336,17 @@ export default function FoundationHubPage({
               </>
             )}
 
-            <LearningPathMiniCards
-              courseId={courseId}
-              currentFocus={currentFocus}
-              nextLocked={nextLocked}
-              lessons={lessons}
-              getLessonHref={getLessonHref}
-              getBossHref={getBossHref}
-              displayTitles={displayTitles}
-            />
+            {path && (
+              <LearningPathMiniCards
+                data={path}
+                displayTitles={displayTitles}
+                activeTrack={activeTrack}
+                setActiveTrack={setActiveTrack}
+              />
+            )}
           </div>
 
-          {/* RIGHT PANEL: Word Matrix + Dedicated Past Activity Slim List */}
+          {/* RIGHT PANEL */}
           <div className="flex flex-col gap-6 lg:col-span-4">
             <WordMatrixCard
               totalWordsLearned={totalWordsLearned}
@@ -359,8 +376,8 @@ export default function FoundationHubPage({
           userId={user.id}
           initialContext={{
             userName: user?.firstName || user?.username || "Student",
-            nativeLang: path?.nativeLanguage || "English",
-            targetLang: path?.targetLanguage || "French",
+            nativeLang: currentTrackData?.nativeLanguage || "English",
+            targetLang: currentTrackData?.targetLanguage || "French",
             currentLessonTitle:
               (currentFocus?.data as any)?.title ||
               `Spoon ${(currentFocus?.data as any)?.orderIndex || 1}`,

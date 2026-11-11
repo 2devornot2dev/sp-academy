@@ -6,8 +6,6 @@ import { toLanguageCode } from "@/lib/languages";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { triggerMilestoneBossAndNextSpoon } from "@/lib/foundation/trigger-milestone-boss";
 
-const HARD_MODE_SPOON_OFFSET = 900; // Hard Spoon 1 = orderIndex 901 (Milestone 301)
-
 export async function advanceMilestoneBuildChain({
   courseId,
   completedSpoonNumber,
@@ -21,16 +19,10 @@ export async function advanceMilestoneBuildChain({
 
     const course = await prisma.foundationCourse.findUnique({
       where: { id: courseId },
-      include: {
-        user: { select: { id: true, firstName: true, gender: true } },
-      },
+      include: { user: { select: { id: true, firstName: true, gender: true } } },
     });
 
     if (!course) return;
-
-    const userId = course.userId;
-    const targetLanguage = toLanguageCode(course.targetLanguage);
-    const nativeLanguage = toLanguageCode(course.nativeLanguage);
 
     if (subStep === 1 || subStep === 2) {
       const currentLesson = await prisma.foundationLesson.findUnique({
@@ -46,7 +38,6 @@ export async function advanceMilestoneBuildChain({
       if (!currentLesson?.lessonHandoff) return;
 
       const nextSpoonNumber = completedSpoonNumber + 1;
-
       const existingNextLesson = await prisma.foundationLesson.findUnique({
         where: {
           foundationCourseId_orderIndex: {
@@ -60,20 +51,19 @@ export async function advanceMilestoneBuildChain({
       if (existingNextLesson) return;
 
       await invokeEduBuilder({
-        userId,
+        userId: course.userId,
         firstName: course.user?.firstName || "Learner",
         gender: course.user?.gender || "N",
         foundationCourseId: courseId,
         spoon: nextSpoonNumber,
-        nativeLanguage,
-        targetLanguage,
+        nativeLanguage: toLanguageCode(course.nativeLanguage),
+        targetLanguage: toLanguageCode(course.targetLanguage),
         levelBand: "unspecified",
         goal: "unspecified",
         scriptComfort: "unspecified",
         type: "lang",
         isOnboarding: false,
       });
-
       return;
     }
 
@@ -107,7 +97,7 @@ export async function advanceMilestoneBuildChain({
       if (!allLessonsReady || !allBridgesReady) return;
 
       await triggerMilestoneBossAndNextSpoon({
-        userId,
+        userId: course.userId,
         courseId,
         milestoneIndex,
         prebakeNextSpoon: false,
@@ -126,8 +116,18 @@ export async function startNextMilestoneDaisyChain({
   currentMilestoneIndex: number;
 }) {
   try {
-    const nextSpoonNumber = currentMilestoneIndex * 3 + 1;
+    const course = await prisma.foundationCourse.findUnique({
+      where: { id: courseId },
+      include: { user: { select: { firstName: true, gender: true } } },
+    });
+    if (!course) return;
 
+    // Do NOT auto-trigger the next spoon if Standard Track reached Milestone 10 (Spoon 30)
+    if (!course.isHardMode && currentMilestoneIndex === 10) {
+      return;
+    }
+
+    const nextSpoonNumber = currentMilestoneIndex * 3 + 1;
     const existingNextSpoon = await prisma.foundationLesson.findUnique({
       where: {
         foundationCourseId_orderIndex: {
@@ -139,13 +139,6 @@ export async function startNextMilestoneDaisyChain({
     });
 
     if (existingNextSpoon) return;
-
-    const course = await prisma.foundationCourse.findUnique({
-      where: { id: courseId },
-      include: { user: { select: { firstName: true, gender: true } } },
-    });
-
-    if (!course) return;
 
     await invokeEduBuilder({
       userId: course.userId,
@@ -167,42 +160,50 @@ export async function startNextMilestoneDaisyChain({
 }
 
 export async function activateHardModeTrack(
-  courseId: string,
+  standardCourseId: string,
 ): Promise<{ ok: boolean; alreadyActive?: boolean; error?: string }> {
   try {
-    const hardSpoon1OrderIndex = HARD_MODE_SPOON_OFFSET + 1; // 901 = Hard Spoon 1
-
-    const existingHardSpoon1 = await prisma.foundationLesson.findUnique({
-      where: {
-        foundationCourseId_orderIndex: {
-          foundationCourseId: courseId,
-          orderIndex: hardSpoon1OrderIndex,
-        },
-      },
-      select: { id: true },
-    });
-
-    if (existingHardSpoon1) {
-      return { ok: true, alreadyActive: true };
-    }
-
-    const course = await prisma.foundationCourse.findUnique({
-      where: { id: courseId },
+    const standardCourse = await prisma.foundationCourse.findUnique({
+      where: { id: standardCourseId },
       include: { user: { select: { firstName: true, gender: true } } },
     });
 
-    if (!course) {
-      return { ok: false, error: "Course not found" };
+    if (!standardCourse) return { ok: false, error: "Course not found" };
+    const userId = standardCourse.userId;
+
+    let hardCourse = await prisma.foundationCourse.findFirst({
+      where: {
+        userId,
+        targetLanguage: standardCourse.targetLanguage,
+        isHardMode: true,
+      },
+      include: { lessons: { select: { id: true, orderIndex: true } } },
+    });
+
+    if (hardCourse && hardCourse.lessons.some((l) => l.orderIndex === 1)) {
+      return { ok: true, alreadyActive: true };
+    }
+
+    if (!hardCourse) {
+      hardCourse = await prisma.foundationCourse.create({
+        data: {
+          userId,
+          nativeLanguage: standardCourse.nativeLanguage,
+          targetLanguage: standardCourse.targetLanguage,
+          isHardMode: true,
+        },
+        include: { lessons: { select: { id: true, orderIndex: true } } },
+      });
     }
 
     const res = await invokeEduBuilder({
-      userId: course.userId,
-      firstName: course.user?.firstName || "Learner",
-      gender: course.user?.gender || "N",
-      foundationCourseId: courseId,
-      spoon: hardSpoon1OrderIndex,
-      nativeLanguage: toLanguageCode(course.nativeLanguage),
-      targetLanguage: toLanguageCode(course.targetLanguage),
+      userId,
+      firstName: standardCourse.user?.firstName || "Learner",
+      gender: standardCourse.user?.gender || "N",
+      foundationCourseId: hardCourse.id,
+      spoon: 1, // Starts at 1!
+      nativeLanguage: toLanguageCode(standardCourse.nativeLanguage),
+      targetLanguage: toLanguageCode(standardCourse.targetLanguage),
       levelBand: "unspecified",
       goal: "unspecified",
       scriptComfort: "unspecified",
@@ -210,10 +211,7 @@ export async function activateHardModeTrack(
       isOnboarding: false,
     });
 
-    if (!res.ok) {
-      return { ok: false, error: res.error };
-    }
-
+    if (!res.ok) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
     console.error("❌ [HardMode] activateHardModeTrack failed:", err);
