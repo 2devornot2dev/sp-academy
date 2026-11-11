@@ -23,6 +23,7 @@ export type FreestyleSessionConfig = {
   openingLine?: string;
   starterHintTarget?: string;
   starterHintNative?: string;
+  userId: string;
 };
 
 // Built-in level-calibrated starter chunks & mission hints per language & level
@@ -54,8 +55,10 @@ function buildCalibratedMission(
       },
       FLUENT: {
         chunks: ["Sin embargo", "Hoy en día", "Me parece que"],
-        hintTarget: "Me parece que hoy en día es fundamental practicar a diario.",
-        hintNative: "It seems to me that nowadays it's essential to practice daily.",
+        hintTarget:
+          "Me parece que hoy en día es fundamental practicar a diario.",
+        hintNative:
+          "It seems to me that nowadays it's essential to practice daily.",
       },
     };
     return byLevel[level] || byLevel.EASY;
@@ -70,7 +73,8 @@ function buildCalibratedMission(
     },
     EASY: {
       chunks: ["Je voudrais", "S'il vous plaît", "C'est super"],
-      hintTarget: "Bonjour ! Je voudrais pratiquer mon français, s'il vous plaît.",
+      hintTarget:
+        "Bonjour ! Je voudrais pratiquer mon français, s'il vous plaît.",
       hintNative: `Hello! I'd like to practice my French (${cleanTopic}), please.`,
     },
     MEDIUM: {
@@ -81,7 +85,8 @@ function buildCalibratedMission(
     FLUENT: {
       chunks: ["Cependant", "En fait", "Il me semble que"],
       hintTarget: "En fait, il me semble que c'est un sujet très intéressant.",
-      hintNative: "Actually, it seems to me that this is a very interesting topic.",
+      hintNative:
+        "Actually, it seems to me that this is a very interesting topic.",
     },
   };
 
@@ -100,10 +105,19 @@ const LEVEL_INSTRUCTIONS: Record<
     "ADVANCED / FLUENT (C1+): Speak at full native speed with rich vocabulary, nuanced expressions, and engaging debate.",
 };
 
+interface FreestyleWrapperProps {
+  defaultNative: string;
+  defaultTarget: string;
+  userId: string;
+  userName: string;
+}
+
 export default function FreestyleWrapper({
   defaultNative,
   defaultTarget,
-}: any) {
+  userId,
+  userName,
+}: FreestyleWrapperProps) {
   const [activeSession, setActiveSession] =
     useState<FreestyleSessionConfig | null>(null);
   const [livekitData, setLivekitData] = useState<{
@@ -115,80 +129,61 @@ export default function FreestyleWrapper({
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
 
   const handleStartSession = async (
-    config: Omit<FreestyleSessionConfig, "id" | "aiAvatarUrl">
+    config: Omit<FreestyleSessionConfig, "id" | "aiAvatarUrl">,
   ) => {
     const isFemale = config.voiceGender === "female";
-    const tutorName = config.tutorName || (isFemale ? "Sophie" : "Laurent");
+    const tutorName = config.tutorName || (isFemale ? "Sophie" : "Antoine");
     const aiAvatarUrl = isFemale ? "/sprite-f.png" : "/sprite-m.png";
     const level = config.level || "EASY";
 
-    const mission = buildCalibratedMission(
-      config.targetLanguage,
-      level,
-      config.topic,
-      config.mode,
-    );
+    // 1. Create DB Session via /api/users/[userId]/freestyle/create
+    const createRes = await fetch(`/api/users/${userId}/freestyle/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...config,
+        level,
+        aiAvatarUrl,
+      }),
+    });
 
-    const requiredChunks =
-      config.requiredChunks && config.requiredChunks.length > 0
-        ? config.requiredChunks
-        : mission.chunks;
+    const sessionData = await createRes.json();
+    if (!createRes.ok || !sessionData.sessionId) {
+      throw new Error(
+        sessionData.error || "Failed to create freestyle session",
+      );
+    }
 
-    const topicLabel =
-      config.topic ||
-      (config.mode === "SURPRISE"
-        ? "Spontaneous Real-World Roleplay"
-        : "Live Conversation Practice");
-
-    const personaPrompt = `${tutorName}, a ${
-      config.persona || "warm, patient, and encouraging"
-    } ${isFemale ? "female" : "male"} native conversation partner. LEVEL CALIBRATION: ${
+    const fd = sessionData.freestyleData || {};
+    const requiredChunks = fd.requiredChunks || [];
+    const topicLabel = fd.topic || config.topic || "Live Conversation Practice";
+    const personaPrompt = `${fd.persona || tutorName}. LEVEL CALIBRATION: ${
       LEVEL_INSTRUCTIONS[level]
     }`;
 
-    const openingLine =
-      config.openingLine ||
-      `Try using your target phrases (${requiredChunks.join(
-        ", "
-      )}) naturally in conversation with ${tutorName}!`;
-
-    // 1. Create DB Session & Mint LiveKit Token with FULL level, persona, and requiredChunks!
-    const [createRes, tokenRes] = await Promise.all([
-      fetch("/api/freestyle/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...config,
+    // 2. Mint LiveKit Token using the exact freestyleData generated by /create
+    const tokenRes = await fetch("/api/livekit/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nativeLanguage: config.nativeLanguage,
+        targetLanguage: config.targetLanguage,
+        voiceGender: config.voiceGender,
+        level,
+        freestyleData: {
+          mode: config.mode || "FOCUSED",
           level,
           topic: topicLabel,
-          aiAvatarUrl,
+          persona: personaPrompt,
           requiredChunks,
-        }),
+          openingLine: fd.openingLine,
+          aiOpeningTarget: fd.aiOpeningTarget,
+          starterHintTarget: fd.starterHintTarget,
+        },
       }),
-      fetch("/api/livekit/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nativeLanguage: config.nativeLanguage,
-          targetLanguage: config.targetLanguage,
-          voiceGender: config.voiceGender,
-          level,
-          freestyleData: {
-            mode: config.mode || "SPECIFIC",
-            level,
-            topic: topicLabel,
-            persona: personaPrompt,
-            requiredChunks,
-            openingLine,
-            starterHintTarget: mission.hintTarget,
-          },
-        }),
-      }),
-    ]);
+    });
 
-    const sessionData = await createRes.json();
     const lkData = await tokenRes.json();
-
     if (!tokenRes.ok || !lkData.token) {
       throw new Error(lkData.error || "Failed to initialize LiveKit room");
     }
@@ -201,119 +196,120 @@ export default function FreestyleWrapper({
     setActiveSession({
       id: sessionData.sessionId,
       ...config,
+      userId,
       level,
       tutorName,
       topic: topicLabel,
       aiAvatarUrl,
       requiredChunks,
-      openingLine,
-      starterHintTarget: mission.hintTarget,
-      starterHintNative: mission.hintNative,
+      openingLine: fd.openingLine,
+      starterHintTarget: fd.starterHintTarget,
+      starterHintNative: fd.starterHintNative,
     });
-  };
 
-  const handleEndSession = () => {
-    const endedSessionId = activeSession?.id || null;
-    setActiveSession(null);
-    setLivekitData(null);
+    const handleEndSession = () => {
+      const endedSessionId = activeSession?.id || null;
+      setActiveSession(null);
+      setLivekitData(null);
 
-    if (endedSessionId) {
-      setPendingReviewId(endedSessionId);
-    }
-  };
+      if (endedSessionId) {
+        setPendingReviewId(endedSessionId);
+      }
+    };
 
-  const handleReviewComplete = () => {
-    setReviewSessionId(null);
-  };
+    const handleReviewComplete = () => {
+      setReviewSessionId(null);
+    };
 
-  return (
-    <div className="relative flex min-h-screen w-full flex-1 flex-col bg-slate-100/80">
-      <AnimatePresence mode="wait">
-        {/* 1. SETUP SCREEN */}
-        {!activeSession && !pendingReviewId && !reviewSessionId && (
-          <motion.div
-            key="setup"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="min-h-screen w-full"
-          >
-            <FreestyleSetup
-              onStart={handleStartSession}
-              defaultNative={defaultNative}
-              defaultTarget={defaultTarget}
-            />
-          </motion.div>
-        )}
+    return (
+      <div className="relative flex min-h-screen w-full flex-1 flex-col bg-slate-100/80">
+        <AnimatePresence mode="wait">
+          {/* 1. SETUP SCREEN */}
+          {!activeSession && !pendingReviewId && !reviewSessionId && (
+            <motion.div
+              key="setup"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="min-h-screen w-full"
+            >
+              <FreestyleSetup
+                onStart={handleStartSession}
+                defaultNative={defaultNative}
+                defaultTarget={defaultTarget}
+              />
+            </motion.div>
+          )}
 
-        {/* 2. LIVEKIT CHAT SCREEN */}
-        {activeSession && livekitData && (
-          <motion.div
-            key="chat"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="flex h-screen w-full flex-col"
-          >
-            <FreestyleChat
-              session={activeSession}
-              livekitToken={livekitData.token}
-              livekitUrl={livekitData.wsUrl}
-              onEnd={handleEndSession}
-            />
-          </motion.div>
-        )}
+          {/* 2. LIVEKIT CHAT SCREEN */}
+          {activeSession && livekitData && (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex h-screen w-full flex-col"
+            >
+              <FreestyleChat
+                session={activeSession}
+                livekitToken={livekitData.token}
+                livekitUrl={livekitData.wsUrl}
+                onEnd={handleEndSession}
+              />
+            </motion.div>
+          )}
 
-        {/* 3. ANALYZING / WAITING SCREEN */}
-        {pendingReviewId && (
-          <motion.div
-            key="pending"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 0.4 }}
-            className="flex min-h-screen w-full flex-col items-center justify-center p-6 text-center"
-          >
-            <div className="w-full max-w-sm space-y-6 rounded-3xl border border-gray-100 bg-white p-10 shadow-xl">
-              <div className="relative mx-auto h-20 w-20">
-                <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
-                <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl">🧠</span>
+          {/* 3. ANALYZING / WAITING SCREEN */}
+          {pendingReviewId && (
+            <motion.div
+              key="pending"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ duration: 0.4 }}
+              className="flex min-h-screen w-full flex-col items-center justify-center p-6 text-center"
+            >
+              <div className="w-full max-w-sm space-y-6 rounded-3xl border border-gray-100 bg-white p-10 shadow-xl">
+                <div className="relative mx-auto h-20 w-20">
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
+                  <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl">🧠</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Analyzing Session
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                    Your AI tutor is reviewing your grammar, vocabulary, and
+                    pronunciation. Give us just a moment...
+                  </p>
                 </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  Analyzing Session
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                  Your AI tutor is reviewing your grammar, vocabulary, and
-                  pronunciation. Give us just a moment...
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-        {/* 4. REVIEW SCREEN */}
-        {reviewSessionId && (
-          <motion.div
-            key="review"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="flex min-h-screen w-full flex-col overflow-y-auto"
-          >
-            <FreestyleReviewHub
-              sessionId={reviewSessionId}
-              onComplete={handleReviewComplete}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+          {/* 4. REVIEW SCREEN */}
+          {reviewSessionId && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="flex min-h-screen w-full flex-col overflow-y-auto"
+            >
+              <FreestyleReviewHub
+                sessionId={reviewSessionId}
+                onComplete={handleReviewComplete}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
 }

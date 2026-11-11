@@ -1,3 +1,4 @@
+// components/learning-hub/foundation-hub-page.tsx
 "use client";
 
 import { useEffect, useMemo } from "react";
@@ -79,6 +80,8 @@ export default function FoundationHubPage({
       ? ((currentFocus.data as any)?.bossStage ?? currentFocus.data)
       : null;
 
+  const isBossUnlocked = (bossStageObj as any)?.freestyleUnlocked ?? true;
+
   const waitingOnBoss =
     currentFocus?.type === "BOSS" &&
     (!bossStageObj || bossStageObj.status === "BUILDING");
@@ -148,8 +151,10 @@ export default function FoundationHubPage({
       orderIndex = getBossSpriteOrderIndex(milestoneNum);
       const bossId =
         (bossDue as any)?.bossStage?.id ?? (bossDue as any)?.id ?? courseId;
-      actionHref = getBossHref(bossId);
-      stepLabel = "Challenge Boss";
+      actionHref = isBossUnlocked ? getBossHref(bossId) : "/conversation";
+      stepLabel = isBossUnlocked
+        ? "Challenge Boss"
+        : "Unlock Boss: 3-Min AI Chat";
     }
 
     if (!orderIndex || !actionHref) return;
@@ -160,7 +165,7 @@ export default function FoundationHubPage({
     summonSpriteNode({
       orderIndex,
       stepType: currentFocus?.type,
-      dedupeKey: `sprite_seen_${orderIndex}_${focusItemId}`,
+      dedupeKey: `sprite_seen_${orderIndex}_${focusItemId}_${isBossUnlocked ? "unlocked" : "locked"}`,
       actionLabel: stepLabel,
       onAction: () => router.push(actionHref!),
     });
@@ -169,6 +174,7 @@ export default function FoundationHubPage({
     waitingOnSpoon,
     waitingOnVocab,
     waitingOnBoss,
+    isBossUnlocked,
     currentFocus?.type,
     completedLessonsCount,
     nextLesson?.id,
@@ -372,21 +378,25 @@ export default function FoundationHubPage({
                   }`,
             activeStepHref:
               currentFocus?.type === "BOSS" && bossDue
-                ? getBossHref(
-                    (bossDue as any)?.bossStage?.id ??
-                      (bossDue as any)?.id ??
-                      courseId
-                  )
+                ? isBossUnlocked
+                  ? getBossHref(
+                      (bossDue as any)?.bossStage?.id ??
+                        (bossDue as any)?.id ??
+                        courseId,
+                    )
+                  : "/conversation"
                 : currentFocus?.type === "BRIDGE" && vocabDue
                   ? getVocabHref(
-                      (vocabDue as any)?.bridge?.id ?? (vocabDue as any)?.id
+                      (vocabDue as any)?.bridge?.id ?? (vocabDue as any)?.id,
                     )
                   : nextLesson
                     ? getLessonHref(nextLesson.id)
                     : undefined,
             activeStepLabel:
               currentFocus?.type === "BOSS"
-                ? "Challenge Boss Stage"
+                ? isBossUnlocked
+                  ? "Challenge Boss Stage"
+                  : "Unlock Boss: Start 3-Min AI Chat"
                 : currentFocus?.type === "BRIDGE"
                   ? "Complete Vocab Bridge"
                   : `Start Spoon ${

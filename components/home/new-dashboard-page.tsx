@@ -12,6 +12,7 @@ import {
   Crown,
   Sparkles,
   Check,
+  Mic,
 } from "lucide-react";
 import ActivityFeed from "@/components/home/activity-feed";
 import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
@@ -31,18 +32,17 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
 
   const isBossFocus = upcoming.focusType === "BOSS";
   const isBridgeFocus = upcoming.focusType === "BRIDGE";
+  const isConvoGate = isBossFocus && upcoming.href === "/conversation";
 
-  const cyclePct = isBossFocus
-    ? 100
-    : Math.max(18, Math.round((languageCard.spoonsInCurrentCycle / 3) * 100));
-
-  // Color-code the 3D Hero CTA button to match the unified app color system:
-  // SPOON = Primary Blue, BRIDGE = Accent Amber, BOSS = Tertiary Purple
-  const cta3DStyle = isBossFocus
-    ? "border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 text-white shadow-purple-500/30"
-    : isBridgeFocus
-      ? "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/30"
-      : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/30";
+  // Color-code the 3D Hero CTA button:
+  // SPOON = Primary Blue, BRIDGE / CONVO GATE = Accent Amber, UNLOCKED BOSS = Tertiary Purple
+  const cta3DStyle = isConvoGate
+    ? "border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/30"
+    : isBossFocus
+      ? "border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 text-white shadow-purple-500/30"
+      : isBridgeFocus
+        ? "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/30"
+        : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/30";
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100 lg:h-screen lg:overflow-hidden">
@@ -175,7 +175,7 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       {/* Mini Boss Node */}
                       <div
                         className={`flex h-7 w-7 items-center justify-center rounded-lg border-b-2 ${
-                          isBossFocus
+                          isBossFocus && !isConvoGate
                             ? "border-purple-950 bg-gradient-to-b from-amber-400 to-fuchsia-600 text-white animate-pulse"
                             : "border-slate-800 bg-slate-800/90 text-amber-400/60"
                         }`}
@@ -185,9 +185,11 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                     </div>
 
                     <span className="text-xs font-extrabold text-amber-300">
-                      {isBossFocus
-                        ? `Boss Stage ${languageCard.currentMilestone} Unlocked!`
-                        : `${languageCard.spoonsInCurrentCycle} / 3 Spoons to Boss ${languageCard.currentMilestone}`}
+                      {isConvoGate
+                        ? `🔒 Complete 1 3-Min AI Chat to Unlock Boss ${languageCard.currentMilestone}`
+                        : isBossFocus
+                          ? `Boss Stage ${languageCard.currentMilestone} Unlocked!`
+                          : `${languageCard.spoonsInCurrentCycle} / 3 Spoons to Boss ${languageCard.currentMilestone}`}
                     </span>
                   </div>
 
@@ -197,10 +199,14 @@ export function NewDashboardPage({ data }: { data: HomeDashboardData }) {
                       href={upcoming.href}
                       className={`inline-flex items-center gap-2.5 rounded-2xl border-b-4 px-6 py-3 text-xs sm:text-sm font-black shadow-lg transition-all duration-150 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 ${cta3DStyle}`}
                     >
-                      <Sparkles className="h-4 w-4 shrink-0" />
+                      {isConvoGate ? (
+                        <Mic className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 shrink-0" />
+                      )}
                       <span className="opacity-85">Up Next:</span>
                       <span className="truncate max-w-[220px] sm:max-w-xs">
-                        {upcoming.title}
+                        {isConvoGate ? upcoming.ctaLabel : upcoming.title}
                       </span>
                       <ArrowRight className="h-4 w-4 shrink-0" />
                     </Link>

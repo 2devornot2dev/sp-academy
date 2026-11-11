@@ -256,7 +256,7 @@ function LiveFreestyleChatInner({
               </span>
             </button>
 
-            <FreestyleTimer initialTime={300} onTimeUp={handleEndSession} />
+            <FreestyleTimer initialTime={180} onTimeUp={handleEndSession} />
           </div>
         </div>
 

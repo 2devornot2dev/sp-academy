@@ -168,6 +168,7 @@ export function PrimaryHeroCard({
   // =========================================================================
   if (bossDue?.bossStage) {
     const bossStage = bossDue.bossStage;
+    const isFreestyleUnlocked = (bossStage as any).freestyleUnlocked ?? true;
     const milestoneNum =
       bossStage.milestoneIndex ?? Math.ceil(bossDue.orderIndex / 3);
     const startSpoon = Math.max(1, bossDue.orderIndex - 2);
@@ -192,7 +193,7 @@ export function PrimaryHeroCard({
       ? getBossHref(bossStage.id, bossDue.id)
       : `/foundation/boss/${bossStage.id}`;
 
-    const totalEx = scenario?.rules?.totalExercises ?? 15;
+    const totalEx = scenario?.rules?.totalExercises ?? 10;
 
     return (
       <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-purple-950/90 bg-slate-950 text-white shadow-xl transition-colors duration-700">
@@ -281,24 +282,45 @@ export function PrimaryHeroCard({
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-              <Swords className={`h-4 w-4 ${theme.icon}`} />
-              <span>Live AI Checkpoint • {totalEx} Challenges</span>
-            </div>
+            {isFreestyleUnlocked ? (
+              <>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <Swords className={`h-4 w-4 ${theme.icon}`} />
+                  <span>Live AI Checkpoint • {totalEx} Challenges</span>
+                </div>
 
-            <Link
-              href={bossHref}
-              className={`inline-flex items-center gap-2.5 rounded-2xl border-b-4 px-8 py-3.5 text-sm font-black shadow-xl transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 ${theme.button3D}`}
-            >
-              <span>Challenge {bossName.split(",")[0]}</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+                <Link
+                  href={bossHref}
+                  className={`inline-flex items-center gap-2.5 rounded-2xl border-b-4 px-8 py-3.5 text-sm font-black shadow-xl transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 ${theme.button3D}`}
+                >
+                  <span>Challenge {bossName.split(",")[0]}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                  <Mic className="h-4 w-4 text-amber-400" />
+                  <span>
+                    🔒 Complete 1 Live 3-Min AI Conversation to Unlock Boss
+                  </span>
+                </div>
+
+                <Link
+                  href="/conversation"
+                  className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                >
+                  <Mic className="h-4 w-4" />
+                  <span>Unlock Boss: Start 3-Min AI Chat</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
     );
   }
-
   // =========================================================================
   // 3. VOCAB BRIDGE READY (3D Split Cinema Card with Accent Amber Theme!)
   // =========================================================================

@@ -96,6 +96,8 @@ model FreestyleSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  milestoneIndex Int?
+
   review                 FreestyleReview?
   FoundationFreestyleLog FoundationFreestyleLog[]
 

@@ -22,12 +22,12 @@ import {
 
 const MODES = [
   {
-    id: "INTRODUCTION",
-    label: "Introduction",
-    tagline: "First impressions, greetings & small talk",
+    id: "FOCUSED",
+    label: "Spoon Focus",
+    tagline: "Practice phrases from your current Spoons",
     preview:
-      "Warm icebreakers: introduce yourself, where you're from, and your interests.",
-    icon: "👋",
+      "Roleplay built directly around the core phrases and themes from your active Milestone Spoons!",
+    icon: "🥄",
     active3D:
       "border-blue-700 bg-gradient-to-b from-sky-50/90 to-white ring-2 ring-sky-400/40",
     icon3D:
@@ -48,8 +48,8 @@ const MODES = [
   {
     id: "SPECIFIC",
     label: "Custom Topic",
-    tagline: "Roleplay any custom scenario you want",
-    preview: "Type any real-world scenario or pick a quick topic below.",
+    tagline: "Introductions or any custom scenario",
+    preview: "Introduce yourself, or type any real-world scenario below.",
     icon: "🎯",
     active3D:
       "border-orange-700 bg-gradient-to-b from-amber-50/90 to-white ring-2 ring-amber-400/40",
@@ -149,11 +149,11 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 const QUICK_TOPICS = [
+  "First introductions & small talk",
   "Ordering coffee at a Parisian café",
   "Asking directions to the metro",
   "Meeting a new neighbor",
   "Checking into a boutique hotel",
-  "Shopping for a jacket",
 ];
 
 const STEPS = [
@@ -178,7 +178,7 @@ export default function FreestyleSetup({
   defaultTarget = "fr-FR",
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [mode, setMode] = useState("RANDOM");
+  const [mode, setMode] = useState("FOCUSED");
   const [level, setLevel] = useState<"ZERO" | "EASY" | "MEDIUM" | "FLUENT">(
     "ZERO"
   );
@@ -195,7 +195,7 @@ export default function FreestyleSetup({
   );
   const [isStarting, setIsStarting] = useState(false);
 
-  const selectedModeObj = MODES.find((m) => m.id === mode) ?? MODES[1];
+  const selectedModeObj = MODES.find((m) => m.id === mode) ?? MODES[0];
   const selectedLevelObj = LEVELS.find((l) => l.id === level) ?? LEVELS[0];
   const selectedPersonaObj =
     PERSONAS.find((p) => p.id === persona) ?? PERSONAS[0];
@@ -258,7 +258,7 @@ export default function FreestyleSetup({
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-xs font-extrabold text-amber-300 shadow-sm backdrop-blur-md">
                 <Timer className="h-3.5 w-3.5 text-amber-400" />
-                <span>5-Min Unscripted Arena</span>
+                <span>3-Min Unscripted Arena</span>
               </div>
               <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-xs font-extrabold text-emerald-300 shadow-sm backdrop-blur-md">
                 <Mic className="h-3.5 w-3.5 text-emerald-400" />
@@ -274,7 +274,7 @@ export default function FreestyleSetup({
             </h1>
             <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">
               No scripts. No safety nets. Customize your AI partner below and
-              jump into a live 5-minute speaking session.
+              jump into a live 3-minute speaking session.
             </p>
           </div>
         </div>
@@ -370,7 +370,7 @@ export default function FreestyleSetup({
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-current" />
-                        <span>Start 5-Minute Session</span>
+                        <span>Start 3-Minute Session</span>
                       </>
                     )}
                   </button>
@@ -379,7 +379,7 @@ export default function FreestyleSetup({
             </div>
 
             {/* ===============================================================
-                CARD 2: 3D STEPPER CARD (Configuration Only — No Duplicate Launch Button)
+                CARD 2: 3D STEPPER CARD
                 =============================================================== */}
             <div className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm">
               {/* Top 3D Stepper Header */}
@@ -503,7 +503,7 @@ export default function FreestyleSetup({
                             <MessageSquarePlus className="h-4 w-4 shrink-0 text-amber-600" />
                             <input
                               type="text"
-                              placeholder="Type custom scenario (e.g., Returning shoes at a store)..."
+                              placeholder="Type custom scenario (e.g., First introductions, Ordering coffee)..."
                               value={topic}
                               onChange={(e) => setTopic(e.target.value)}
                               className="h-8 flex-1 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
@@ -600,7 +600,7 @@ export default function FreestyleSetup({
                 )}
               </div>
 
-              {/* Step Footer (Only Step Navigation — No Competing Launch Button!) */}
+              {/* Step Footer */}
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-3">
                 {step === 1 ? (
                   <span className="text-xs font-extrabold text-slate-400">
@@ -639,7 +639,7 @@ export default function FreestyleSetup({
           </div>
 
           {/* =================================================================
-              RIGHT COLUMN (4 Cols): 3D SESSION PREFERENCES CARD (No Duplicate Button!)
+              RIGHT COLUMN (4 Cols): 3D SESSION PREFERENCES CARD
               ================================================================= */}
           <div className="flex min-h-0 flex-col lg:col-span-4">
             <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 sm:p-6 shadow-sm">
@@ -763,7 +763,7 @@ export default function FreestyleSetup({
                   </span>
                   <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase">
                     <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-500" />
-                    5 Min Live
+                    3 Min Live
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

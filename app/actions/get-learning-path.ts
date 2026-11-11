@@ -1,3 +1,4 @@
+// app/actions/get-learning-path.ts
 "use server";
 import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
@@ -17,14 +18,13 @@ type BossScenarioData = {
       happy?: string;
       sad?: string;
       angry?: string;
-      confused?: string
+      confused?: string;
     };
   };
   rules?: {
     passingScore?: number;
     totalExercises?: number;
   };
-  // Legacy fallback fields
   title?: string;
   setting?: string;
   description?: string;
@@ -88,20 +88,43 @@ export async function getLearningPath(userId: string) {
   });
   const bridgeByIndex = new Map(bridges.map((b) => [b.bridgeIndex, b]));
 
-  // 2. Fetch Boss Stages & Presign Cover + Avatar URLs
-  const bossStages = await prisma.foundationBossStage.findMany({
-    where: { foundationCourseId: course.id, userId },
-    select: {
-      id: true,
-      milestoneIndex: true,
-      status: true,
-      passed: true,
-      targetLessonIds: true,
-      targetBridgeIds: true,
-      scenarioData: true,
-      completedAt: true,
-    },
-  });
+  // 2. Fetch Boss Stages & Completed Freestyle Conversations
+  const [bossStages, freestyleSessions] = await Promise.all([
+    prisma.foundationBossStage.findMany({
+      where: { foundationCourseId: course.id, userId },
+      select: {
+        id: true,
+        milestoneIndex: true,
+        status: true,
+        passed: true,
+        targetLessonIds: true,
+        targetBridgeIds: true,
+        scenarioData: true,
+        completedAt: true,
+      },
+    }),
+    prisma.freestyleSession.findMany({
+      where: {
+        userId,
+        status: { in: ["REVIEW_PENDING", "COMPLETED"] },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        milestoneIndex: true,
+        duration: true,
+        createdAt: true,
+      },
+    }),
+  ]);
+
+  // Check if user has already hit the 5-per-day cap today so we never lock them out of a Boss
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todaySessionCount = freestyleSessions.filter(
+    (s) => new Date(s.createdAt) >= startOfToday,
+  ).length;
+  const hitDailyCap = todaySessionCount >= 5;
 
   const resolvedBossStages = await Promise.all(
     bossStages.map(async (b) => {
@@ -123,7 +146,6 @@ export async function getLearningPath(userId: string) {
         safePresign(rawAvatar),
       ]);
 
-      // Also inject the presigned URLs directly into scenarioData.boss so any child component gets signed URLs
       const enrichedScenario: BossScenarioData = scenario
         ? {
             ...scenario,
@@ -143,17 +165,28 @@ export async function getLearningPath(userId: string) {
           }
         : null;
 
+      // Unlock if Boss already passed, OR user completed a convo for this milestoneIndex, OR hit 5/day cap
+      const mIndex = b.milestoneIndex ?? 1;
+      const milestoneSessions = freestyleSessions.filter(
+        (s) => s.milestoneIndex === mIndex,
+      );
+      const freestyleUnlocked =
+        Boolean(b.passed) || milestoneSessions.length >= 1 || hitDailyCap;
+
       return {
         ...b,
         coverUrl: presignedCover,
         avatarUrl: presignedAvatar,
         scenarioData: enrichedScenario,
+        freestyleUnlocked,
+        completedFreestyleCount: milestoneSessions.length,
+        requiredFreestyleCount: 1,
       };
-    })
+    }),
   );
 
   const bossByMilestoneIndex = new Map(
-    resolvedBossStages.map((b) => [b.milestoneIndex, b])
+    resolvedBossStages.map((b) => [b.milestoneIndex, b]),
   );
 
   // 3. Map everything into the Lessons array
@@ -172,7 +205,7 @@ export async function getLearningPath(userId: string) {
           ? (bossByMilestoneIndex.get(milestoneIndex) ?? null)
           : null,
       };
-    })
+    }),
   );
 
   // 4. Calculate Current Focus & Next Locked
@@ -217,7 +250,6 @@ export async function getLearningPath(userId: string) {
     }
   }
 
- // Replace the bottom of get-learning-path.ts (from `const wordMatrix = ...` to the end) with:
   const wordMatrix = await prisma.languageProfile.findUnique({
     where: {
       userId_languageCode: { userId, languageCode: course.targetLanguage },
@@ -235,7 +267,6 @@ export async function getLearningPath(userId: string) {
 
   const allStats = wordMatrix?.wordStats ?? [];
 
-  // Top Spoken Word (wordType === "WORD")
   const topWord =
     allStats
       .filter((w) => w.wordType === "WORD")
@@ -243,10 +274,9 @@ export async function getLearningPath(userId: string) {
         (a, b) =>
           b.spokenAttempts - a.spokenAttempts ||
           b.tappedCorrect - a.tappedCorrect ||
-          b.seenCount - a.seenCount
+          b.seenCount - a.seenCount,
       )[0] ?? null;
 
-  // Top Spoken Phrase (wordType === "PHRASE")
   const topPhrase =
     allStats
       .filter((w) => w.wordType === "PHRASE")
@@ -254,18 +284,17 @@ export async function getLearningPath(userId: string) {
         (a, b) =>
           b.spokenAttempts - a.spokenAttempts ||
           b.tappedCorrect - a.tappedCorrect ||
-          b.seenCount - a.seenCount
+          b.seenCount - a.seenCount,
       )[0] ?? null;
 
-  // Overall Speech & Mastery Telemetry
   const spokenItems = allStats.filter(
-    (w) => w.spokenAttempts > 0 && w.avgSpokenScore != null
+    (w) => w.spokenAttempts > 0 && w.avgSpokenScore != null,
   );
   const avgPronunciation =
     spokenItems.length > 0
       ? Math.round(
           spokenItems.reduce((sum, w) => sum + (w.avgSpokenScore ?? 0), 0) /
-            spokenItems.length
+            spokenItems.length,
         )
       : null;
 
@@ -273,7 +302,7 @@ export async function getLearningPath(userId: string) {
     allStats.length > 0
       ? Math.round(
           allStats.reduce((sum, w) => sum + (w.masteryScore ?? 0), 0) /
-            allStats.length
+            allStats.length,
         )
       : null;
 
@@ -312,8 +341,8 @@ export async function getLearningPath(userId: string) {
           translation: topPhrase.translation,
           partOfSpeech: topPhrase.partOfSpeech,
           spokenAttempts: topPhrase.spokenAttempts,
-          avgSpokenScore: topPhrase.avgSpokenScore
-            ? Math.round(topPhrase.avgSpokenScore)
+          avgSpokenScore: topWord.avgSpokenScore
+            ? Math.round(topWord.avgSpokenScore)
             : null,
           seenCount: topPhrase.seenCount,
           status: topPhrase.status,
