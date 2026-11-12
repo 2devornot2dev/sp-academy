@@ -19,7 +19,9 @@ export async function advanceMilestoneBuildChain({
 
     const course = await prisma.foundationCourse.findUnique({
       where: { id: courseId },
-      include: { user: { select: { id: true, firstName: true, gender: true } } },
+      include: {
+        user: { select: { id: true, firstName: true, gender: true } },
+      },
     });
 
     if (!course) return;
@@ -191,6 +193,7 @@ export async function activateHardModeTrack(
           nativeLanguage: standardCourse.nativeLanguage,
           targetLanguage: standardCourse.targetLanguage,
           isHardMode: true,
+          cacheKey: `${standardCourse.cacheKey}:hard`, // see note
         },
         include: { lessons: { select: { id: true, orderIndex: true } } },
       });

@@ -14,18 +14,24 @@ import { invalidateDossierCache } from "@/lib/sprites/get-cached-dossier";
 
 export async function handleFreestyleReview(task: SystemTask, body: unknown) {
   try {
+    // 🔍 1. LOG RAW INCOMING BODY
+    console.log("====================================================");
+    console.log("📥 [FREESTYLE REVIEW WEBHOOK] Raw Body Received:");
+    console.log(JSON.stringify(body, null, 2));
+    console.log("====================================================");
+
     const parsedResult = FreestyleReviewWebhookSchema.safeParse(body);
-    console.log("Parsed Freestyle Review:", parsedResult.success);
+    console.log("🔍 Schema Validation Success:", parsedResult.success);
 
     if (!parsedResult.success) {
       console.error(
-        "Invalid Webhook Payload:",
-        z.flattenError(parsedResult.error),
+        "❌ [FREESTYLE REVIEW] Invalid Webhook Payload:",
+        parsedResult.error.flatten ? parsedResult.error.flatten() : parsedResult.error,
       );
       return NextResponse.json(
         {
           message: "Invalid payload",
-          errors: z.flattenError(parsedResult.error),
+          errors: parsedResult.error.flatten ? parsedResult.error.flatten() : parsedResult.error,
         },
         { status: 400 },
       );
@@ -33,9 +39,9 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
 
     const { sessionId, status, review, error } = parsedResult.data;
 
-    // 🚨 1. HANDLE FAILURE
+    // 🚨 2. HANDLE FAILURE
     if (status === "FAILED") {
-      console.error(`Lambda failed for session ${sessionId}:`, error);
+      console.error(`❌ [FREESTYLE REVIEW] Lambda failed for session ${sessionId}:`, error);
 
       await prisma.freestyleReview.upsert({
         where: { freestyleSessionId: sessionId },
@@ -51,7 +57,6 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
         data: { status: "FAILED" },
       });
 
-      // Tell the UI that the review failed so it doesn't spin forever
       await pusherServer.trigger(`session-${sessionId}`, "review:completed", {
         sessionId,
         status: "FAILED",
@@ -60,10 +65,21 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       return NextResponse.json({ message: "Handled failure" }, { status: 200 });
     }
 
-    // 🚨 2. HANDLE SUCCESS
+    // 🚨 3. HANDLE SUCCESS
     if (!review) {
       throw new Error("SUCCESS status but no review data");
     }
+
+    // 📊 4. DETAILED BREAKDOWN LOGGING
+    console.log("====================================================");
+    console.log(`✅ [FREESTYLE REVIEW] Session ${sessionId} Succeeded!`);
+    console.log("📈 METRICS:", JSON.stringify(review.metrics, null, 2));
+    console.log("⚠️ MISTAKES COUNT:", review.mistakes?.length ?? 0);
+    console.log("⚠️ MISTAKES LIST:", JSON.stringify(review.mistakes, null, 2));
+    console.log("🧠 GRAMMAR ANALYSIS:", JSON.stringify(review.grammarAnalysis, null, 2));
+    console.log("💡 VOCAB UPGRADES:", JSON.stringify(review.vocabUpgrades, null, 2));
+    console.log("💬 OVERALL FEEDBACK:", JSON.stringify(review.overallFeedback, null, 2));
+    console.log("====================================================");
 
     const {
       mistakes,
@@ -106,7 +122,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       return sess;
     });
 
-    // 3. ENRICH USER'S WORD MATRIX (`WordStat`) & INVALIDATE VOX DOSSIER CACHE
+    // 5. ENRICH USER'S WORD MATRIX (`WordStat`) & INVALIDATE VOX DOSSIER CACHE
     try {
       const meta = (task.metadata as Record<string, any>) || {};
       const userId = updatedSession?.userId || meta.userId;
@@ -124,7 +140,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
           create: { userId, languageCode: targetLang },
         });
 
-        // 3a. Add/update vocabulary upgrades in WordStat
+        // 5a. Add/update vocabulary upgrades in WordStat
         for (const item of vocabUpgrades ?? []) {
           const cleanWord = item.better
             .trim()
@@ -160,7 +176,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
           });
         }
 
-        // 3b. Log corrected mistakes into WordStat so Vox prioritizes them for practice
+        // 5b. Log corrected mistakes into WordStat so Vox prioritizes them for practice
         for (const m of mistakes ?? []) {
           const cleanCorrection = m.correction
             .trim()
@@ -200,7 +216,6 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
           });
         }
 
-        // Refresh Vox/Vivi's cached dossier so new mistakes & words appear in Briefing immediately
         await invalidateDossierCache(userId);
       }
     } catch (matrixErr) {
@@ -210,7 +225,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       );
     }
 
-    // 4. Tell the UI that the review is ready!
+    // 6. Notify UI
     await pusherServer.trigger(`session-${sessionId}`, "review:completed", {
       sessionId,
       status: "SUCCESS",
@@ -230,7 +245,6 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       })
       .catch(console.error);
 
-    // Fallback trigger so UI gets unstuck in case of a server crash
     try {
       const parsedBody = body as any;
       if (parsedBody?.sessionId) {

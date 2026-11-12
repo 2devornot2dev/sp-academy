@@ -429,3 +429,5 @@ export async function getLearningPath(userId: string) {
 export type LearningPathData = NonNullable<
   Awaited<ReturnType<typeof getLearningPath>>
 >;
+
+export type LearningPath = LearningPathData;
