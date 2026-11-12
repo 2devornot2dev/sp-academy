@@ -398,18 +398,19 @@ function LiveFreestyleChatInner({
           : 0;
 
         // --- #5 MICRO-WIN DETECTOR (Client-Side Instant Sparks!) ---
-        letnewlyMatchedGoal: string | null = null;
+        let newlyMatchedGoal: string | null = null;
         if (text && requiredChunks.length > 0) {
-          setMatchedChunks((prev) => {
-            const next = new Set(prev);
-            for (const chunk of requiredChunks) {
-              if (!next.has(chunk) && doesSpeechMatchPhrase(text, chunk)) {
-                next.add(chunk);
-                newlyMatchedGoal = chunk;
-              }
+          const next = new Set(matchedChunksRef.current);
+          for (const chunk of requiredChunks) {
+            if (!next.has(chunk) && doesSpeechMatchPhrase(text, chunk)) {
+              next.add(chunk);
+              if (!newlyMatchedGoal) newlyMatchedGoal = chunk;
             }
-            return next;
-          });
+          }
+          if (newlyMatchedGoal) {
+            matchedChunksRef.current = next;
+            setMatchedChunks(next);
+          }
         }
 
         const wordCount = text.split(/\s+/).filter(Boolean).length;
