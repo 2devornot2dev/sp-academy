@@ -211,7 +211,7 @@ Rules:
     const session = await prisma.freestyleSession.create({
       data: {
         userId,
-        mode: String(mode),
+        mode: mode,
         topic: generated.topic,
         nativeLanguage,
         targetLanguage,
