@@ -40,8 +40,7 @@ export async function POST(request: Request, { params }: Params) {
     const body = await request.json();
 
     // ========================================================================
-    // BRANCH A: LIVE TUTOR NOTEPAD ANALYSIS (`action === "ANALYZE_TURN"`)
-    // Checks what the user just spoke -> Returns "Here's how a native says it"
+    // BRANCH A: LIVE TUTOR NOTEPAD + USER TRANSLATION (`action === "ANALYZE_TURN"`)
     // ========================================================================
     if (body.action === "ANALYZE_TURN") {
       const {
@@ -51,7 +50,7 @@ export async function POST(request: Request, { params }: Params) {
         targetLanguage = "fr-FR",
       } = body;
 
-      if (!userText || userText.trim().split(/\s+/).length < 2) {
+      if (!userText || !userText.trim()) {
         return NextResponse.json({ skip: true });
       }
 
@@ -59,7 +58,7 @@ export async function POST(request: Request, { params }: Params) {
         const completion = await groq.chat.completions.create({
           model: "qwen/qwen3.8-27b",
           temperature: 0.2,
-          max_tokens: 800,
+          max_tokens: 900,
           reasoning_effort: "low",
           messages: [
             {
@@ -70,13 +69,14 @@ Focus ONLY on spoken grammar, verb conjugation, gender agreement, or natural wor
 
 Output ONLY a JSON object:
 {
+  "userTranslation": "Accurate, natural translation of what the learner said ('${userText}') into ${nativeLanguage}",
   "hasCorrection": boolean,
   "category": "GRAMMAR" | "GENDER" | "VOCABULARY",
   "severity": "MINOR" | "MAJOR",
   "userSaid": "${userText}",
   "nativeWay": "The natural, corrected way to say what the user meant in ${targetLanguage} (or a slightly richer native upgrade if they made 0 mistakes)",
   "nativeTranslation": "Translation of nativeWay in ${nativeLanguage}",
-  "quickWhy": "1 ultra-short, friendly 8-to-14 word tip in ${nativeLanguage} explaining why (e.g. 'Use « je travaille » directly without « suis »')"
+  "quickWhy": "1 ultra-short, friendly 8-to-14 word tip in ${nativeLanguage} explaining why"
 }`,
             },
             {
@@ -90,6 +90,7 @@ Output ONLY a JSON object:
         const parsed = extractJsonObject(raw);
 
         return NextResponse.json({
+          userTranslation: parsed.userTranslation || "",
           hasCorrection: Boolean(parsed.hasCorrection),
           category: parsed.category || "GRAMMAR",
           severity: parsed.severity || "MINOR",
@@ -100,13 +101,13 @@ Output ONLY a JSON object:
             parsed.quickWhy ||
             "Great effort! Here is a natural native way to phrase that.",
         });
-      } catch (e) {
+      } catch {
         return NextResponse.json({ skip: true });
       }
     }
 
     // ========================================================================
-    // BRANCH B: DYNAMIC TURN-BY-TURN COACHING HINT (`action === "HINT"`)
+    // BRANCH B: DYNAMIC COACHING HINT + AI TRANSLATION (`action === "HINT"`)
     // ========================================================================
     if (body.action === "HINT") {
       const {
@@ -128,25 +129,24 @@ Output ONLY a JSON object:
             {
               role: "system",
               content: `You are a live language coach helping ${firstName} (level: ${level}) reply to their conversation partner in ${targetLanguage}.
-The AI partner just said: "${aiText}" (${aiTranslation || ""}).
+The AI partner just said: "${aiText}".
 ${
   nextTargetChunk
-    ? `Next Target Phrase to weave in if possible: "${nextTargetChunk}".`
-    : ""
+    ? `Optional Target Phrase to weave in naturally if it fits: "${nextTargetChunk}".`
+    : "All 3 session phrase goals are complete! Just help them keep a fun, natural conversation going (or ask their partner a question back!)."
 }
 
-Output ONLY a JSON object with 3 keys:
+Output ONLY a JSON object with 4 keys:
 {
-  "coachingTip": "1 short, punchy nudge in ${nativeLanguage} guiding ${firstName} on what to say next without giving away the full foreign sentence (max 14 words)",
-  "starter": "A natural 1-sentence reply in ${targetLanguage} that directly answers "${aiText}"${
-                nextTargetChunk ? ` and uses "${nextTargetChunk}"` : ""
-              } (keep it 3-6 words if level is ZERO/EASY)",
+  "aiTranslation": "Exact natural translation of '${aiText}' into ${nativeLanguage}",
+  "coachingTip": "1 short, punchy nudge in ${nativeLanguage} guiding ${firstName} on how to respond naturally (max 14 words)",
+  "starter": "A natural 1-sentence reply in ${targetLanguage} that directly answers '${aiText}' (keep it 3-6 words if level is ZERO/EASY)",
   "translation": "Exact translation of 'starter' in ${nativeLanguage}"
 }`,
             },
             {
               role: "user",
-              content: `Generate live reply coaching for: "${aiText}"`,
+              content: `Generate live reply coaching and translation for: "${aiText}"`,
             },
           ],
         });
@@ -155,25 +155,26 @@ Output ONLY a JSON object with 3 keys:
         const parsed = extractJsonObject(raw);
 
         return NextResponse.json({
+          aiTranslation: parsed.aiTranslation || aiTranslation || "",
           coachingTip:
             parsed.coachingTip ||
             (nextTargetChunk
               ? `Reply to your partner and try using "${nextTargetChunk}"!`
-              : "Answer your partner's question naturally!"),
-          starter: parsed.starter || nextTargetChunk || "Oui, bien sûr !",
-          translation: parsed.translation || "Yes, of course!",
+              : "Keep the flow going—answer and ask your partner a question back!"),
+          starter: parsed.starter || nextTargetChunk || "Oui, et toi ?",
+          translation: parsed.translation || "Yes, and you?",
         });
       } catch {
         return NextResponse.json({
+          aiTranslation: aiTranslation || "",
           coachingTip: nextTargetChunk
             ? `Answer the question and try using "${nextTargetChunk}"!`
-            : "Answer your partner's question!",
-          starter: nextTargetChunk || "Oui, c'est vrai !",
-          translation: "Yes, that's true!",
+            : "Answer naturally and ask your partner a question back!",
+          starter: nextTargetChunk || "Oui, et toi ?",
+          translation: "Yes, and you?",
         });
       }
     }
-
     // ========================================================================
     // BRANCH C: CREATE NEW 3-MIN FREESTYLE SESSION
     // ========================================================================
@@ -335,10 +336,10 @@ Output ONLY a JSON object with 3 keys:
 {
   "topic": "Short scenario title in ${nativeLanguage} (3-6 words)",
   "persona": "1-sentence role for ${tutorName} (${personaDesc}) in ${nativeLanguage}",
-  "requiredChunks": ["2-to-5 word speakable phrase 1 in ${targetLanguage}", "2-to-5 word phrase 2", "2-to-5 word phrase 3"],
+  "requiredChunks": ["2-to-5 word speakable phrase 1 in ${targetLanguage}", "completely distinct phrase 2 (no overlapping words)", "completely distinct phrase 3"],
   "chunkTranslations": ["English meaning of phrase 1", "English meaning of phrase 2", "English meaning of phrase 3"],
   "openingLine": "1-sentence coaching tip for ${firstName} in ${nativeLanguage}",
-  "aiOpeningTarget": "First in-character question spoken by ${tutorName} in ${targetLanguage} that naturally sets up ${firstName} to reply using requiredChunks[0] (NEVER ask 'Are you ready?')",
+  "aiOpeningTarget": "Warm, friendly 2-sentence opener spoken by ${tutorName} in ${targetLanguage}: Sentence 1 MUST greet ${firstName} by name and share a tiny relatable detail (e.g., 'Bonjour ${firstName} ! Moi je prends un café avant de commencer.'), Sentence 2 asks a warm, easy lead-in question.",
   "starterHintTarget": "Complete example reply in ${targetLanguage} that answers aiOpeningTarget using requiredChunks[0]",
   "starterHintNative": "Translation of starterHintTarget in ${nativeLanguage}"
 }

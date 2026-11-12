@@ -543,14 +543,6 @@ export default function FreestyleSetup({
                               </p>
                             </div>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setMode("SPECIFIC")}
-                            className="hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-700 transition hover:border-amber-300 hover:bg-amber-50"
-                          >
-                            <span>🎯 Or Pick Custom Topic</span>
-                          </button>
                         </div>
                       )}
                     </div>

@@ -40,7 +40,7 @@ import {
   type TutorMood,
 } from "@/lib/freestyle/tutors";
 import { toast } from "sonner";
-
+import { motion, AnimatePresence } from "framer-motion";
 interface FreestyleChatProps {
   session: any;
   livekitToken: string;
@@ -138,6 +138,44 @@ function renderScoredWords(pron: any, fallbackText: string) {
     </span>
   );
 }
+
+function getMoodMotion(mood: TutorMood) {
+  switch (mood) {
+    case "happy":
+      return {
+        scale: [1, 1.14, 1.04],
+        y: [0, -10, 0],
+        rotate: [0, -3, 3, 0],
+      };
+    case "mad":
+      return {
+        scale: [1, 1.08, 1.02],
+        x: [0, -8, 8, -6, 6, -3, 3, 0],
+      };
+    case "sad":
+      return {
+        scale: [1, 0.95, 0.98],
+        y: [0, 6, 3],
+        rotate: [0, -4, -2],
+      };
+    case "thinking":
+      return {
+        scale: 1,
+        rotate: [0, -3, 2, 0],
+      };
+    default:
+      return { scale: 1, x: 0, y: 0, rotate: 0 };
+  }
+}
+
+const MOOD_OVERLAY: Record<TutorMood, { tint: string; badge: string | null }> =
+  {
+    default: { tint: "bg-transparent", badge: null },
+    happy: { tint: "bg-emerald-400/20", badge: "✨" },
+    mad: { tint: "bg-rose-600/30", badge: "💢" },
+    sad: { tint: "bg-indigo-900/25", badge: "💧" },
+    thinking: { tint: "bg-indigo-500/15", badge: "💭" },
+  };
 
 function LiveFreestyleChatInner({
   session,
@@ -258,7 +296,20 @@ function LiveFreestyleChatInner({
 
         if (res.ok) {
           const data = await res.json();
-          if (!data.skip && data.nativeWay) {
+          if (data.userTranslation) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === turnId && !m.translation
+                  ? { ...m, translation: data.userTranslation }
+                  : m,
+              ),
+            );
+          }
+          if (
+            !data.skip &&
+            data.nativeWay &&
+            userText.trim().split(/\s+/).length >= 2
+          ) {
             const note: NotepadNote = {
               id: `note-${Date.now()}`,
               turnId,
@@ -292,9 +343,7 @@ function LiveFreestyleChatInner({
       setIsHintUpdating(true);
 
       const nextUnmatchedChunk =
-        requiredChunks.find((c) => !matchedChunksRef.current.has(c)) ||
-        requiredChunks[0] ||
-        "";
+        requiredChunks.find((c) => !matchedChunksRef.current.has(c)) || "";
 
       try {
         const res = await fetch(
@@ -316,6 +365,15 @@ function LiveFreestyleChatInner({
 
         if (res.ok) {
           const data = await res.json();
+          if (data.aiTranslation) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.role === "assistant" && m.text === aiText && !m.translation
+                  ? { ...m, translation: data.aiTranslation }
+                  : m,
+              ),
+            );
+          }
           if (data.coachingTip) setCoachingTip(data.coachingTip);
           if (data.starter) {
             setSuggestions({
@@ -600,6 +658,12 @@ function LiveFreestyleChatInner({
   );
   const latestNote = notepadNotes[0] || null;
 
+  const handleEndSessionRef = useRef(handleEndSession);
+  handleEndSessionRef.current = handleEndSession;
+  const stableOnTimeUp = useCallback(() => {
+    void handleEndSessionRef.current();
+  }, []);
+
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col gap-5 overflow-hidden animate-bg p-4 sm:p-6 lg:flex-row">
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
@@ -673,7 +737,6 @@ function LiveFreestyleChatInner({
                   </span>
                 </button>
               </div>
-
               <button
                 type="button"
                 onClick={() => setShowTranslations((prev) => !prev)}
@@ -688,8 +751,7 @@ function LiveFreestyleChatInner({
                   {showTranslations ? "Translations On" : "Translations Off"}
                 </span>
               </button>
-
-              <FreestyleTimer initialTime={180} onTimeUp={handleEndSession} />
+              <FreestyleTimer initialTime={180} onTimeUp={stableOnTimeUp} />.
             </div>
           </div>
         </div>
@@ -775,26 +837,57 @@ function LiveFreestyleChatInner({
           <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-6">
             {/* Top / Center: Living Tutor Portrait + Active Speech Stage */}
             <div className="my-auto flex flex-col items-center text-center">
-              {/* Reactive Tutor Portrait */}
-              <div className="relative mb-4">
+              {/* Reactive Tutor Portrait (Framer Motion Emote Engine) */}
+              <div className="relative mb-5">
+                {/* Ambient Mood Glow */}
                 <div
-                  className={`pointer-events-none absolute -inset-3 rounded-[2.2rem] blur-xl transition-all duration-500 ${
+                  className={`pointer-events-none absolute -inset-4 rounded-[2.5rem] blur-xl transition-all duration-500 ${
                     agentState === "speaking"
-                      ? "animate-pulse bg-sky-400/40"
+                      ? "animate-pulse bg-sky-400/45"
                       : effectiveMood === "happy"
-                        ? "bg-emerald-400/40"
+                        ? "bg-emerald-400/50"
                         : effectiveMood === "mad"
-                          ? "bg-rose-500/40"
+                          ? "bg-rose-500/55"
                           : effectiveMood === "sad"
-                            ? "bg-amber-400/35"
+                            ? "bg-amber-400/40"
                             : "bg-indigo-400/20"
                   }`}
                 />
 
-                <div
-                  className={`relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl transition-all duration-300 ${
+                {/* Expanding Shockwave Ring whenever Mood Changes */}
+                <AnimatePresence>
+                  <motion.div
+                    key={`ring-${effectiveMood}`}
+                    initial={{ scale: 0.9, opacity: 0.85 }}
+                    animate={{ scale: 1.4, opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.55, ease: "easeOut" }}
+                    className={`pointer-events-none absolute inset-0 rounded-[2rem] border-4 ${
+                      effectiveMood === "happy"
+                        ? "border-emerald-400"
+                        : effectiveMood === "mad"
+                          ? "border-rose-500"
+                          : effectiveMood === "sad"
+                            ? "border-amber-400"
+                            : effectiveMood === "thinking"
+                              ? "border-indigo-400"
+                              : "border-sky-400"
+                    }`}
+                  />
+                </AnimatePresence>
+
+                {/* Animated Portrait Box (Bounces when Happy, Shakes + Red Tint when Mad, Droops when Sad) */}
+                <motion.div
+                  key={`box-${effectiveMood}`}
+                  animate={getMoodMotion(effectiveMood)}
+                  transition={
+                    effectiveMood === "thinking"
+                      ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+                      : { duration: 0.45, ease: "easeOut" }
+                  }
+                  className={`relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl ${
                     effectiveMood === "happy"
-                      ? "border-emerald-400 border-b-emerald-700 scale-105"
+                      ? "border-emerald-400 border-b-emerald-700"
                       : effectiveMood === "mad"
                         ? "border-rose-500 border-b-rose-800"
                         : effectiveMood === "sad"
@@ -807,11 +900,40 @@ function LiveFreestyleChatInner({
                     alt={tutorName}
                     className="h-full w-full object-cover object-top"
                   />
-                </div>
 
-                {/* Emote Status Pill */}
-                <span
-                  className={`absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-md ${
+                  {/* Subtle Color Wash Overlay (Red flush for Mad, Warm glow for Happy, Cool dim for Sad) */}
+                  <div
+                    className={`pointer-events-none absolute inset-0 transition-colors duration-300 ${MOOD_OVERLAY[effectiveMood].tint}`}
+                  />
+                </motion.div>
+
+                {/* Popping Top-Right Emoji Burst */}
+                <AnimatePresence mode="wait">
+                  {MOOD_OVERLAY[effectiveMood].badge && (
+                    <motion.div
+                      key={`emoji-${effectiveMood}`}
+                      initial={{ scale: 0, rotate: -20, y: 8 }}
+                      animate={{ scale: 1, rotate: 0, y: 0 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 18,
+                      }}
+                      className="absolute -top-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-white bg-white text-lg shadow-lg"
+                    >
+                      {MOOD_OVERLAY[effectiveMood].badge}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Animated Emote Status Pill */}
+                <motion.span
+                  key={`pill-${effectiveMood}`}
+                  initial={{ scale: 0.85, y: 4 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 20 }}
+                  className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-md ${
                     effectiveMood === "happy"
                       ? "border-emerald-800 bg-emerald-400 text-slate-950"
                       : effectiveMood === "thinking"
@@ -832,7 +954,7 @@ function LiveFreestyleChatInner({
                         : effectiveMood === "sad"
                           ? `✏️ Almost There`
                           : `🎙️ ${tutorName}`}
-                </span>
+                </motion.span>
               </div>
 
               {/* Tutor's Latest Spoken Line Card */}
