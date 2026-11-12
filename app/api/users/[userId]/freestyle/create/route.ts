@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: Params) {
 
     const body = await request.json();
     const {
-      mode = "RANDOM",
+      mode = "FOCUSED",
       level = "EASY",
       persona = "FRIENDLY",
       topic,
@@ -39,87 +39,70 @@ export async function POST(request: Request, { params }: Params) {
     } = body;
 
     // ------------------------------------------------------------------------
-    // 1. RESOLVE USER'S ACTIVE MILESTONE INDEX & SPOON LESSON CHUNKS
+    // 1. RESOLVE USER'S ACTIVE MILESTONE & SPOON LESSON CHUNKS
     // ------------------------------------------------------------------------
-    const activeCourse = await prisma.foundationCourse.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        lessons: {
-          orderBy: { orderIndex: "asc" },
-          select: {
-            id: true,
-            orderIndex: true,
-            title: true,
-            completedAt: true,
-            lessonHandoff: true,
-          },
-        },
-        foundationBossStages: {
-          orderBy: { milestoneIndex: "asc" },
-          select: {
-            milestoneIndex: true,
-            passed: true,
-          },
-        },
-      },
-    });
-
-    // Determine current milestoneIndex:
-    // Find the first unpassed boss stage, or derive from first incomplete spoon lesson
     let currentMilestoneIndex = 1;
-    if (activeCourse) {
-      const firstIncompleteLesson = activeCourse.lessons.find(
-        (l) => !l.completedAt,
-      );
-      const passedMilestoneSet = new Set(
-        activeCourse.foundationBossStages
-          .filter((b) => b.passed)
-          .map((b) => b.milestoneIndex),
-      );
-
-      if (firstIncompleteLesson) {
-        currentMilestoneIndex = Math.ceil(firstIncompleteLesson.orderIndex / 3);
-      } else if (activeCourse.lessons.length > 0) {
-        const maxMilestone = Math.ceil(activeCourse.lessons.length / 3);
-        // Find lowest milestone whose boss isn't passed yet
-        for (let m = 1; m <= maxMilestone; m++) {
-          if (!passedMilestoneSet.has(m)) {
-            currentMilestoneIndex = m;
-            break;
-          }
-          currentMilestoneIndex = m;
-        }
-      }
-    }
-
-    // Extract current milestone's 3 Spoon lessons (for FOCUSED mode)
-    const startOrder = (currentMilestoneIndex - 1) * 3 + 1;
-    const endOrder = currentMilestoneIndex * 3;
-    const milestoneLessons =
-      activeCourse?.lessons.filter(
-        (l) => l.orderIndex >= startOrder && l.orderIndex <= endOrder,
-      ) ?? [];
-
     const spoonChunks: string[] = [];
     const spoonThemes: string[] = [];
 
-    for (const l of milestoneLessons) {
-      if (l.title) spoonThemes.push(l.title);
-      const lh = (l.lessonHandoff as any) || {};
-      const rawChunks = [
-        ...(Array.isArray(lh.taughtChunks) ? lh.taughtChunks : []),
-        ...(Array.isArray(lh.chunks) ? lh.chunks : []),
-      ];
-      for (const c of rawChunks) {
-        if (typeof c === "string" && c.trim()) {
-          const clean = c.split("=")[0].trim();
-          if (clean && !spoonChunks.includes(clean)) {
-            spoonChunks.push(clean);
+    try {
+      const activeCourse = await prisma.foundationCourse.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          lessons: {
+            orderBy: { orderIndex: "asc" },
+            select: {
+              id: true,
+              orderIndex: true,
+              title: true,
+              completedAt: true,
+              lessonHandoff: true,
+            },
+          },
+        },
+      });
+
+      if (activeCourse && activeCourse.lessons.length > 0) {
+        const firstIncompleteLesson = activeCourse.lessons.find(
+          (l) => !l.completedAt,
+        );
+
+        if (firstIncompleteLesson) {
+          currentMilestoneIndex = Math.ceil(
+            firstIncompleteLesson.orderIndex / 3,
+          );
+        } else {
+          currentMilestoneIndex = Math.ceil(activeCourse.lessons.length / 3);
+        }
+
+        // Grab the 3 Spoons for this active milestone
+        const startOrder = (currentMilestoneIndex - 1) * 3 + 1;
+        const endOrder = currentMilestoneIndex * 3;
+        const milestoneLessons = activeCourse.lessons.filter(
+          (l) => l.orderIndex >= startOrder && l.orderIndex <= endOrder,
+        );
+
+        for (const l of milestoneLessons) {
+          if (l.title) spoonThemes.push(l.title);
+          const lh = (l.lessonHandoff as any) || {};
+          const rawChunks = [
+            ...(Array.isArray(lh.taughtChunks) ? lh.taughtChunks : []),
+            ...(Array.isArray(lh.chunks) ? lh.chunks : []),
+          ];
+          for (const c of rawChunks) {
+            if (typeof c === "string" && c.trim()) {
+              const clean = c.split("=")[0].trim();
+              if (clean && !spoonChunks.includes(clean)) {
+                spoonChunks.push(clean);
+              }
+            }
           }
         }
       }
+    } catch (e) {
+      console.warn("[freestyle/create] Could not resolve milestone chunks:", e);
     }
 
     const tutorName = voiceGender === "female" ? "Sophie" : "Antoine";
@@ -130,7 +113,7 @@ export async function POST(request: Request, { params }: Params) {
       PERSONA_STYLES[String(persona).toUpperCase()] || PERSONA_STYLES.FRIENDLY;
 
     const defaultChunks =
-      mode === "FOCUSED" && spoonChunks.length >= 2
+      spoonChunks.length >= 2
         ? spoonChunks.slice(0, 3)
         : targetLanguage.startsWith("es")
           ? ["Por favor", "Me gustaría", "Gracias"]
@@ -153,35 +136,40 @@ export async function POST(request: Request, { params }: Params) {
       starterHintNative: "Hello! I'd like to practice, please.",
     };
 
+    // ------------------------------------------------------------------------
+    // 2. GROQ CONFIG GENERATION (Fast & Reliable Model, No Token Exhaustion)
+    // ------------------------------------------------------------------------
     try {
       const focusedContext =
         mode === "FOCUSED" && spoonChunks.length > 0
-          ? `\n- FOCUSED MODE: The learner is practicing Milestone ${currentMilestoneIndex} Spoon lessons (${spoonThemes.join(", ")}). You MUST pick 3 'requiredChunks' directly from this list: ${JSON.stringify(spoonChunks.slice(0, 10))} and design the scenario around them!`
+          ? `\n- FOCUSED MODE: Pick 3 'requiredChunks' strictly from this list: ${JSON.stringify(
+              spoonChunks.slice(0, 10),
+            )}.`
           : "";
 
+      // Use llama-3.3-70b-versatile or qwen without reasoning exhaustion!
       const completion = await groq.chat.completions.create({
-        model: "qwen/qwen3.8-27b",
-        temperature: 0.6,
-        max_tokens: 600,
+        model: "llama-3.3-70b-versatile",
+        temperature: 0.5,
+        max_tokens: 5000,
         reasoning_effort: "low",
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
-            content: `Generate a 3-minute language roleplay config. Return ONLY JSON:
+            content: `You generate a 3-minute language conversation setup.
+Return ONLY valid JSON matching this schema:
 {
   "topic": "Short scenario title in ${nativeLanguage} (3-6 words)",
   "persona": "1-sentence role for ${tutorName} (${personaDesc}) in ${nativeLanguage}",
-  "requiredChunks": ["chunk1", "chunk2", "chunk3"],
+  "requiredChunks": ["phrase1", "phrase2", "phrase3"],
   "openingLine": "1-sentence goal for ${firstName} in ${nativeLanguage}",
   "aiOpeningTarget": "First spoken line by ${tutorName} in ${targetLanguage}",
-  "starterHintTarget": "Example first reply in ${targetLanguage} using requiredChunks[0]",
+  "starterHintTarget": "Example first reply in ${targetLanguage}",
   "starterHintNative": "Translation of starterHintTarget in ${nativeLanguage}"
 }
 Rules:
-- Mode: ${mode} (SPECIFIC=use custom topic "${topic || "Introduction & Small Talk"}"; RANDOM=invent a specific cafe/travel/shop scenario; ARGUMENTATIVE=friendly debate; FOCUSED=practice current Spoon lesson phrases).${focusedContext}
-- Level: ${level} (ZERO=2-3 word survival chunks; EASY=short A1 phrases; MEDIUM=B1 conversational chunks; FLUENT=C1 idioms).
-- requiredChunks MUST be 3 short phrases in ${targetLanguage} only (no proper names).`,
+- requiredChunks MUST be 3 short phrases in ${targetLanguage}.${focusedContext}`,
           },
           {
             role: "user",
@@ -190,9 +178,6 @@ Rules:
               level,
               persona,
               topic: topic || null,
-              spoonThemes: mode === "FOCUSED" ? spoonThemes : undefined,
-              spoonChunks:
-                mode === "FOCUSED" ? spoonChunks.slice(0, 10) : undefined,
               nativeLanguage,
               targetLanguage,
             }),
@@ -200,22 +185,33 @@ Rules:
         ],
       });
 
-      const raw = (completion.choices[0]?.message?.content || "{}")
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .trim();
+      const raw = completion.choices[0]?.message?.content?.trim() || "{}";
       const parsed = JSON.parse(raw);
 
       if (parsed.topic && Array.isArray(parsed.requiredChunks)) {
-        generated = { ...generated, ...parsed };
+        generated = {
+          topic: parsed.topic,
+          persona: parsed.persona || generated.persona,
+          requiredChunks: parsed.requiredChunks.slice(0, 3),
+          openingLine: parsed.openingLine || generated.openingLine,
+          aiOpeningTarget: parsed.aiOpeningTarget || generated.aiOpeningTarget,
+          starterHintTarget:
+            parsed.starterHintTarget || generated.starterHintTarget,
+          starterHintNative:
+            parsed.starterHintNative || generated.starterHintNative,
+        };
       }
     } catch (e) {
       console.warn("[freestyle/create] Groq fallback used:", e);
     }
 
+    // ------------------------------------------------------------------------
+    // 3. CREATE PRISMA SESSION
+    // ------------------------------------------------------------------------
     const session = await prisma.freestyleSession.create({
       data: {
-        user: { connect: { id: userId } },
-        mode,
+        userId,
+        mode: String(mode),
         topic: generated.topic,
         nativeLanguage,
         targetLanguage,
@@ -241,10 +237,10 @@ Rules:
         starterHintNative: generated.starterHintNative,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create Session Error:", error);
     return NextResponse.json(
-      { error: "Failed to create session" },
+      { error: error?.message || "Failed to create session" },
       { status: 500 },
     );
   }
