@@ -148,8 +148,7 @@ export default function FreestyleWrapper({
 
     const fd = sessionData.freestyleData || {};
     const requiredChunks = fd.requiredChunks || [];
-    const topicLabel =
-      fd.topic || config.topic || "Live Conversation Practice";
+    const topicLabel = fd.topic || config.topic || "Live Conversation Practice";
     const personaPrompt = `${fd.persona || tutorName}. LEVEL CALIBRATION: ${
       LEVEL_INSTRUCTIONS[level]
     }`;
@@ -189,16 +188,18 @@ export default function FreestyleWrapper({
     setActiveSession({
       id: sessionData.sessionId,
       userId,
+      userAvatarUrl: sessionData.userAvatarUrl,
       ...config,
       level,
       tutorName,
       topic: topicLabel,
       aiAvatarUrl,
       requiredChunks,
+      chunkTranslations: fd.chunkTranslations || [],
       openingLine: fd.openingLine,
       starterHintTarget: fd.starterHintTarget,
       starterHintNative: fd.starterHintNative,
-    });
+    } as any);
   };
 
   const handleEndSession = (result?: {

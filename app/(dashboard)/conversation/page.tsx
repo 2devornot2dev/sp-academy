@@ -15,7 +15,7 @@ export default async function ConversationPage() {
   const defaultTarget = lang?.targetLanguage ?? "fr-FR";
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-100/80">
+    <div className="flex min-h-screen w-full flex-col animate-bg">
       <FreestyleWrapper
         userId={user.id}
         userName={user.firstName}

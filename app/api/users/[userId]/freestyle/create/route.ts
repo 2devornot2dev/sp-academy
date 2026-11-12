@@ -17,6 +17,13 @@ interface Params {
   }>;
 }
 
+function extractJsonObject(raw: string): any {
+  const withoutThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const match = withoutThink.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object found in model output");
+  return JSON.parse(match[0]);
+}
+
 export async function POST(request: Request, { params }: Params) {
   try {
     const user = await requireUser();
@@ -26,8 +33,84 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     const firstName = user.firstName || "Learner";
+    const userAvatarUrl =
+      (user as any).avatarUrl || (user as any).image || null;
 
     const body = await request.json();
+
+    // ========================================================================
+    // BRANCH A: DYNAMIC TURN-BY-TURN COACHING HINT (`action === "HINT"`)
+    // Called automatically whenever the AI partner finishes speaking a turn!
+    // ========================================================================
+    if (body.action === "HINT") {
+      const {
+        aiText = "",
+        aiTranslation = "",
+        nextTargetChunk = "",
+        level = "ZERO",
+        nativeLanguage = "en-US",
+        targetLanguage = "fr-FR",
+      } = body;
+
+      try {
+        const completion = await groq.chat.completions.create({
+          model: "qwen/qwen3.8-27b",
+          temperature: 0.4,
+          max_tokens: 900,
+          reasoning_effort: "low",
+          messages: [
+            {
+              role: "system",
+              content: `You are a live language coach helping ${firstName} (level: ${level}) reply to their conversation partner in ${targetLanguage}.
+The AI partner just said: "${aiText}" (${aiTranslation || ""}).
+${
+  nextTargetChunk
+    ? `Next Target Phrase to weave in if possible: "${nextTargetChunk}".`
+    : ""
+}
+
+Output ONLY a JSON object with 3 keys:
+{
+  "coachingTip": "1 short, punchy nudge in ${nativeLanguage} guiding ${firstName} on what to say next without giving away the full foreign sentence (max 14 words)",
+  "starter": "A natural 1-sentence reply in ${targetLanguage} that directly answers "${aiText}"${
+                nextTargetChunk ? ` and uses "${nextTargetChunk}"` : ""
+              } (keep it 3-6 words if level is ZERO/EASY)",
+  "translation": "Exact translation of 'starter' in ${nativeLanguage}"
+}`,
+            },
+            {
+              role: "user",
+              content: `Generate live reply coaching for: "${aiText}"`,
+            },
+          ],
+        });
+
+        const raw = completion.choices[0]?.message?.content || "{}";
+        const parsed = extractJsonObject(raw);
+
+        return NextResponse.json({
+          coachingTip:
+            parsed.coachingTip ||
+            (nextTargetChunk
+              ? `Reply to your partner and try using "${nextTargetChunk}"!`
+              : "Answer your partner's question naturally!"),
+          starter: parsed.starter || nextTargetChunk || "Oui, bien sûr !",
+          translation: parsed.translation || "Yes, of course!",
+        });
+      } catch (e) {
+        return NextResponse.json({
+          coachingTip: nextTargetChunk
+            ? `Answer the question and try using "${nextTargetChunk}"!`
+            : "Answer your partner's question!",
+          starter: nextTargetChunk || "Oui, c'est vrai !",
+          translation: "Yes, that's true!",
+        });
+      }
+    }
+
+    // ========================================================================
+    // BRANCH B: CREATE NEW 3-MIN FREESTYLE SESSION
+    // ========================================================================
     const {
       mode = "FOCUSED",
       level = "EASY",
@@ -38,17 +121,15 @@ export async function POST(request: Request, { params }: Params) {
       targetLanguage = "fr-FR",
     } = body;
 
-    // ------------------------------------------------------------------------
-    // 1. RESOLVE USER'S ACTIVE MILESTONE & SPOON LESSON CHUNKS
-    // ------------------------------------------------------------------------
+    // 1. RESOLVE USER'S ACTIVE MILESTONE & FULL SPEAKABLE SPOON SENTENCES
     let currentMilestoneIndex = 1;
-    const spoonChunks: string[] = [];
+    const speakablePhrases: string[] = [];
     const spoonThemes: string[] = [];
 
     try {
       const activeCourse = await prisma.foundationCourse.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
+        where: { userId, isHardMode: false },
+        orderBy: { createdAt: "asc" },
         select: {
           id: true,
           lessons: {
@@ -59,6 +140,9 @@ export async function POST(request: Request, { params }: Params) {
               title: true,
               completedAt: true,
               lessonHandoff: true,
+              grammarContent: true,
+              visualContent: true,
+              freestyle: true,
             },
           },
         },
@@ -77,32 +161,55 @@ export async function POST(request: Request, { params }: Params) {
           currentMilestoneIndex = Math.ceil(activeCourse.lessons.length / 3);
         }
 
-        // Grab the 3 Spoons for this active milestone
         const startOrder = (currentMilestoneIndex - 1) * 3 + 1;
         const endOrder = currentMilestoneIndex * 3;
         const milestoneLessons = activeCourse.lessons.filter(
           (l) => l.orderIndex >= startOrder && l.orderIndex <= endOrder,
         );
 
+        const addPhrase = (raw?: string | null) => {
+          if (!raw || typeof raw !== "string") return;
+          const clean = raw
+            .split("=")[0]
+            .replace(/^[«"“]+|[»"”]+$/g, "")
+            .trim();
+          // Prefer multi-word speakable phrases (2 to 7 words) over 1-word fragments!
+          const wordCount = clean.split(/\s+/).filter(Boolean).length;
+          if (
+            wordCount >= 2 &&
+            wordCount <= 7 &&
+            !speakablePhrases.some(
+              (p) => p.toLowerCase() === clean.toLowerCase(),
+            )
+          ) {
+            speakablePhrases.push(clean);
+          }
+        };
+
         for (const l of milestoneLessons) {
           if (l.title) spoonThemes.push(l.title);
+          const gc = (l.grammarContent as any) || {};
+          const vc = (l.visualContent as any) || {};
+          const fs = (l.freestyle as any) || {};
           const lh = (l.lessonHandoff as any) || {};
-          const rawChunks = [
-            ...(Array.isArray(lh.taughtChunks) ? lh.taughtChunks : []),
-            ...(Array.isArray(lh.chunks) ? lh.chunks : []),
-          ];
-          for (const c of rawChunks) {
-            if (typeof c === "string" && c.trim()) {
-              const clean = c.split("=")[0].trim();
-              if (clean && !spoonChunks.includes(clean)) {
-                spoonChunks.push(clean);
-              }
-            }
+
+          // Priority 1: Full target sentences & valid NPC replies
+          addPhrase(gc.targetSentence);
+          addPhrase(lh.targetSentence);
+          if (Array.isArray(vc?.constraint?.validReplies)) {
+            vc.constraint.validReplies.forEach(addPhrase);
+          }
+          // Priority 2: Freestyle requiredChunks & multi-word taughtChunks
+          if (Array.isArray(fs?.requiredChunks)) {
+            fs.requiredChunks.forEach(addPhrase);
+          }
+          if (Array.isArray(lh?.taughtChunks)) {
+            lh.taughtChunks.forEach(addPhrase);
           }
         }
       }
     } catch (e) {
-      console.warn("[freestyle/create] Could not resolve milestone chunks:", e);
+      console.warn("[freestyle/create] Could not resolve milestone phrases:", e);
     }
 
     const tutorName = voiceGender === "female" ? "Sophie" : "Antoine";
@@ -113,63 +220,72 @@ export async function POST(request: Request, { params }: Params) {
       PERSONA_STYLES[String(persona).toUpperCase()] || PERSONA_STYLES.FRIENDLY;
 
     const defaultChunks =
-      spoonChunks.length >= 2
-        ? spoonChunks.slice(0, 3)
+      speakablePhrases.length >= 3
+        ? speakablePhrases.slice(0, 3)
         : targetLanguage.startsWith("es")
-          ? ["Por favor", "Me gustaría", "Gracias"]
-          : ["Bonjour", "Je voudrais", "S'il vous plaît"];
+          ? [
+              "Me gustaría un café",
+              "Trabajo todos los días",
+              "Muchas gracias por todo",
+            ]
+          : [
+              "Je voudrais un café",
+              "Je travaille chaque jour",
+              "C'est une bonne idée",
+            ];
 
     let generated = {
       topic:
         mode === "FOCUSED" && spoonThemes.length > 0
           ? `Milestone ${currentMilestoneIndex}: ${spoonThemes[0]}`
           : topic || "Everyday Conversation",
-      persona: `${tutorName}, a ${personaDesc} native speaker`,
+      persona: `${tutorName}, a ${personaDesc} native speaker. Actively guide ${firstName} by asking questions that naturally prompt them to say their 3 target phrases (${defaultChunks.join(
+        " / ",
+      )}) one by one! Do NOT ask "Are you ready to start?"—jump straight into the scenario!`,
       requiredChunks: defaultChunks,
-      openingLine: `${firstName}, chat naturally with ${tutorName} and use your target phrases.`,
+      chunkTranslations: [] as string[],
+      openingLine: `Chat with ${tutorName} and work your 3 target phrases into the conversation!`,
       aiOpeningTarget: targetLanguage.startsWith("es")
-        ? `¡Hola ${firstName}! ¿Cómo estás hoy?`
-        : `Bonjour ${firstName} ! Comment ça va aujourd'hui ?`,
-      starterHintTarget: targetLanguage.startsWith("es")
-        ? "¡Hola! Me gustaría practicar español, por favor."
-        : "Bonjour ! Je voudrais pratiquer mon français, s'il vous plaît.",
-      starterHintNative: "Hello! I'd like to practice, please.",
+        ? `¡Hola ${firstName}! ¿Qué te gustaría hacer hoy?`
+        : `Bonjour ${firstName} ! Dis-moi, comment se passe ta journée ?`,
+      starterHintTarget: defaultChunks[0],
+      starterHintNative: "Start by using your first target phrase!",
     };
 
-    // ------------------------------------------------------------------------
-    // 2. GROQ CONFIG GENERATION (Fast & Reliable Model, No Token Exhaustion)
-    // ------------------------------------------------------------------------
+    // 2. GENERATE ROLEPLAY CONFIG WITH QWEN (qwen/qwen3.8-27b)
     try {
       const focusedContext =
-        mode === "FOCUSED" && spoonChunks.length > 0
-          ? `\n- FOCUSED MODE: Pick 3 'requiredChunks' strictly from this list: ${JSON.stringify(
-              spoonChunks.slice(0, 10),
+        mode === "FOCUSED" && speakablePhrases.length > 0
+          ? `\n- FOCUSED MODE: The learner is practicing Milestone ${currentMilestoneIndex} (${spoonThemes.join(
+              ", ",
+            )}). Use or lightly adapt 3 complete, speakable 2-to-5 word phrases from this lesson list: ${JSON.stringify(
+              speakablePhrases.slice(0, 8),
             )}.`
           : "";
 
-      // Use llama-3.3-70b-versatile or qwen without reasoning exhaustion!
       const completion = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "qwen/qwen3.8-27b",
         temperature: 0.5,
-        max_tokens: 5000,
+        max_tokens: 10000,
         reasoning_effort: "low",
-        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
-            content: `You generate a 3-minute language conversation setup.
-Return ONLY valid JSON matching this schema:
+            content: `Generate a 3-minute guided language roleplay config. Output ONLY a valid JSON object:
 {
   "topic": "Short scenario title in ${nativeLanguage} (3-6 words)",
   "persona": "1-sentence role for ${tutorName} (${personaDesc}) in ${nativeLanguage}",
-  "requiredChunks": ["phrase1", "phrase2", "phrase3"],
-  "openingLine": "1-sentence goal for ${firstName} in ${nativeLanguage}",
-  "aiOpeningTarget": "First spoken line by ${tutorName} in ${targetLanguage}",
-  "starterHintTarget": "Example first reply in ${targetLanguage}",
+  "requiredChunks": ["2-to-5 word speakable phrase 1 in ${targetLanguage}", "2-to-5 word phrase 2", "2-to-5 word phrase 3"],
+  "chunkTranslations": ["English meaning of phrase 1", "English meaning of phrase 2", "English meaning of phrase 3"],
+  "openingLine": "1-sentence coaching tip for ${firstName} in ${nativeLanguage}",
+  "aiOpeningTarget": "First in-character question spoken by ${tutorName} in ${targetLanguage} that naturally sets up ${firstName} to reply using requiredChunks[0] (NEVER ask 'Are you ready?')",
+  "starterHintTarget": "Complete example reply in ${targetLanguage} that answers aiOpeningTarget using requiredChunks[0]",
   "starterHintNative": "Translation of starterHintTarget in ${nativeLanguage}"
 }
-Rules:
-- requiredChunks MUST be 3 short phrases in ${targetLanguage}.${focusedContext}`,
+CRITICAL RULES:
+- NEVER put single isolated 1-word fragments in 'requiredChunks'! Every item in 'requiredChunks' MUST be a complete, natural 2-to-5 word phrase or mini-sentence that a learner can say out loud.
+- Mode: ${mode} (SPECIFIC=use "${topic || "Introductions & Small Talk"}"; RANDOM=fun real-world cafe/travel/shop scenario; ARGUMENTATIVE=friendly debate; FOCUSED=practice current Spoon lesson sentences).${focusedContext}
+- Level: ${level} (ZERO=simple 2-4 word survival sentences; EASY=3-5 word A1 sentences; MEDIUM=B1 expressions; FLUENT=C1 idioms).`,
           },
           {
             role: "user",
@@ -178,6 +294,8 @@ Rules:
               level,
               persona,
               topic: topic || null,
+              speakablePhrases:
+                mode === "FOCUSED" ? speakablePhrases.slice(0, 8) : undefined,
               nativeLanguage,
               targetLanguage,
             }),
@@ -185,14 +303,20 @@ Rules:
         ],
       });
 
-      const raw = completion.choices[0]?.message?.content?.trim() || "{}";
-      const parsed = JSON.parse(raw);
+      const raw = completion.choices[0]?.message?.content || "{}";
+      const parsed = extractJsonObject(raw);
 
       if (parsed.topic && Array.isArray(parsed.requiredChunks)) {
+        const cleanChunks = parsed.requiredChunks.slice(0, 3);
         generated = {
           topic: parsed.topic,
-          persona: parsed.persona || generated.persona,
-          requiredChunks: parsed.requiredChunks.slice(0, 3),
+          persona: `${parsed.persona || generated.persona}. IMPORTANT: Do NOT ask "Are you ready?" or "Shall we start?". Stay in character and ask questions that help ${firstName} use their 3 target phrases: ${cleanChunks.join(
+            ", ",
+          )}.`,
+          requiredChunks: cleanChunks,
+          chunkTranslations: Array.isArray(parsed.chunkTranslations)
+            ? parsed.chunkTranslations.slice(0, 3)
+            : [],
           openingLine: parsed.openingLine || generated.openingLine,
           aiOpeningTarget: parsed.aiOpeningTarget || generated.aiOpeningTarget,
           starterHintTarget:
@@ -202,16 +326,13 @@ Rules:
         };
       }
     } catch (e) {
-      console.warn("[freestyle/create] Groq fallback used:", e);
+      console.warn("[freestyle/create] Qwen fallback used:", e);
     }
 
-    // ------------------------------------------------------------------------
-    // 3. CREATE PRISMA SESSION
-    // ------------------------------------------------------------------------
     const session = await prisma.freestyleSession.create({
       data: {
         userId,
-        mode: mode,
+        mode: String(mode),
         topic: generated.topic,
         nativeLanguage,
         targetLanguage,
@@ -224,6 +345,7 @@ Rules:
     return NextResponse.json({
       sessionId: session.id,
       milestoneIndex: currentMilestoneIndex,
+      userAvatarUrl,
       targetVoiceId,
       freestyleData: {
         mode,
@@ -231,6 +353,7 @@ Rules:
         topic: generated.topic,
         persona: generated.persona,
         requiredChunks: generated.requiredChunks,
+        chunkTranslations: generated.chunkTranslations,
         openingLine: generated.openingLine,
         aiOpeningTarget: generated.aiOpeningTarget,
         starterHintTarget: generated.starterHintTarget,
