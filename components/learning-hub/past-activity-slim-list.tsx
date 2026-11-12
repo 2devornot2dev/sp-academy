@@ -15,8 +15,9 @@ import {
   Layers,
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
+import type { LearningTrack } from "@/app/actions/get-learning-path";
 
-type Lesson = LearningPath["lessons"][number];
+type Lesson = LearningTrack["lessons"][number]
 
 export type PastActivityItem = {
   id: string;

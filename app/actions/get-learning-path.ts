@@ -431,3 +431,5 @@ export type LearningPathData = NonNullable<
 >;
 
 export type LearningPath = LearningPathData;
+
+export type LearningTrack = LearningPathData["standardTrack"]; // new

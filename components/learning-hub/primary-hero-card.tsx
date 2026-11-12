@@ -17,8 +17,9 @@ import {
 } from "lucide-react";
 import type { LearningPath } from "@/app/actions/get-learning-path";
 import { vocabWordCount } from "@/lib/utils";
+import type { LearningTrack } from "@/app/actions/get-learning-path";
 
-type Lesson = LearningPath["lessons"][number];
+type Lesson = LearningTrack["lessons"][number];
 
 const BOSS_THEMES = [
   {
