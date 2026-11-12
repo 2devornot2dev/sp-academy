@@ -22,6 +22,7 @@ import {
 import FreestyleSetup from "./freestyle-setup";
 import FreestyleChat from "./freestyle-chat";
 import { FreestyleReviewHub } from "./review/freestyle-review-hub";
+import { getTutorAvatarByMood } from "@/lib/freestyle/tutors";
 
 export type FreestyleSessionConfig = {
   id: string;
@@ -125,7 +126,7 @@ export default function FreestyleWrapper({
     setIncompleteReason(null);
     const isFemale = config.voiceGender === "female";
     const tutorName = config.tutorName || (isFemale ? "Sophie" : "Antoine");
-    const aiAvatarUrl = isFemale ? "/sprite-f.png" : "/sprite-m.png";
+    const aiAvatarUrl = getTutorAvatarByMood(config.voiceGender, "default");
     const level = config.level || "EASY";
 
     // 1. Create DB Session via /api/users/[userId]/freestyle/create

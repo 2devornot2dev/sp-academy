@@ -19,7 +19,7 @@ import {
   ShieldCheck,
   Compass,
 } from "lucide-react";
-
+import { getTutorAvatarByMood } from "@/lib/freestyle/tutors";
 const MODES = [
   {
     id: "FOCUSED",
@@ -208,9 +208,7 @@ export default function FreestyleSetup({
 
   const step1Valid = !(mode === "SPECIFIC" && !topic.trim());
 
-  const previewAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${
-    voiceGender === "female" ? "Sophie" : "Antoine"
-  }&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+  const previewAvatarUrl = getTutorAvatarByMood(voiceGender, "default");
 
   const handleStart = async () => {
     const silentAudio = new Audio("data:audio/mp3;base64,//MkxAA...");

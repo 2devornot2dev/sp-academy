@@ -1,7 +1,7 @@
 // lib/freestyle/tutors.ts
 
 export type TutorGender = "female" | "male";
-export type TutorMood = "default" | "happy" | "thinking" | "encouraging";
+export type TutorMood = "default" | "happy" | "thinking" | "mad" | "sad";
 
 export interface FreestyleTutorConfig {
   id: string;
@@ -22,10 +22,11 @@ export const FREESTYLE_TUTORS: Record<TutorGender, FreestyleTutorConfig> = {
     coverUrl: "/freestyle-cover.png",
     // 👇 Drop your generated S3/CDN emote URLs here
     avatars: {
-      default: "/sprite-f.png",
-      happy: "/sprite-f.png",
-      thinking: "/sprite-f.png",
-      encouraging: "/sprite-f.png",
+      default: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521564/female-avatar-main_mgzdrl.png",
+      happy: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521564/female-avatar-happy_rgydrd.png",
+      thinking: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521564/female-avatar-thinking_uqulz8.png",
+      mad: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521564/female-avatar-mad_cjl7yv.png",
+      sad: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521564/female-avatar-sad_d0r5ab.png"
     },
     // 👇 Drop your per-language Voice IDs here
     voiceIds: {
@@ -44,10 +45,11 @@ export const FREESTYLE_TUTORS: Record<TutorGender, FreestyleTutorConfig> = {
     coverUrl: "/freestyle-cover.png",
     // 👇 Drop your generated S3/CDN emote URLs here
     avatars: {
-      default: "/sprite-m.png",
-      happy: "/sprite-m.png",
-      thinking: "/sprite-m.png",
-      encouraging: "/sprite-m.png",
+      default:"https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521666/male-avatar-main_rdnw3k.png",
+      happy: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521665/male-avatar-happy_bnxft3.png",
+      thinking: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521665/male-avatar-thinking_qq4vcn.png",
+      mad: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521665/male-avatar-mad_cpag8l.png",
+      sad: "https://res.cloudinary.com/ddgo2mftc/image/upload/v1794521665/male-avatar-sad_jgbfvq.png"
     },
     // 👇 Drop your per-language Voice IDs here
     voiceIds: {

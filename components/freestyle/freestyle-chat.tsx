@@ -96,7 +96,10 @@ function doesSpeechMatchPhrase(spoken: string, targetPhrase: string): boolean {
   return hitCount / targetWords.length >= 0.75;
 }
 
-function detectConnectorWord(spoken: string, targetLang = "fr-FR"): string | null {
+function detectConnectorWord(
+  spoken: string,
+  targetLang = "fr-FR",
+): string | null {
   const langPrefix = targetLang.slice(0, 2).toLowerCase();
   const connectors =
     CONNECTOR_WORDS_BY_LANG[langPrefix] || CONNECTOR_WORDS_BY_LANG.fr;
@@ -269,7 +272,7 @@ function LiveFreestyleChatInner({
             };
             setNotepadNotes((prev) => [note, ...prev]);
             if (data.hasCorrection) {
-              setTutorMood("encouraging");
+              setTutorMood(data.severity === "MAJOR" ? "mad" : "sad");
             }
           }
         }
@@ -453,6 +456,10 @@ function LiveFreestyleChatInner({
           });
         } else if (overallScore >= 85) {
           setTutorMood("happy");
+        } else if (overallScore > 0 && overallScore < 55) {
+          setTutorMood("mad");
+        } else if (overallScore > 0 && overallScore < 70) {
+          setTutorMood("sad");
         } else {
           setTutorMood("default");
         }
@@ -776,9 +783,11 @@ function LiveFreestyleChatInner({
                       ? "animate-pulse bg-sky-400/40"
                       : effectiveMood === "happy"
                         ? "bg-emerald-400/40"
-                        : effectiveMood === "encouraging"
-                          ? "bg-amber-400/35"
-                          : "bg-indigo-400/20"
+                        : effectiveMood === "mad"
+                          ? "bg-rose-500/40"
+                          : effectiveMood === "sad"
+                            ? "bg-amber-400/35"
+                            : "bg-indigo-400/20"
                   }`}
                 />
 
@@ -786,9 +795,11 @@ function LiveFreestyleChatInner({
                   className={`relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl transition-all duration-300 ${
                     effectiveMood === "happy"
                       ? "border-emerald-400 border-b-emerald-700 scale-105"
-                      : effectiveMood === "encouraging"
-                        ? "border-amber-400 border-b-orange-700"
-                        : "border-sky-400 border-b-blue-800"
+                      : effectiveMood === "mad"
+                        ? "border-rose-500 border-b-rose-800"
+                        : effectiveMood === "sad"
+                          ? "border-amber-400 border-b-orange-700"
+                          : "border-sky-400 border-b-blue-800"
                   }`}
                 >
                   <img
@@ -805,18 +816,22 @@ function LiveFreestyleChatInner({
                       ? "border-emerald-800 bg-emerald-400 text-slate-950"
                       : effectiveMood === "thinking"
                         ? "border-indigo-900 bg-indigo-500 text-white"
-                        : effectiveMood === "encouraging"
-                          ? "border-orange-800 bg-amber-300 text-slate-950"
-                          : "border-blue-900 bg-sky-400 text-slate-950"
+                        : effectiveMood === "mad"
+                          ? "border-rose-950 bg-rose-500 text-white"
+                          : effectiveMood === "sad"
+                            ? "border-orange-800 bg-amber-300 text-slate-950"
+                            : "border-blue-900 bg-sky-400 text-slate-950"
                   }`}
                 >
                   {effectiveMood === "happy"
                     ? `🔥 Impressed`
                     : effectiveMood === "thinking"
                       ? `💭 Thinking...`
-                      : effectiveMood === "encouraging"
-                        ? `✏️ Coaching Tip`
-                        : `🎙️ ${tutorName}`}
+                      : effectiveMood === "mad"
+                        ? `😤 Tough Love`
+                        : effectiveMood === "sad"
+                          ? `✏️ Almost There`
+                          : `🎙️ ${tutorName}`}
                 </span>
               </div>
 
