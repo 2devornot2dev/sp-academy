@@ -25,10 +25,20 @@ import {
   EyeOff,
   Compass,
   Zap,
+  RectangleHorizontal,
+  MessagesSquare,
+  PenTool,
+  Award,
 } from "lucide-react";
 import { FreestyleTimer } from "./freestyle-timer";
 import { useMatrix } from "@/context/matrix-context";
 import { useSpeak } from "@/hooks/use-speak";
+import {
+  getFreestyleTutor,
+  getTutorAvatarByMood,
+  CONNECTOR_WORDS_BY_LANG,
+  type TutorMood,
+} from "@/lib/freestyle/tutors";
 import { toast } from "sonner";
 
 interface FreestyleChatProps {
@@ -43,6 +53,25 @@ interface FreestyleChatProps {
   }) => void;
 }
 
+interface NotepadNote {
+  id: string;
+  turnId: string;
+  hasCorrection: boolean;
+  category: "GRAMMAR" | "GENDER" | "VOCABULARY";
+  severity: "MINOR" | "MAJOR";
+  userSaid: string;
+  nativeWay: string;
+  nativeTranslation?: string;
+  quickWhy: string;
+}
+
+interface SpeechSpark {
+  id: string;
+  label: string;
+  subLabel: string;
+  kind: "STREAK" | "STRETCH" | "CONNECTOR" | "GOAL";
+}
+
 function normalizeForMatch(str: string): string {
   return (str || "")
     .toLowerCase()
@@ -53,10 +82,6 @@ function normalizeForMatch(str: string): string {
     .trim();
 }
 
-/**
- * Matches either exact substring OR >= 75% of the content words in the phrase
- * so natural beginner variations still get rewarded!
- */
 function doesSpeechMatchPhrase(spoken: string, targetPhrase: string): boolean {
   const normSpoken = normalizeForMatch(spoken);
   const normTarget = normalizeForMatch(targetPhrase);
@@ -71,6 +96,46 @@ function doesSpeechMatchPhrase(spoken: string, targetPhrase: string): boolean {
   return hitCount / targetWords.length >= 0.75;
 }
 
+function detectConnectorWord(spoken: string, targetLang = "fr-FR"): string | null {
+  const langPrefix = targetLang.slice(0, 2).toLowerCase();
+  const connectors =
+    CONNECTOR_WORDS_BY_LANG[langPrefix] || CONNECTOR_WORDS_BY_LANG.fr;
+  const lower = spoken.toLowerCase();
+  for (const conn of connectors) {
+    const regex = new RegExp(`\\b${conn}\\b`, "i");
+    if (regex.test(lower)) return conn;
+  }
+  return null;
+}
+
+function renderScoredWords(pron: any, fallbackText: string) {
+  if (!pron?.words?.length) {
+    return <span>{fallbackText}</span>;
+  }
+  return (
+    <span className="inline-flex flex-wrap gap-x-1.5 gap-y-1">
+      {pron.words.map((w: any, idx: number) => {
+        const score = w.accuracyScore ?? 100;
+        const underlineColor =
+          score >= 80
+            ? "decoration-emerald-300"
+            : score >= 60
+              ? "decoration-amber-300"
+              : "decoration-rose-300";
+        return (
+          <span
+            key={idx}
+            title={`Accuracy: ${Math.round(score)}%`}
+            className={`underline decoration-2 underline-offset-4 ${underlineColor}`}
+          >
+            {w.word}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 function LiveFreestyleChatInner({
   session,
   onEnd,
@@ -82,12 +147,27 @@ function LiveFreestyleChatInner({
   const { trackInteraction } = useMatrix();
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
 
+  // #3 View Mode Toggle ("single" 1-on-1 stage vs "multi" thread) + Tutor Mood
+  const [viewMode, setViewMode] = useState<"single" | "multi">("single");
+  const [tutorMood, setTutorMood] = useState<TutorMood>("default");
+
   const [messages, setMessages] = useState<any[]>([]);
   const [matchedChunks, setMatchedChunks] = useState<Set<string>>(new Set());
   const [showTranslations, setShowTranslations] = useState(true);
   const [isEnding, setIsEnding] = useState(false);
 
-  // Dynamic Coaching State (updates after every AI turn!)
+  // #1 Live Tutor Notepad State (Real-time corrections & upgrades + sent to Review!)
+  const [notepadNotes, setNotepadNotes] = useState<NotepadNote[]>([]);
+  const [isAnalyzingNote, setIsAnalyzingNote] = useState(false);
+
+  // #5 Live Micro-Wins / Speech Sparks State
+  const [sparks, setSparks] = useState<SpeechSpark[]>([]);
+  const [activeSparkToast, setActiveSparkToast] = useState<SpeechSpark | null>(
+    null,
+  );
+  const flowStreakRef = useRef(0);
+
+  // Dynamic Coaching Hint State
   const [coachingTip, setCoachingTip] = useState<string>(
     session?.openingLine ||
       "Listen to your partner's opening question and work in Goal #1!",
@@ -101,13 +181,13 @@ function LiveFreestyleChatInner({
   });
   const [isHintUpdating, setIsHintUpdating] = useState(false);
 
-  // Level ZERO sees the French reply immediately; higher levels get a "Peek" toggle so we guide without hand-holding!
   const isZeroLevel = session?.level === "ZERO";
   const [revealReply, setRevealReply] = useState<boolean>(isZeroLevel);
 
   const sessionStartTime = useRef(Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const matchedChunksRef = useRef<Set<string>>(new Set());
+  const lastAiTextRef = useRef<string>("");
 
   useEffect(() => {
     matchedChunksRef.current = matchedChunks;
@@ -122,12 +202,16 @@ function LiveFreestyleChatInner({
     [session?.chunkTranslations],
   );
 
-  const aiAvatar =
-    session?.aiAvatarUrl && !session.aiAvatarUrl.includes("dicebear")
-      ? session.aiAvatarUrl
-      : session?.voiceGender === "female"
-        ? "/sprite-f.png"
-        : "/sprite-m.png";
+  const tutorConfig = getFreestyleTutor(session?.voiceGender);
+  const tutorName = session?.tutorName || tutorConfig.name;
+
+  // Resolve current Tutor Emote Avatar URL
+  const effectiveMood: TutorMood =
+    agentState === "thinking" ? "thinking" : tutorMood;
+  const currentTutorAvatar = getTutorAvatarByMood(
+    session?.voiceGender,
+    effectiveMood,
+  );
 
   const userAvatar =
     session?.userAvatarUrl ||
@@ -135,35 +219,75 @@ function LiveFreestyleChatInner({
       session?.userId || "Paul"
     }&backgroundColor=c0aede,b6e3f4`;
 
-  const tutorName =
-    session?.tutorName ||
-    (session?.voiceGender === "female" ? "Sophie" : "Antoine");
+  const triggerSpark = useCallback((spark: Omit<SpeechSpark, "id">) => {
+    const fullSpark: SpeechSpark = {
+      ...spark,
+      id: `spark-${Date.now()}-${Math.random()}`,
+    };
+    setSparks((prev) => [fullSpark, ...prev]);
+    setActiveSparkToast(fullSpark);
+    setTutorMood("happy");
+    setTimeout(() => {
+      setActiveSparkToast((cur) => (cur?.id === fullSpark.id ? null : cur));
+    }, 3800);
+  }, []);
 
-  // Compute live speaking telemetry (Combo Streak & Avg Score)
-  const userTurns = useMemo(
-    () => messages.filter((m) => m.role === "user"),
-    [messages],
+  // #1 Analyze user turn in background for Sophie's Live Notepad
+  const analyzeUserTurnForNotepad = useCallback(
+    async (userText: string, turnId: string) => {
+      if (!userText || !session?.userId) return;
+      setIsAnalyzingNote(true);
+      try {
+        const res = await fetch(
+          `/api/users/${session.userId}/freestyle/create`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "ANALYZE_TURN",
+              userText,
+              aiContext: lastAiTextRef.current,
+              nativeLanguage: session?.nativeLanguage || "en-US",
+              targetLanguage: session?.targetLanguage || "fr-FR",
+            }),
+          },
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.skip && data.nativeWay) {
+            const note: NotepadNote = {
+              id: `note-${Date.now()}`,
+              turnId,
+              hasCorrection: Boolean(data.hasCorrection),
+              category: data.category || "GRAMMAR",
+              severity: data.severity || "MINOR",
+              userSaid: userText,
+              nativeWay: data.nativeWay,
+              nativeTranslation: data.nativeTranslation,
+              quickWhy: data.quickWhy,
+            };
+            setNotepadNotes((prev) => [note, ...prev]);
+            if (data.hasCorrection) {
+              setTutorMood("encouraging");
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Notepad] analysis skipped:", e);
+      } finally {
+        setIsAnalyzingNote(false);
+      }
+    },
+    [session?.nativeLanguage, session?.targetLanguage, session?.userId],
   );
-  const sessionAvgScore = useMemo(() => {
-    const scored = userTurns
-      .map(
-        (m) =>
-          m.pronunciationScore?.pronunciationScore ??
-          m.pronunciationScore?.pronScore ??
-          m.pronunciationScore?.accuracyScore,
-      )
-      .filter((v): v is number => typeof v === "number" && v > 0);
-    if (scored.length === 0) return null;
-    return Math.round(scored.reduce((a, b) => a + b, 0) / scored.length);
-  }, [userTurns]);
 
-  // Fetch a fresh, contextual coaching hint whenever the AI partner speaks!
+  // Refresh next reply coaching hint when AI finishes speaking
   const refreshDynamicHint = useCallback(
     async (aiText: string, aiTranslation?: string | null) => {
       if (!aiText || !session?.userId) return;
       setIsHintUpdating(true);
 
-      // Find the next uncompleted target phrase to weave into the hint
       const nextUnmatchedChunk =
         requiredChunks.find((c) => !matchedChunksRef.current.has(c)) ||
         requiredChunks[0] ||
@@ -200,8 +324,8 @@ function LiveFreestyleChatInner({
             setRevealReply(false);
           }
         }
-      } catch (e) {
-        console.warn("[FreestyleChat] Hint refresh skipped:", e);
+      } catch {
+        // Ignore
       } finally {
         setIsHintUpdating(false);
       }
@@ -216,17 +340,18 @@ function LiveFreestyleChatInner({
     ],
   );
 
-  // Auto scroll
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, agentState]);
+    if (viewMode === "multi") {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, agentState, viewMode]);
 
   // Listen to "spoon-meta" data channel from Python Agent
   useDataChannel("spoon-meta", (msg) => {
     try {
       const payload = JSON.parse(new TextDecoder().decode(msg.payload));
 
-      // 1. Assistant message arrived -> Update chat & trigger fresh Coaching Hint!
+      // 1. Assistant message arrived
       if (payload.type === "AGENT_TURN") {
         const aiText = payload.text || "";
         const aiTrans =
@@ -234,6 +359,8 @@ function LiveFreestyleChatInner({
           payload.nativeText ||
           payload.englishTranslation ||
           null;
+
+        lastAiTextRef.current = aiText;
 
         setMessages((prev) => [
           ...prev,
@@ -255,23 +382,81 @@ function LiveFreestyleChatInner({
         }
       }
 
-      // 2. User spoke -> Azure Pronunciation + Phrase Detection + Banked Words
+      // 2. User spoke -> Azure Pronunciation + Micro-Wins (#5) + Notepad (#1)
       if (payload.type === "TURN_META" && payload.role === "user") {
-        const text = payload.originalText || payload.text || "";
+        const text = (payload.originalText || payload.text || "").trim();
         const pron = payload.pronunciation;
+        const turnId = `user-${Date.now()}`;
 
+        const overallScore = pron
+          ? Math.round(
+              pron.pronunciationScore ??
+                pron.pronScore ??
+                pron.accuracyScore ??
+                0,
+            )
+          : 0;
+
+        // --- #5 MICRO-WIN DETECTOR (Client-Side Instant Sparks!) ---
+        letnewlyMatchedGoal: string | null = null;
         if (text && requiredChunks.length > 0) {
           setMatchedChunks((prev) => {
             const next = new Set(prev);
             for (const chunk of requiredChunks) {
-              if (doesSpeechMatchPhrase(text, chunk)) {
+              if (!next.has(chunk) && doesSpeechMatchPhrase(text, chunk)) {
                 next.add(chunk);
+                newlyMatchedGoal = chunk;
               }
             }
             return next;
           });
         }
 
+        const wordCount = text.split(/\s+/).filter(Boolean).length;
+        const stretchThreshold =
+          session?.level === "ZERO" || session?.level === "EASY" ? 6 : 9;
+        const connectorUsed = detectConnectorWord(
+          text,
+          session?.targetLanguage,
+        );
+
+        if (overallScore >= 80) {
+          flowStreakRef.current += 1;
+        } else {
+          flowStreakRef.current = 0;
+        }
+
+        if (newlyMatchedGoal) {
+          triggerSpark({
+            kind: "GOAL",
+            label: "Target Phrase Nailed!",
+            subLabel: `« ${newlyMatchedGoal} »`,
+          });
+        } else if (flowStreakRef.current >= 2) {
+          triggerSpark({
+            kind: "STREAK",
+            label: `${flowStreakRef.current}x Native Flow Streak!`,
+            subLabel: `${overallScore}% Pronunciation Resonance`,
+          });
+        } else if (connectorUsed) {
+          triggerSpark({
+            kind: "CONNECTOR",
+            label: "Connector Pro!",
+            subLabel: `Used « ${connectorUsed} » naturally`,
+          });
+        } else if (wordCount >= stretchThreshold) {
+          triggerSpark({
+            kind: "STRETCH",
+            label: "Sentence Stretch!",
+            subLabel: `${wordCount} words spoken in one breath`,
+          });
+        } else if (overallScore >= 85) {
+          setTutorMood("happy");
+        } else {
+          setTutorMood("default");
+        }
+
+        // Bank words in Word Matrix
         if (pron?.words?.length) {
           pron.words.forEach((w: any) => {
             if (!w.word) return;
@@ -287,13 +472,18 @@ function LiveFreestyleChatInner({
         setMessages((prev) => [
           ...prev,
           {
-            id: `user-${Date.now()}`,
+            id: turnId,
             role: "user",
             text,
             translation: payload.translation || payload.nativeText || null,
             pronunciationScore: pron,
           },
         ]);
+
+        // Trigger #1 Sophie's Live Notepad check in background
+        if (wordCount >= 2) {
+          void analyzeUserTurnForNotepad(text, turnId);
+        }
       }
     } catch (e) {
       console.warn("spoon-meta error:", e);
@@ -319,6 +509,17 @@ function LiveFreestyleChatInner({
       description: "Checking your speaking turns with AI.",
     });
 
+    // Convert Live Notepad corrections into the exact mistake schema for the Review Lambda!
+    const compiledMistakes = notepadNotes
+      .filter((n) => n.hasCorrection)
+      .map((n) => ({
+        category: n.category,
+        severity: n.severity,
+        mistake: n.userSaid,
+        correction: n.nativeWay,
+        explanation: n.quickWhy,
+      }));
+
     try {
       const res = await fetch(`/api/users/${session.userId}/freestyle/review`, {
         method: "POST",
@@ -331,7 +532,7 @@ function LiveFreestyleChatInner({
           nativeLanguage: session.nativeLanguage,
           targetLanguage: session.targetLanguage,
           messages,
-          mistakes: [],
+          mistakes: compiledMistakes,
           duration,
         }),
       });
@@ -381,35 +582,44 @@ function LiveFreestyleChatInner({
   const currentGoalTranslation =
     activeGoalIndex !== -1 ? chunkTranslations[activeGoalIndex] : null;
 
+  const latestAiMessage = useMemo(
+    () => [...messages].reverse().find((m) => m.role === "assistant") || null,
+    [messages],
+  );
+  const latestUserMessage = useMemo(
+    () => [...messages].reverse().find((m) => m.role === "user") || null,
+    [messages],
+  );
+  const latestNote = notepadNotes[0] || null;
+
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col gap-5 overflow-hidden  p-4 sm:p-6 lg:flex-row">
-      {/* Subtle dark scrim so the 3D white cards pop off the animated gradient */}
+    <div className="relative flex h-full min-h-0 w-full flex-col gap-5 overflow-hidden animate-bg p-4 sm:p-6 lg:flex-row">
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       <RoomAudioRenderer />
 
       {/* =========================================================
-          LEFT / MAIN CONVERSATION ARENA STAGE
+          LEFT / MAIN STAGE (SINGLE 1-ON-1 STAGE vs MULTI THREAD)
       ========================================================= */}
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl">
-        {/* 1. Vibrant Arena Header */}
-        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-6 py-4 text-white">
+        {/* 1. Vibrant Arena Header + Single/Multi View Switcher */}
+        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-6 py-3.5 text-white">
           <div className="pointer-events-none absolute -top-12 right-10 h-32 w-32 rounded-full bg-sky-500/20 blur-2xl" />
 
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3.5">
-              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
+              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
                 <img
-                  src={aiAvatar}
+                  src={currentTutorAvatar}
                   alt={tutorName}
-                  className="h-full w-full object-cover object-top"
+                  className="h-full w-full object-cover object-top transition-all duration-300"
                 />
                 <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
               </div>
 
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-black tracking-tight text-white">
+                  <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
                     {session?.topic || "Live Conversation Arena"}
                   </h2>
                   <span className="rounded-lg border border-sky-400/40 bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-sky-300 uppercase">
@@ -418,22 +628,43 @@ function LiveFreestyleChatInner({
                 </div>
                 <p className="text-xs font-semibold text-slate-300">
                   Partner: <strong className="text-white">{tutorName}</strong> •{" "}
-                  {session?.targetLanguage || "fr-FR"} Live Voice
+                  <span className="text-amber-300">{sparks.length} Sparks</span>{" "}
+                  • {notepadNotes.length} Notepad Notes
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              {/* Live Combo / Resonance Pill */}
-              {userTurns.length > 0 && (
-                <div className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 py-1.5 text-xs font-black text-emerald-300">
-                  <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span>{userTurns.length} Turns</span>
-                  {sessionAvgScore !== null && (
-                    <span className="text-white/90">• {sessionAvgScore}%</span>
-                  )}
-                </div>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Single / Multi View Switcher (Matches SpriteChat!) */}
+              <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-900/90 p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("single")}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                    viewMode === "single"
+                      ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <RectangleHorizontal className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">1-on-1 Stage</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewMode("multi")}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                    viewMode === "multi"
+                      ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <MessagesSquare className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">
+                    Transcript ({messages.length})
+                  </span>
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -445,7 +676,7 @@ function LiveFreestyleChatInner({
                 }`}
               >
                 <Languages size={14} />
-                <span>
+                <span className="hidden md:inline">
                   {showTranslations ? "Translations On" : "Translations Off"}
                 </span>
               </button>
@@ -455,9 +686,9 @@ function LiveFreestyleChatInner({
           </div>
         </div>
 
-        {/* 2. Interactive Target Phrases Strip (With Audio Preview + English Meaning) */}
+        {/* 2. Interactive Target Phrases Strip */}
         {requiredChunks.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-6 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-6 py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 text-[11px] font-black tracking-wider text-indigo-900 uppercase">
                 <Target className="h-3.5 w-3.5 text-indigo-600" />
@@ -512,225 +743,334 @@ function LiveFreestyleChatInner({
           </div>
         )}
 
-        {/* 3. Conversation Stream Area */}
-        <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-6 scroll-smooth">
-          {messages.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border-2 border-b-4 border-sky-300 bg-white text-blue-600 shadow-md">
-                <Mic size={28} className="animate-pulse" />
+        {/* Floating #5 Micro-Win Spark Celebration Banner */}
+        {activeSparkToast && (
+          <div className="pointer-events-none absolute top-28 left-1/2 z-30 -translate-x-1/2 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200">
+            <div className="inline-flex items-center gap-2.5 rounded-2xl border-2 border-b-4 border-amber-600 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-400 px-5 py-2 text-slate-950 shadow-xl">
+              <Award className="h-5 w-5 fill-amber-600 text-slate-950" />
+              <div>
+                <span className="block text-xs font-black uppercase tracking-wider">
+                  ⚡ {activeSparkToast.label}
+                </span>
+                <span className="block text-[11px] font-extrabold text-slate-800">
+                  {activeSparkToast.subLabel}
+                </span>
               </div>
-              <p className="text-base font-black text-slate-900">
-                {agentState === "connecting"
-                  ? `Connecting to ${tutorName}...`
-                  : `${tutorName} is ready! Speak anytime.`}
-              </p>
-              <p className="mt-1 max-w-sm text-xs font-semibold text-slate-500">
-                Check the{" "}
-                <strong className="text-blue-600">Live Coaching Deck</strong> on
-                the right for real-time ideas and phrase support on every turn!
-              </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {messages.map((message) => {
-            const isUser = message.role === "user";
-            const pron = message.pronunciationScore;
-            const overall = pron
-              ? Math.round(
-                  pron.pronunciationScore ??
-                    pron.pronScore ??
-                    pron.accuracyScore ??
-                    0,
-                )
-              : null;
-            const acc = pron
-              ? Math.round(pron.accuracyScore ?? overall ?? 0)
-              : null;
-            const flow = pron
-              ? Math.round(pron.fluencyScore ?? overall ?? 0)
-              : null;
-            const isHighPass = overall !== null && overall >= 80;
-
-            // AI ASSISTANT BUBBLE
-            if (!isUser) {
-              return (
+        {/* =================================================================
+            3A. SINGLE STAGE VIEW (1-on-1 Face-to-Face Living Tutor + Notepad!)
+        ================================================================= */}
+        {viewMode === "single" ? (
+          <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-6">
+            {/* Top / Center: Living Tutor Portrait + Active Speech Stage */}
+            <div className="my-auto flex flex-col items-center text-center">
+              {/* Reactive Tutor Portrait */}
+              <div className="relative mb-4">
                 <div
-                  key={message.id}
-                  className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
-                >
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
-                    <img
-                      src={aiAvatar}
-                      alt={tutorName}
-                      className="h-full w-full object-cover object-top"
-                    />
-                  </div>
+                  className={`pointer-events-none absolute -inset-3 rounded-[2.2rem] blur-xl transition-all duration-500 ${
+                    agentState === "speaking"
+                      ? "animate-pulse bg-sky-400/40"
+                      : effectiveMood === "happy"
+                        ? "bg-emerald-400/40"
+                        : effectiveMood === "encouraging"
+                          ? "bg-amber-400/35"
+                          : "bg-indigo-400/20"
+                  }`}
+                />
 
-                  <div className="max-w-[80%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 shadow-xs">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm sm:text-base font-bold text-slate-900 leading-relaxed">
-                        {message.text}
+                <div
+                  className={`relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl transition-all duration-300 ${
+                    effectiveMood === "happy"
+                      ? "border-emerald-400 border-b-emerald-700 scale-105"
+                      : effectiveMood === "encouraging"
+                        ? "border-amber-400 border-b-orange-700"
+                        : "border-sky-400 border-b-blue-800"
+                  }`}
+                >
+                  <img
+                    src={currentTutorAvatar}
+                    alt={tutorName}
+                    className="h-full w-full object-cover object-top"
+                  />
+                </div>
+
+                {/* Emote Status Pill */}
+                <span
+                  className={`absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-md ${
+                    effectiveMood === "happy"
+                      ? "border-emerald-800 bg-emerald-400 text-slate-950"
+                      : effectiveMood === "thinking"
+                        ? "border-indigo-900 bg-indigo-500 text-white"
+                        : effectiveMood === "encouraging"
+                          ? "border-orange-800 bg-amber-300 text-slate-950"
+                          : "border-blue-900 bg-sky-400 text-slate-950"
+                  }`}
+                >
+                  {effectiveMood === "happy"
+                    ? `🔥 Impressed`
+                    : effectiveMood === "thinking"
+                      ? `💭 Thinking...`
+                      : effectiveMood === "encouraging"
+                        ? `✏️ Coaching Tip`
+                        : `🎙️ ${tutorName}`}
+                </span>
+              </div>
+
+              {/* Tutor's Latest Spoken Line Card */}
+              <div className="mt-2 w-full max-w-2xl rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-6 py-5 shadow-md">
+                {latestAiMessage ? (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <p className="text-lg sm:text-2xl font-black leading-snug text-slate-900">
+                        &ldquo;{latestAiMessage.text}&rdquo;
                       </p>
                       <button
                         type="button"
-                        onClick={() => handlePlayPhraseAudio(message.text)}
-                        title="Replay audio"
-                        className="mt-0.5 shrink-0 rounded-lg p-1 text-slate-400 hover:bg-sky-50 hover:text-blue-600"
+                        onClick={() =>
+                          handlePlayPhraseAudio(latestAiMessage.text)
+                        }
+                        title="Replay tutor audio"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
                       >
-                        <Volume2 size={15} />
+                        <Volume2 size={16} />
                       </button>
                     </div>
-                    {showTranslations && message.translation && (
-                      <p className="mt-1.5 border-t border-slate-100 pt-1.5 text-xs font-semibold text-slate-500">
-                        {message.translation}
+                    {showTranslations && latestAiMessage.translation && (
+                      <p className="mt-2 text-xs sm:text-sm font-bold text-slate-500">
+                        {latestAiMessage.translation}
                       </p>
                     )}
+                  </>
+                ) : (
+                  <p className="text-base font-extrabold text-slate-600">
+                    {agentState === "connecting"
+                      ? `Connecting voice room with ${tutorName}...`
+                      : `${tutorName} is listening! Greet ${tutorName} to begin.`}
+                  </p>
+                )}
+              </div>
+
+              {/* User's Latest Spoken Turn Pill */}
+              {latestUserMessage && (
+                <div className="mt-4 flex items-center justify-center gap-3 animate-in fade-in duration-200">
+                  <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm sm:text-base font-bold text-white shadow-md">
+                    {renderScoredWords(
+                      latestUserMessage.pronunciationScore,
+                      latestUserMessage.text,
+                    )}
+                  </div>
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                    <img
+                      src={userAvatar}
+                      alt="You"
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                 </div>
-              );
-            }
+              )}
+            </div>
 
-            // USER TURN (With User Avatar + Word Underlines + Telemetry Pill)
-            return (
-              <div
-                key={message.id}
-                className="flex items-start justify-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
-              >
-                <div className="flex flex-col items-end gap-1.5">
-                  <div className="max-w-md rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-3 text-white shadow-md">
-                    {pron?.words?.length ? (
-                      <p className="flex flex-wrap gap-x-1.5 gap-y-1 text-sm sm:text-base font-bold leading-relaxed">
-                        {pron.words.map((w: any, idx: number) => {
-                          const score = w.accuracyScore ?? 100;
-                          const underlineColor =
-                            score >= 80
-                              ? "decoration-emerald-300"
-                              : score >= 60
-                                ? "decoration-amber-300"
-                                : "decoration-rose-300";
-                          return (
-                            <span
-                              key={idx}
-                              title={`Accuracy: ${Math.round(score)}%`}
-                              className={`underline decoration-2 underline-offset-4 ${underlineColor}`}
-                            >
-                              {w.word}
-                            </span>
-                          );
-                        })}
-                      </p>
-                    ) : (
-                      <p className="text-sm sm:text-base font-bold leading-relaxed">
-                        {message.text}
-                      </p>
-                    )}
-
-                    {showTranslations && message.translation && (
-                      <p className="mt-1 border-t border-white/15 pt-1 text-xs font-medium text-indigo-100">
-                        {message.translation}
-                      </p>
+            {/* Bottom of Single Stage: #1 SOPHIE'S LIVE NOTEPAD ("Here's how it should have been said!") */}
+            <div className="mt-5 w-full">
+              <div className="overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
+                      <PenTool className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-xs font-black tracking-wider text-slate-900 uppercase">
+                      {tutorName}&apos;s Live Notepad
+                    </span>
+                    {latestNote && (
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[9px] font-black uppercase ${
+                          latestNote.hasCorrection
+                            ? "border border-rose-200 bg-rose-100 text-rose-800"
+                            : "border border-emerald-200 bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {latestNote.hasCorrection
+                          ? `${latestNote.category} Polish`
+                          : "Native Upgrade"}
+                      </span>
                     )}
                   </div>
 
-                  {/* Pronunciation Telemetry Bar */}
-                  {overall !== null && (
-                    <div
-                      className={`inline-flex flex-wrap items-center gap-3 rounded-full border px-3.5 py-1 text-[11px] font-black shadow-2xs ${
-                        isHighPass
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1">
-                        {isHighPass ? (
-                          <Flame size={13} className="text-emerald-600" />
-                        ) : (
-                          <Target size={13} className="text-amber-600" />
-                        )}
-                        {overall}%{" "}
-                        <span className="text-[9px] tracking-wider uppercase opacity-80">
-                          {isHighPass ? "Native Flow" : "Keep Sharpening"}
-                        </span>
-                      </span>
-
-                      {acc !== null && (
-                        <span className="flex items-center gap-1 text-[10px] opacity-85">
-                          ACC
-                          <span className="h-1.5 w-8 overflow-hidden rounded-full bg-black/10">
-                            <span
-                              style={{ width: `${acc}%` }}
-                              className={`block h-full ${
-                                isHighPass ? "bg-emerald-500" : "bg-amber-500"
-                              }`}
-                            />
-                          </span>
-                        </span>
-                      )}
-
-                      {flow !== null && (
-                        <span className="flex items-center gap-1 text-[10px] opacity-85">
-                          FLOW
-                          <span className="h-1.5 w-8 overflow-hidden rounded-full bg-black/10">
-                            <span
-                              style={{ width: `${flow}%` }}
-                              className={`block h-full ${
-                                isHighPass ? "bg-emerald-500" : "bg-amber-500"
-                              }`}
-                            />
-                          </span>
-                        </span>
-                      )}
-                    </div>
+                  {isAnalyzingNote && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Jotting note...
+                    </span>
                   )}
                 </div>
 
-                {/* User Avatar */}
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
-                  <img
-                    src={userAvatar}
-                    alt="You"
-                    className="h-full w-full object-cover"
-                  />
+                {latestNote ? (
+                  <div className="mt-2.5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                        {latestNote.hasCorrection && (
+                          <>
+                            <span className="font-bold text-rose-500 line-through">
+                              &ldquo;{latestNote.userSaid}&rdquo;
+                            </span>
+                            <span className="font-black text-slate-400">➜</span>
+                          </>
+                        )}
+                        <span className="font-black text-emerald-700">
+                          &ldquo;{latestNote.nativeWay}&rdquo;
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-600">
+                        💡 {latestNote.quickWhy}
+                        {latestNote.nativeTranslation && (
+                          <span className="ml-1 text-slate-400">
+                            ({latestNote.nativeTranslation})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePlayPhraseAudio(latestNote.nativeWay)
+                      }
+                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border-2 border-b-[3px] border-emerald-600 bg-emerald-500 px-3.5 py-2 text-xs font-black text-white shadow-2xs transition hover:bg-emerald-600 sm:self-center"
+                    >
+                      <Volume2 size={14} />
+                      <span>Hear Native Way</span>
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    Speak a sentence and {tutorName} will jot down real-time
+                    native phrasing tips and grammar upgrades right here!
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* =================================================================
+             3B. MULTI-THREAD VIEW (Full Scrollable Transcript + Inline Notes)
+          ================================================================= */
+          <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-6 scroll-smooth">
+            {messages.map((message) => {
+              const isUser = message.role === "user";
+              const pron = message.pronunciationScore;
+              const overall = pron
+                ? Math.round(
+                    pron.pronunciationScore ??
+                      pron.pronScore ??
+                      pron.accuracyScore ??
+                      0,
+                  )
+                : null;
+              const isHighPass = overall !== null && overall >= 80;
+              const turnNote = notepadNotes.find(
+                (n) => n.turnId === message.id,
+              );
+
+              if (!isUser) {
+                return (
+                  <div
+                    key={message.id}
+                    className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  >
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
+                      <img
+                        src={currentTutorAvatar}
+                        alt={tutorName}
+                        className="h-full w-full object-cover object-top"
+                      />
+                    </div>
+
+                    <div className="max-w-[80%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 shadow-xs">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm sm:text-base font-bold leading-relaxed text-slate-900">
+                          {message.text}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handlePlayPhraseAudio(message.text)}
+                          className="mt-0.5 shrink-0 rounded-lg p-1 text-slate-400 hover:bg-sky-50 hover:text-blue-600"
+                        >
+                          <Volume2 size={15} />
+                        </button>
+                      </div>
+                      {showTranslations && message.translation && (
+                        <p className="mt-1.5 border-t border-slate-100 pt-1.5 text-xs font-semibold text-slate-500">
+                          {message.translation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={message.id}
+                  className="flex items-start justify-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                >
+                  <div className="flex max-w-md flex-col items-end gap-1.5">
+                    <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-3 text-sm sm:text-base font-bold leading-relaxed text-white shadow-md">
+                      {renderScoredWords(pron, message.text)}
+                    </div>
+
+                    {overall !== null && (
+                      <div
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-0.5 text-[11px] font-black ${
+                          isHighPass
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-amber-200 bg-amber-50 text-amber-800"
+                        }`}
+                      >
+                        <Flame size={12} />
+                        <span>{overall}% Flow</span>
+                      </div>
+                    )}
+
+                    {/* Inline Notepad Correction attached to this turn */}
+                    {turnNote && (
+                      <div className="mt-1 w-full rounded-2xl border-2 border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-left text-xs shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-black text-amber-900">
+                            ✏️ Native Way: « {turnNote.nativeWay} »
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handlePlayPhraseAudio(turnNote.nativeWay)
+                            }
+                            className="text-blue-600 hover:underline font-black"
+                          >
+                            🔊 Hear
+                          </button>
+                        </div>
+                        <p className="mt-0.5 font-semibold text-slate-600">
+                          {turnNote.quickWhy}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                    <img
+                      src={userAvatar}
+                      alt="You"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-
-          {/* AI Speaking / Thinking Indicator */}
-          {agentState === "speaking" && (
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 overflow-hidden rounded-2xl border-2 border-sky-300 bg-slate-900">
-                <img
-                  src={aiAvatar}
-                  alt={tutorName}
-                  className="h-full w-full object-cover object-top"
-                />
-              </div>
-              <div className="flex items-center gap-2.5 rounded-2xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-black text-indigo-700 shadow-2xs">
-                <Volume2 className="h-4 w-4 animate-pulse text-indigo-600" />
-                <span>{tutorName} is speaking...</span>
-              </div>
-            </div>
-          )}
-
-          {agentState === "thinking" && (
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-900">
-                <img
-                  src={aiAvatar}
-                  alt={tutorName}
-                  className="h-full w-full object-cover object-top"
-                />
-              </div>
-              <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-2xs">
-                <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                <span>{tutorName} is thinking...</span>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} className="h-2" />
-        </div>
+              );
+            })}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
+        )}
 
         {/* 4. Bottom Control Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-white px-6 py-4">
@@ -785,7 +1125,7 @@ function LiveFreestyleChatInner({
       </div>
 
       {/* =========================================================
-          RIGHT SIDECAR: DYNAMIC LIVE COACHING DECK
+          RIGHT SIDECAR: DYNAMIC LIVE COACHING DECK + SPARKSFEED
       ========================================================= */}
       <div className="relative z-10 flex w-full flex-col justify-between rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-2xl lg:w-88">
         <div className="space-y-5">
@@ -800,7 +1140,7 @@ function LiveFreestyleChatInner({
                   Live Coaching Deck
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400">
-                  Updates dynamically on every turn
+                  Real-time cues &amp; speech sparks
                 </p>
               </div>
             </div>
@@ -810,7 +1150,7 @@ function LiveFreestyleChatInner({
             )}
           </div>
 
-          {/* 1. Dynamic Coaching Direction (Guides without Hand-Holding!) */}
+          {/* 1. Dynamic Coaching Direction */}
           <div className="rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 p-4 shadow-2xs">
             <div className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
               <Compass className="h-3.5 w-3.5" />
@@ -847,7 +1187,7 @@ function LiveFreestyleChatInner({
             )}
           </div>
 
-          {/* 2. Suggested Reply Lifeline (With Listen + Peek Toggle) */}
+          {/* 2. Example Reply Lifeline */}
           <div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-amber-600 uppercase">
@@ -964,12 +1304,35 @@ function LiveFreestyleChatInner({
               </div>
             </div>
           )}
+
+          {/* 4. #5 Live Micro-Wins / Speech Sparks Feed */}
+          {sparks.length > 0 && (
+            <div>
+              <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-amber-600 uppercase">
+                <Zap className="h-3 w-3 fill-amber-400 text-amber-500" />
+                <span>Live Speech Sparks ({sparks.length})</span>
+              </span>
+              <div className="mt-2 max-h-28 space-y-1.5 overflow-y-auto pr-1">
+                {sparks.slice(0, 3).map((sp) => (
+                  <div
+                    key={sp.id}
+                    className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-[11px] font-black text-amber-950"
+                  >
+                    <span>⚡ {sp.label}</span>
+                    <span className="truncate max-w-[120px] font-bold text-amber-700">
+                      {sp.subLabel}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50 p-3.5 text-xs font-medium leading-relaxed text-slate-500">
-          <strong className="font-extrabold text-slate-700">Pro Tip:</strong>{" "}
-          Click any target phrase to hear its pronunciation, then weave it into
-          your reply!
+        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50 p-3 text-xs font-medium leading-relaxed text-slate-500">
+          <strong className="font-extrabold text-slate-700">Live Glue:</strong>{" "}
+          Every note on {tutorName}&apos;s Notepad is automatically saved into
+          your post-call AI Review!
         </div>
       </div>
     </div>

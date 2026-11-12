@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-guard";
 import { groq } from "@/lib/groq";
+import { getFreestyleTutor, getTutorVoiceId } from "@/lib/freestyle/tutors";
 
 const PERSONA_STYLES: Record<string, string> = {
   FRIENDLY: "warm, patient, and encouraging",
@@ -39,8 +40,73 @@ export async function POST(request: Request, { params }: Params) {
     const body = await request.json();
 
     // ========================================================================
-    // BRANCH A: DYNAMIC TURN-BY-TURN COACHING HINT (`action === "HINT"`)
-    // Called automatically whenever the AI partner finishes speaking a turn!
+    // BRANCH A: LIVE TUTOR NOTEPAD ANALYSIS (`action === "ANALYZE_TURN"`)
+    // Checks what the user just spoke -> Returns "Here's how a native says it"
+    // ========================================================================
+    if (body.action === "ANALYZE_TURN") {
+      const {
+        userText = "",
+        aiContext = "",
+        nativeLanguage = "en-US",
+        targetLanguage = "fr-FR",
+      } = body;
+
+      if (!userText || userText.trim().split(/\s+/).length < 2) {
+        return NextResponse.json({ skip: true });
+      }
+
+      try {
+        const completion = await groq.chat.completions.create({
+          model: "qwen/qwen3.8-27b",
+          temperature: 0.2,
+          max_tokens: 800,
+          reasoning_effort: "low",
+          messages: [
+            {
+              role: "system",
+              content: `You are a live language tutor writing a quick sticky note on a notepad while ${firstName} speaks ${targetLanguage}.
+Note: "${userText}" comes from speech-to-text, so COMPLETELY IGNORE punctuation, capitalization, or missing question marks!
+Focus ONLY on spoken grammar, verb conjugation, gender agreement, or natural word choice in response to: "${aiContext}".
+
+Output ONLY a JSON object:
+{
+  "hasCorrection": boolean,
+  "category": "GRAMMAR" | "GENDER" | "VOCABULARY",
+  "severity": "MINOR" | "MAJOR",
+  "userSaid": "${userText}",
+  "nativeWay": "The natural, corrected way to say what the user meant in ${targetLanguage} (or a slightly richer native upgrade if they made 0 mistakes)",
+  "nativeTranslation": "Translation of nativeWay in ${nativeLanguage}",
+  "quickWhy": "1 ultra-short, friendly 8-to-14 word tip in ${nativeLanguage} explaining why (e.g. 'Use « je travaille » directly without « suis »')"
+}`,
+            },
+            {
+              role: "user",
+              content: `Partner said: "${aiContext}"\nLearner said: "${userText}"`,
+            },
+          ],
+        });
+
+        const raw = completion.choices[0]?.message?.content || "{}";
+        const parsed = extractJsonObject(raw);
+
+        return NextResponse.json({
+          hasCorrection: Boolean(parsed.hasCorrection),
+          category: parsed.category || "GRAMMAR",
+          severity: parsed.severity || "MINOR",
+          userSaid: userText,
+          nativeWay: parsed.nativeWay || userText,
+          nativeTranslation: parsed.nativeTranslation || "",
+          quickWhy:
+            parsed.quickWhy ||
+            "Great effort! Here is a natural native way to phrase that.",
+        });
+      } catch (e) {
+        return NextResponse.json({ skip: true });
+      }
+    }
+
+    // ========================================================================
+    // BRANCH B: DYNAMIC TURN-BY-TURN COACHING HINT (`action === "HINT"`)
     // ========================================================================
     if (body.action === "HINT") {
       const {
@@ -97,7 +163,7 @@ Output ONLY a JSON object with 3 keys:
           starter: parsed.starter || nextTargetChunk || "Oui, bien sûr !",
           translation: parsed.translation || "Yes, of course!",
         });
-      } catch (e) {
+      } catch {
         return NextResponse.json({
           coachingTip: nextTargetChunk
             ? `Answer the question and try using "${nextTargetChunk}"!`
@@ -109,7 +175,7 @@ Output ONLY a JSON object with 3 keys:
     }
 
     // ========================================================================
-    // BRANCH B: CREATE NEW 3-MIN FREESTYLE SESSION
+    // BRANCH C: CREATE NEW 3-MIN FREESTYLE SESSION
     // ========================================================================
     const {
       mode = "FOCUSED",
@@ -121,7 +187,6 @@ Output ONLY a JSON object with 3 keys:
       targetLanguage = "fr-FR",
     } = body;
 
-    // 1. RESOLVE USER'S ACTIVE MILESTONE & FULL SPEAKABLE SPOON SENTENCES
     let currentMilestoneIndex = 1;
     const speakablePhrases: string[] = [];
     const spoonThemes: string[] = [];
@@ -173,7 +238,6 @@ Output ONLY a JSON object with 3 keys:
             .split("=")[0]
             .replace(/^[«"“]+|[»"”]+$/g, "")
             .trim();
-          // Prefer multi-word speakable phrases (2 to 7 words) over 1-word fragments!
           const wordCount = clean.split(/\s+/).filter(Boolean).length;
           if (
             wordCount >= 2 &&
@@ -193,13 +257,11 @@ Output ONLY a JSON object with 3 keys:
           const fs = (l.freestyle as any) || {};
           const lh = (l.lessonHandoff as any) || {};
 
-          // Priority 1: Full target sentences & valid NPC replies
           addPhrase(gc.targetSentence);
           addPhrase(lh.targetSentence);
           if (Array.isArray(vc?.constraint?.validReplies)) {
             vc.constraint.validReplies.forEach(addPhrase);
           }
-          // Priority 2: Freestyle requiredChunks & multi-word taughtChunks
           if (Array.isArray(fs?.requiredChunks)) {
             fs.requiredChunks.forEach(addPhrase);
           }
@@ -212,10 +274,9 @@ Output ONLY a JSON object with 3 keys:
       console.warn("[freestyle/create] Could not resolve milestone phrases:", e);
     }
 
-    const tutorName = voiceGender === "female" ? "Sophie" : "Antoine";
-    const targetVoiceId = `${targetLanguage}-${
-      voiceGender === "female" ? "girl-01" : "boy-01"
-    }`;
+    const tutorConfig = getFreestyleTutor(voiceGender);
+    const tutorName = tutorConfig.name;
+    const targetVoiceId = getTutorVoiceId(voiceGender, targetLanguage);
     const personaDesc =
       PERSONA_STYLES[String(persona).toUpperCase()] || PERSONA_STYLES.FRIENDLY;
 
@@ -252,7 +313,6 @@ Output ONLY a JSON object with 3 keys:
       starterHintNative: "Start by using your first target phrase!",
     };
 
-    // 2. GENERATE ROLEPLAY CONFIG WITH QWEN (qwen/qwen3.8-27b)
     try {
       const focusedContext =
         mode === "FOCUSED" && speakablePhrases.length > 0
@@ -266,7 +326,7 @@ Output ONLY a JSON object with 3 keys:
       const completion = await groq.chat.completions.create({
         model: "qwen/qwen3.8-27b",
         temperature: 0.5,
-        max_tokens: 10000,
+        max_tokens: 2000,
         reasoning_effort: "low",
         messages: [
           {
@@ -332,7 +392,7 @@ CRITICAL RULES:
     const session = await prisma.freestyleSession.create({
       data: {
         userId,
-        mode: String(mode),
+        mode: mode,
         topic: generated.topic,
         nativeLanguage,
         targetLanguage,
