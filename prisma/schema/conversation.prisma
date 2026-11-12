@@ -60,6 +60,7 @@ enum FreestyleMode {
   SPECIFIC
   RANDOM
   ARGUMENTATIVE
+  FOCUSED
 }
 
 enum SessionStatus {
