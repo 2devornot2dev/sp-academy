@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-guard";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
+import { extractTrickyWords } from "@/lib/freestyle/grades";
 
 interface Params {
   params: Promise<{
@@ -72,6 +73,7 @@ export async function GET(_req: Request, { params }: Params) {
         ...session.review,
         spriteOutro,
       },
+      trickyWords: extractTrickyWords(session.messages),
     });
   } catch (error) {
     console.error("Fetch review error:", error);

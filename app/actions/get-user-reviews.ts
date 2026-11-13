@@ -4,10 +4,11 @@
 import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 import type {
+  ReviewApiResponse,
   ReviewData,
-  SessionData,
   SpriteOutro,
 } from "@/components/freestyle/review/freestyle-review-hub";
+import { extractTrickyWords } from "@/lib/freestyle/grades";
 
 async function safePresign(key?: string | null): Promise<string | null> {
   if (!key) return null;
@@ -101,7 +102,7 @@ export async function getConversationReview(
   found: boolean;
   isBaking: boolean;
   isFailed: boolean;
-  data: { session: SessionData; review: ReviewData } | null;
+  data: ReviewApiResponse | null;
 }> {
   const session = await prisma.freestyleSession.findFirst({
     where: { id: sessionId, userId },
@@ -173,6 +174,7 @@ export async function getConversationReview(
         duration: session.duration,
       },
       review: reviewData,
+      trickyWords: extractTrickyWords(session.messages),
     },
   };
 }
