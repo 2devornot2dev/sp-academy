@@ -3,12 +3,9 @@ import React from "react";
 import Link from "next/link";
 import { getUserDetailsById, type UserDetails } from "@/lib/actions";
 import { requireUser } from "@/lib/auth-guard";
+import { prisma } from "@/lib/prisma";
 import {
   Cog,
-  User as UserIcon,
-  Share2,
-  Bell,
-  CreditCard,
   ShieldCheck,
   Sparkles,
   Globe2,
@@ -16,7 +13,7 @@ import {
   Mail,
   ArrowUpRight,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AccountTabs } from "@/components/account/account-tabs";
 import { BillingForm } from "@/components/account/billing-form";
 import { SharingSettingsForm } from "@/components/account/sharing-settings-form";
 import { NotificationSettingsForm } from "@/components/account/notifications-settings-form";
@@ -27,7 +24,19 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountSettings() {
   const user = await requireUser();
-  const userDetails: UserDetails = await getUserDetailsById(user.id);
+
+  const [userDetails, sprites]: [UserDetails, any[]] = await Promise.all([
+    getUserDetailsById(user.id),
+    prisma.sprite.findMany({
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        avatarUrl: true,
+        persona: true,
+      },
+    }),
+  ]);
 
   const avatarSrc =
     userDetails.avatarUrl ||
@@ -43,7 +52,9 @@ export default async function AccountSettings() {
   const isPro = Boolean(userDetails.BillingInformation?.isActive);
   const spriteName = userDetails.spriteProfile?.sprite?.name || "Vox";
   const spriteAvatar =
-    userDetails.spriteProfile?.sprite?.avatarUrl || "/sprite-m.png";
+    userDetails.spriteProfile?.sprite?.avatarUrl ||
+    sprites.find((s) => s.slug === "vox")?.avatarUrl ||
+    "/sprite-m.png";
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 font-sans text-slate-900 selection:bg-indigo-100">
@@ -97,7 +108,6 @@ export default async function AccountSettings() {
         <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-12">
           {/* LEFT COLUMN (4 Cols): 3D PLAYER IDENTITY & COMPANION CARD */}
           <div className="flex flex-col gap-6 lg:col-span-4">
-            {/* Dark 3D Player Passport Card */}
             <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-br from-[#0F172A] via-[#131D36] to-[#1E1B4B] p-6 text-white shadow-xl">
               <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl" />
 
@@ -177,78 +187,43 @@ export default async function AccountSettings() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN (8 Cols): 3D TACTILE TABS & SETTINGS FORMS */}
+          {/* RIGHT COLUMN (8 Cols): CLEAN 3D TACTILE TABS */}
           <div className="lg:col-span-8">
-            <Tabs defaultValue="general" className="w-full space-y-6">
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-2 shadow-sm sm:grid-cols-4">
-                <TabsTrigger
-                  value="general"
-                  className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black tracking-wide uppercase transition-all data-[state=active]:border-b-2 data-[state=active]:border-blue-800 data-[state=active]:bg-gradient-to-b data-[state=active]:from-sky-400 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs"
-                >
-                  <UserIcon className="h-3.5 w-3.5" />
-                  <span>General</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="sharing"
-                  className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black tracking-wide uppercase transition-all data-[state=active]:border-b-2 data-[state=active]:border-blue-800 data-[state=active]:bg-gradient-to-b data-[state=active]:from-sky-400 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  <span>Sharing</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="notifications"
-                  className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black tracking-wide uppercase transition-all data-[state=active]:border-b-2 data-[state=active]:border-blue-800 data-[state=active]:bg-gradient-to-b data-[state=active]:from-sky-400 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs"
-                >
-                  <Bell className="h-3.5 w-3.5" />
-                  <span>Alerts</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="billing"
-                  className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black tracking-wide uppercase transition-all data-[state=active]:border-b-2 data-[state=active]:border-blue-800 data-[state=active]:bg-gradient-to-b data-[state=active]:from-sky-400 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xs"
-                >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  <span>Billing</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="general" className="mt-0 space-y-6">
-                <GeneralSettings
-                  initialImageUrl={
-                    userDetails.avatarUrl
-                      ? userDetails.avatarUrl
-                      : userDetails.image
-                  }
-                  initialSettings={userDetails}
-                  userId={user.id}
-                />
-
-                <DangerZone userId={user.id} />
-              </TabsContent>
-
-              <TabsContent value="sharing" className="mt-0">
+            <AccountTabs
+              generalContent={
+                <div className="space-y-6">
+                  <GeneralSettings
+                    initialImageUrl={
+                      userDetails.avatarUrl
+                        ? userDetails.avatarUrl
+                        : userDetails.image
+                    }
+                    initialSettings={userDetails}
+                    sprites={sprites}
+                    userId={user.id}
+                  />
+                  <DangerZone userId={user.id} />
+                </div>
+              }
+              sharingContent={
                 <SharingSettingsForm
                   initialSettings={userDetails.AccountSettings}
                   userId={user.id}
                 />
-              </TabsContent>
-
-              <TabsContent value="notifications" className="mt-0">
+              }
+              notificationsContent={
                 <NotificationSettingsForm
                   initialSettings={userDetails.AccountSettings}
                   userId={user.id}
                 />
-              </TabsContent>
-
-              <TabsContent value="billing" className="mt-0">
+              }
+              billingContent={
                 <BillingForm
                   billingInfo={userDetails.BillingInformation}
                   userId={user.id}
                 />
-              </TabsContent>
-            </Tabs>
+              }
+            />
           </div>
         </div>
       </main>

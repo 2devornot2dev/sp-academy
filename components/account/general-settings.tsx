@@ -8,15 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  Select,
-  SelectGroup,
-  SelectLabel,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Loader2,
   Upload,
   Wand2,
@@ -28,6 +19,7 @@ import {
   Zap,
   Check,
   Phone,
+  Bot,
 } from "lucide-react";
 import { updateAccountSettings, type UserDetails } from "@/lib/actions";
 
@@ -43,9 +35,18 @@ export interface GeneralSettingsValues {
   targetVoiceId: string;
 }
 
+interface SpriteRecord {
+  id: string;
+  slug: string;
+  name: string;
+  avatarUrl: string | null;
+  persona: string | null;
+}
+
 interface GeneralSettingsProps {
   initialSettings: UserDetails;
   initialImageUrl?: string | null;
+  sprites?: SpriteRecord[];
   userId: string;
 }
 
@@ -72,28 +73,10 @@ function normalizeGenderSelect(raw: string | null | undefined): string {
   return "PREFER_NOT_TO_SAY";
 }
 
-const SPRITE_OPTIONS = [
-  {
-    slug: "vox",
-    name: "Vox",
-    role: "High-Energy Mic Master",
-    avatar: "/sprite-m.png",
-    voiceSuffix: "boy-01",
-    desc: "Upbeat, punchy pronunciation coach who hypes up every win.",
-  },
-  {
-    slug: "vivi",
-    name: "Vivi",
-    role: "Warm Expression Guide",
-    avatar: "/sprite-f.png",
-    voiceSuffix: "girl-01",
-    desc: "Calm, clear, audio-focused guide who breaks down tricky phrases.",
-  },
-] as const;
-
 export function GeneralSettings({
   initialSettings,
   initialImageUrl = null,
+  sprites = [],
   userId,
 }: GeneralSettingsProps) {
   const router = useRouter();
@@ -144,6 +127,30 @@ export function GeneralSettings({
   const [unsavedAvatar, setUnsavedAvatar] = useState<boolean>(false);
 
   const spriteProfile = initialSettings?.spriteProfile;
+
+  const voxDb = sprites.find((s) => s.slug === "vox");
+  const viviDb = sprites.find((s) => s.slug === "vivi");
+
+  const spriteOptions = [
+    {
+      slug: "vox" as const,
+      name: voxDb?.name || "Vox",
+      role: "High-Energy Mic Master",
+      avatar: voxDb?.avatarUrl || null,
+      desc:
+        voxDb?.persona ||
+        "Upbeat, punchy pronunciation coach who hypes up every win.",
+    },
+    {
+      slug: "vivi" as const,
+      name: viviDb?.name || "Vivi",
+      role: "Warm Expression Guide",
+      avatar: viviDb?.avatarUrl || null,
+      desc:
+        viviDb?.persona ||
+        "Calm, clear, audio-focused guide who breaks down tricky phrases.",
+    },
+  ];
 
   const handleSelectSprite = (slug: "vox" | "vivi") => {
     const suffix = slug === "vivi" ? "girl-01" : "boy-01";
@@ -438,31 +445,19 @@ export function GeneralSettings({
               >
                 Grammatical Gender
               </Label>
-              <Select
+              <select
+                id="gender"
                 value={settings.gender}
-                onValueChange={(value) => {
-                  if (value !== null) {
-                    setSettings((prev) => ({ ...prev, gender: value }));
-                  }
-                }}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, gender: e.target.value }))
+                }
+                className="h-11 w-full cursor-pointer rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-3.5 text-xs font-black text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
               >
-                <SelectTrigger
-                  id="gender"
-                  className="h-11 w-full rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900"
-                >
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">Male (Masculine forms)</SelectItem>
-                  <SelectItem value="FEMALE">
-                    Female (Feminine forms)
-                  </SelectItem>
-                  <SelectItem value="NON_BINARY">Non-Binary</SelectItem>
-                  <SelectItem value="PREFER_NOT_TO_SAY">
-                    Prefer not to say
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="MALE">Male (Masculine forms)</option>
+                <option value="FEMALE">Female (Feminine forms)</option>
+                <option value="NON_BINARY">Non-Binary</option>
+                <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+              </select>
             </div>
 
             {/* Target Language */}
@@ -473,32 +468,25 @@ export function GeneralSettings({
               >
                 Target Learning Language
               </Label>
-              <Select
+              <select
+                id="targetLanguage"
                 value={settings.targetLanguage}
-                onValueChange={(value) => {
-                  if (value !== null) {
-                    const suffix =
-                      settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
-                    setSettings((prev) => ({
-                      ...prev,
-                      targetLanguage: value,
-                      targetVoiceId: `${value}-${suffix}`,
-                    }));
-                  }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const suffix =
+                    settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
+                  setSettings((prev) => ({
+                    ...prev,
+                    targetLanguage: val,
+                    targetVoiceId: `${val}-${suffix}`,
+                  }));
                 }}
+                className="h-11 w-full cursor-pointer rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/40 px-3.5 text-xs font-black text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
               >
-                <SelectTrigger
-                  id="targetLanguage"
-                  className="h-11 w-full rounded-2xl border-2 border-sky-200 bg-sky-50/40 font-black text-slate-900"
-                >
-                  <SelectValue placeholder="Select target language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fr-FR">🇫🇷 French (fr-FR)</SelectItem>
-                  <SelectItem value="es-ES">🇪🇸 Spanish (es-ES)</SelectItem>
-                  <SelectItem value="en-US">🇺🇸 English (en-US)</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="fr-FR">🇫🇷 French (fr-FR)</option>
+                <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
+                <option value="en-US">🇺🇸 English (en-US)</option>
+              </select>
             </div>
           </div>
 
@@ -527,7 +515,7 @@ export function GeneralSettings({
             </div>
 
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-              {SPRITE_OPTIONS.map((sp) => {
+              {spriteOptions.map((sp) => {
                 const active = settings.spriteSlug === sp.slug;
                 return (
                   <button
@@ -540,11 +528,24 @@ export function GeneralSettings({
                         : "border-slate-200 border-b-slate-300 bg-white/70 hover:border-sky-300 hover:bg-white"
                     }`}
                   >
-                    <img
-                      src={sp.avatar}
-                      alt={sp.name}
-                      className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 object-cover object-top"
-                    />
+                    {sp.avatar ? (
+                      <img
+                        src={sp.avatar}
+                        alt={sp.name}
+                        className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 object-cover object-top"
+                      />
+                    ) : (
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white ${
+                          sp.slug === "vivi"
+                            ? "bg-gradient-to-b from-fuchsia-400 to-purple-600"
+                            : "bg-gradient-to-b from-sky-400 to-blue-600"
+                        }`}
+                      >
+                        <Bot className="h-6 w-6" />
+                      </div>
+                    )}
+
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-black text-slate-900">
@@ -559,7 +560,7 @@ export function GeneralSettings({
                       <span className="block text-[10px] font-extrabold text-blue-600 uppercase">
                         {sp.role}
                       </span>
-                      <p className="mt-1 text-xs font-medium leading-snug text-slate-500">
+                      <p className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-slate-500">
                         {sp.desc}
                       </p>
                     </div>
@@ -576,29 +577,21 @@ export function GeneralSettings({
                 >
                   Explanation / Native Language
                 </Label>
-                <Select
+                <select
+                  id="nativeLanguage"
                   value={settings.nativeLanguage}
-                  onValueChange={(value) => {
-                    if (value !== null) {
-                      setSettings((prev) => ({
-                        ...prev,
-                        nativeLanguage: value,
-                      }));
-                    }
-                  }}
+                  onChange={(e) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      nativeLanguage: e.target.value,
+                    }))
+                  }
+                  className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
                 >
-                  <SelectTrigger
-                    id="nativeLanguage"
-                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white text-xs font-bold text-slate-900"
-                  >
-                    <SelectValue placeholder="Select native language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en-US">🇺🇸 English (en-US)</SelectItem>
-                    <SelectItem value="fr-FR">🇫🇷 French (fr-FR)</SelectItem>
-                    <SelectItem value="es-ES">🇪🇸 Spanish (es-ES)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="en-US">🇺🇸 English (en-US)</option>
+                  <option value="fr-FR">🇫🇷 French (fr-FR)</option>
+                  <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
+                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -608,44 +601,24 @@ export function GeneralSettings({
                 >
                   Target Voice Persona
                 </Label>
-                <Select
+                <select
+                  id="targetVoiceId"
                   value={settings.targetVoiceId}
-                  onValueChange={(value) => {
-                    if (value !== null) {
-                      setSettings((prev) => ({
-                        ...prev,
-                        targetVoiceId: value,
-                      }));
-                    }
-                  }}
+                  onChange={(e) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      targetVoiceId: e.target.value,
+                    }))
+                  }
+                  className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
                 >
-                  <SelectTrigger
-                    id="targetVoiceId"
-                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white text-xs font-bold text-slate-900"
-                  >
-                    <SelectValue placeholder="Select voice" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fr-FR-girl-01">
-                      Vivi • French Female
-                    </SelectItem>
-                    <SelectItem value="fr-FR-boy-01">
-                      Vox • French Male
-                    </SelectItem>
-                    <SelectItem value="es-ES-girl-01">
-                      Vivi • Spanish Female
-                    </SelectItem>
-                    <SelectItem value="es-ES-boy-01">
-                      Vox • Spanish Male
-                    </SelectItem>
-                    <SelectItem value="en-US-girl-01">
-                      Vivi • English Female
-                    </SelectItem>
-                    <SelectItem value="en-US-boy-01">
-                      Vox • English Male
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="fr-FR-girl-01">Vivi • French Female</option>
+                  <option value="fr-FR-boy-01">Vox • French Male</option>
+                  <option value="es-ES-girl-01">Vivi • Spanish Female</option>
+                  <option value="es-ES-boy-01">Vox • Spanish Male</option>
+                  <option value="en-US-girl-01">Vivi • English Female</option>
+                  <option value="en-US-boy-01">Vox • English Male</option>
+                </select>
               </div>
             </div>
           </div>
@@ -767,48 +740,32 @@ export function GeneralSettings({
                     <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
                       Type
                     </Label>
-                    <Select
+                    <select
                       value={avatarType}
-                      onValueChange={(v) => v && setAvatarType(v)}
+                      onChange={(e) => setAvatarType(e.target.value)}
+                      className="h-9 w-full rounded-xl border-2 border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-900"
                     >
-                      <SelectTrigger className="h-9 rounded-xl border-2 border-slate-200 bg-white text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Image Type</SelectLabel>
-                          <SelectItem value="realistic_image">
-                            Realistic Photo
-                          </SelectItem>
-                          <SelectItem value="digital_illustration">
-                            Digital Illustration
-                          </SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <option value="realistic_image">Realistic Photo</option>
+                      <option value="digital_illustration">
+                        Digital Illustration
+                      </option>
+                    </select>
                   </div>
 
                   <div className="space-y-1">
                     <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
                       Aesthetic
                     </Label>
-                    <Select
+                    <select
                       value={avatarStyle}
-                      onValueChange={(v) => v && setAvatarStyle(v)}
+                      onChange={(e) => setAvatarStyle(e.target.value)}
+                      className="h-9 w-full rounded-xl border-2 border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-900"
                     >
-                      <SelectTrigger className="h-9 rounded-xl border-2 border-slate-200 bg-white text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Art Style</SelectLabel>
-                          <SelectItem value="default">Default</SelectItem>
-                          <SelectItem value="neon">Neon Glow</SelectItem>
-                          <SelectItem value="cyberpunk">Cyberpunk</SelectItem>
-                          <SelectItem value="low-poly">Low-Poly 3D</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <option value="default">Default</option>
+                      <option value="neon">Neon Glow</option>
+                      <option value="cyberpunk">Cyberpunk</option>
+                      <option value="low-poly">Low-Poly 3D</option>
+                    </select>
                   </div>
                 </div>
 
