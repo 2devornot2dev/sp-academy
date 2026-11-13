@@ -26,12 +26,14 @@ export interface RepairCardItem {
 interface Props {
   cards: RepairCardItem[];
   targetLanguage?: string;
+  onBack?: () => void;
   onComplete: () => void;
 }
 
 export function FreestyleGrammarReview({
   cards,
   targetLanguage = "fr-FR",
+  onBack,
   onComplete,
 }: Props) {
   const [index, setIndex] = useState(0);
@@ -52,13 +54,25 @@ export function FreestyleGrammarReview({
             Your phrasing was super clean in this conversation.
           </p>
         </div>
-        <button
-          onClick={onComplete}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-lg transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
-        >
-          <span>Continue to Word Lab &amp; Speaking</span>
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-4 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </button>
+          )}
+          <button
+            onClick={onComplete}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-lg transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+          >
+            <span>Continue to Word Lab &amp; Speaking</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -77,7 +91,7 @@ export function FreestyleGrammarReview({
   };
 
   return (
-    <div className="space-y-6 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8 animate-in fade-in">
+    <div className="space-y-6 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md sm:p-8 animate-in fade-in">
       {/* Top Progress Header */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -113,7 +127,6 @@ export function FreestyleGrammarReview({
 
       {/* Before -> After Transformation */}
       <div className="space-y-4">
-        {/* What You Said */}
         <div className="rounded-2xl border-2 border-rose-200/80 bg-rose-50/50 px-5 py-3.5">
           <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-rose-500 uppercase">
             <XCircle className="h-3.5 w-3.5" />
@@ -124,7 +137,6 @@ export function FreestyleGrammarReview({
           </p>
         </div>
 
-        {/* Native Way with Clickable Individual Words + Full Sentence Audio */}
         <div className="rounded-3xl border-2 border-b-4 border-emerald-300 border-b-emerald-400 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-emerald-700 uppercase">
@@ -143,7 +155,6 @@ export function FreestyleGrammarReview({
             </button>
           </div>
 
-          {/* Tappable Word Pills */}
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
             {words.map((word, wIdx) => {
               const isActive = activeWordIdx === wIdx;
@@ -166,7 +177,6 @@ export function FreestyleGrammarReview({
           </div>
         </div>
 
-        {/* Coach Why Box */}
         <div className="rounded-2xl border-2 border-amber-200/80 bg-amber-50/60 px-5 py-3.5">
           <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-amber-700 uppercase">
             <Lightbulb className="h-3.5 w-3.5" />
@@ -182,15 +192,18 @@ export function FreestyleGrammarReview({
       <div className="flex items-center justify-between gap-3 pt-1">
         <button
           type="button"
-          disabled={index === 0}
           onClick={() => {
             setActiveWordIdx(null);
-            setIndex((i) => Math.max(0, i - 1));
+            if (index === 0) {
+              onBack?.();
+            } else {
+              setIndex((i) => Math.max(0, i - 1));
+            }
           }}
-          className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Previous</span>
+          <span>{index === 0 ? "Back to Scorecard" : "Previous"}</span>
         </button>
 
         <button
