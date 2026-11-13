@@ -11,7 +11,8 @@ export function getAlphaGrade(score: number | null | undefined) {
       letter: "—",
       tier: "Pending",
       pill: "border-slate-200 border-b-slate-300 bg-slate-100 text-slate-400",
-      tile: "border-white/10 bg-slate-900/70 text-slate-400",
+      tile: "border-b-[3px] border-slate-800 bg-slate-700 text-slate-300",
+      headerPill: "border-white/20 bg-slate-950/40 text-slate-300",
       lightTile: "border-slate-200 border-b-slate-300 bg-slate-50 text-slate-500",
       heroEmblem:
         "border-slate-700 bg-gradient-to-b from-slate-700 to-slate-900 text-slate-300",
@@ -36,7 +37,9 @@ export function getAlphaGrade(score: number | null | undefined) {
       letter,
       tier: "Native Flow",
       pill: "border-emerald-300 border-b-emerald-500 bg-emerald-100 text-emerald-900",
-      tile: "border-emerald-400/40 bg-emerald-500/20 text-emerald-300",
+      tile: "border-b-[3px] border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 text-slate-950 shadow-sm",
+      headerPill:
+        "border-emerald-400/50 bg-emerald-500/25 text-emerald-200",
       lightTile: "border-emerald-200 border-b-emerald-300 bg-emerald-50 text-emerald-800",
       heroEmblem:
         "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-slate-950 shadow-emerald-500/35",
@@ -48,7 +51,8 @@ export function getAlphaGrade(score: number | null | undefined) {
       letter,
       tier: "Strong Pace",
       pill: "border-sky-300 border-b-sky-500 bg-sky-100 text-sky-900",
-      tile: "border-sky-400/40 bg-sky-500/20 text-sky-300",
+      tile: "border-b-[3px] border-blue-900 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm",
+      headerPill: "border-sky-400/50 bg-sky-500/25 text-sky-200",
       lightTile: "border-sky-200 border-b-sky-300 bg-sky-50 text-sky-800",
       heroEmblem:
         "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/35",
@@ -60,7 +64,8 @@ export function getAlphaGrade(score: number | null | undefined) {
       letter,
       tier: "Building Up",
       pill: "border-amber-300 border-b-orange-400 bg-amber-100 text-amber-900",
-      tile: "border-amber-400/40 bg-amber-500/20 text-amber-300",
+      tile: "border-b-[3px] border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-sm",
+      headerPill: "border-amber-400/50 bg-amber-500/25 text-amber-200",
       lightTile: "border-amber-200 border-b-amber-300 bg-amber-50 text-amber-800",
       heroEmblem:
         "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/35",
@@ -71,7 +76,8 @@ export function getAlphaGrade(score: number | null | undefined) {
     letter,
     tier: "Needs Polish",
     pill: "border-rose-300 border-b-rose-500 bg-rose-100 text-rose-900",
-    tile: "border-rose-400/40 bg-rose-500/20 text-rose-300",
+    tile: "border-b-[3px] border-rose-900 bg-gradient-to-b from-rose-500 to-red-600 text-white shadow-sm",
+    headerPill: "border-rose-400/50 bg-rose-500/25 text-rose-200",
     lightTile: "border-rose-200 border-b-rose-300 bg-rose-50 text-rose-800",
     heroEmblem:
       "border-rose-900 bg-gradient-to-b from-rose-500 to-red-600 text-white shadow-rose-500/35",

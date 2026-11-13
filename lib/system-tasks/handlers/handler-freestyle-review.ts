@@ -109,9 +109,13 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       spriteOutro,
     } = review;
 
-    const feedbackWithOutro = spriteOutro
-      ? { ...overallFeedback, spriteOutro }
-      : overallFeedback;
+    const meta = (task.metadata as Record<string, any>) || {};
+    const feedbackWithOutro = {
+      ...overallFeedback,
+      ...(spriteOutro ? { spriteOutro } : {}),
+      tutorName: meta.tutorName || "Sophie",
+      voiceGender: meta.voiceGender || "female",
+    };
 
     const jsonOrNull = (v: unknown) =>
       v ? (v as Prisma.InputJsonValue) : Prisma.JsonNull;

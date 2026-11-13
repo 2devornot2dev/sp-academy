@@ -181,11 +181,12 @@ export function FreestyleReviewHub({
   const { session, review } = data;
   const trickyWords = data.trickyWords || [];
 
-  const inferredGender = JSON.stringify(review)
-    .toLowerCase()
-    .includes("antoine")
-    ? "male"
-    : "female";
+  const savedGender = (review.overallFeedback as any)?.voiceGender;
+  const inferredGender =
+    savedGender ||
+    (JSON.stringify(review).toLowerCase().includes("antoine")
+      ? "male"
+      : "female");
   const tutor = getFreestyleTutor(inferredGender);
 
   const overallGrade = getAlphaGrade(review.metrics.overallScore);
@@ -233,8 +234,10 @@ export function FreestyleReviewHub({
                 {session.mode} • {session.level} •{" "}
                 {Math.max(1, Math.round(session.duration / 60))}m
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/40 px-3.5 py-1.5 text-xs font-black text-amber-300 backdrop-blur-md">
-                <Trophy className="h-3.5 w-3.5 text-amber-400" />
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-black backdrop-blur-md ${overallGrade.headerPill}`}
+              >
+                <Trophy className="h-3.5 w-3.5" />
                 <span>Grade: {overallGrade.letter}</span>
               </span>
             </div>
@@ -269,7 +272,8 @@ export function FreestyleReviewHub({
           {STEPS.map((s, idx) => {
             const isCurrent = step === s.id;
             const isDone =
-              step === "celebration" || (typeof step === "number" && step > s.id);
+              step === "celebration" ||
+              (typeof step === "number" && step > s.id);
             const Icon = s.icon;
             return (
               <Fragment key={s.id}>
@@ -287,11 +291,7 @@ export function FreestyleReviewHub({
                           : "border-slate-300 bg-slate-100 text-slate-400"
                     }`}
                   >
-                    {isDone ? (
-                      <Check className="h-4 w-4 stroke-[3.5]" />
-                    ) : (
-                      s.id
-                    )}
+                    {isDone ? <Check className="h-4 w-4 stroke-[3.5]" /> : s.id}
                   </span>
                   <span
                     className={`flex items-center gap-1.5 text-xs font-black tracking-wider uppercase ${
@@ -418,7 +418,7 @@ export function FreestyleReviewHub({
                       </div>
 
                       <span
-                        className={`inline-flex min-w-[38px] items-center justify-center rounded-lg border px-2 py-0.5 text-xs font-black ${g.tile}`}
+                        className={`inline-flex h-8 min-w-[44px] items-center justify-center rounded-xl px-2.5 text-sm font-black ${g.tile}`}
                       >
                         {g.letter}
                       </span>

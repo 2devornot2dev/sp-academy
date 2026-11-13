@@ -567,7 +567,7 @@ function LiveFreestyleChatInner({
     );
   };
 
-  const handleEndSession = async () => {
+const handleEndSession = async () => {
     if (isEnding) return;
     setIsEnding(true);
 
@@ -601,7 +601,8 @@ function LiveFreestyleChatInner({
           messages,
           mistakes: compiledMistakes,
           duration,
-          tutorName
+          tutorName,
+          voiceGender: session.voiceGender,
         }),
       });
 
