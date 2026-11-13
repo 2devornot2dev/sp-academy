@@ -28,14 +28,17 @@ export interface UserReviewListItem {
   nativeLanguage: string;
   duration: number;
   status: string;
-  createdAt: Date;
+  createdAt: string;
   overallScore: number | null;
   grammarScore: number | null;
   vocabScore: number | null;
   pronunciationScore: number | null;
   fluencyScore: number | null;
+  summary: string | null;
   topWeakness: string | null;
+  topUpgrade: { original: string; better: string } | null;
   mistakesCount: number;
+  vocabUpgradesCount: number;
   isReady: boolean;
 }
 
@@ -57,6 +60,10 @@ export async function getUserReviews(
     const rev = s.review;
     const metrics = (rev?.metrics as any) || null;
     const grammar = (rev?.grammarAnalysis as any) || null;
+    const feedback = (rev?.overallFeedback as any) || null;
+    const upgrades = Array.isArray(rev?.vocabUpgrades)
+      ? (rev.vocabUpgrades as any[])
+      : [];
     const mistakes = Array.isArray(rev?.mistakes) ? rev.mistakes : [];
     const isReady = Boolean(rev && rev.lambdaStatus === "SUCCESS");
 
@@ -69,14 +76,19 @@ export async function getUserReviews(
       nativeLanguage: s.nativeLanguage,
       duration: s.duration,
       status: s.status,
-      createdAt: s.createdAt,
+      createdAt: s.createdAt.toISOString(),
       overallScore: metrics?.overallScore ?? null,
       grammarScore: metrics?.grammarScore ?? null,
       vocabScore: metrics?.vocabScore ?? null,
       pronunciationScore: metrics?.pronunciationScore ?? null,
       fluencyScore: metrics?.fluencyScore ?? null,
+      summary: feedback?.summary ?? null,
       topWeakness: grammar?.topWeakness ?? null,
+      topUpgrade: upgrades[0]
+        ? { original: upgrades[0].original, better: upgrades[0].better }
+        : null,
       mistakesCount: mistakes.length,
+      vocabUpgradesCount: upgrades.length,
       isReady,
     };
   });
@@ -133,10 +145,12 @@ export async function getConversationReview(
 
   const reviewData: ReviewData = {
     metrics: session.review.metrics as unknown as ReviewData["metrics"],
-    mistakes: (session.review.mistakes as unknown as ReviewData["mistakes"]) || [],
+    mistakes:
+      (session.review.mistakes as unknown as ReviewData["mistakes"]) || [],
     overallFeedback: rawFeedback as ReviewData["overallFeedback"],
     grammarAnalysis:
-      (session.review.grammarAnalysis as unknown as ReviewData["grammarAnalysis"]) ??
+      (session.review
+        .grammarAnalysis as unknown as ReviewData["grammarAnalysis"]) ??
       undefined,
     vocabUpgrades:
       (session.review.vocabUpgrades as unknown as ReviewData["vocabUpgrades"]) ??
