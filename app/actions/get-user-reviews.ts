@@ -5,10 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 import type {
   ReviewApiResponse,
-  ReviewData,
-  SpriteOutro,
 } from "@/components/freestyle/review/freestyle-review-hub";
 import { extractTrickyWords } from "@/lib/freestyle/grades";
+import { ReviewData, SpriteOutro } from "@/components/freestyle/review/review-types";
 
 async function safePresign(key?: string | null): Promise<string | null> {
   if (!key) return null;
