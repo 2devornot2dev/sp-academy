@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-guard";
 import { getUserReviews } from "@/app/actions/get-user-reviews";
-import { ReviewTable, getAlphaGrade } from "@/components/freestyle/review/review-table";
+import { ReviewTable } from "@/components/freestyle/review/review-table";
+import { getAlphaGrade } from "@/lib/freestyle/grades";
 import { ArrowLeft, Award, MessagesSquare, Trophy } from "lucide-react";
 
 export const dynamic = "force-dynamic";
