@@ -5,7 +5,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  Target,
   History,
   Plus,
   Moon,
@@ -55,12 +54,12 @@ export function SpriteChatHeader({
 }: SpriteChatHeaderProps) {
   const [manualExpand, setManualExpand] = useState(false);
 
-  const isCollapsed =
-    activeTab === "session" && isSessionActive && !manualExpand;
+  const isSessionTab = activeTab !== "history";
+  const isCollapsed = isSessionTab && isSessionActive && !manualExpand;
 
   return (
     <div className="relative z-20 shrink-0 overflow-hidden border-b-2 border-slate-200 bg-white px-4 py-3 shadow-xs transition-all">
-      {/* EXPANDED ROW 1 */}
+      {/* EXPANDED ROW 1 (With X Close Button in Top-Right!) */}
       <AnimatePresence initial={false}>
         {!isCollapsed && (
           <motion.div
@@ -97,9 +96,9 @@ export function SpriteChatHeader({
                         ? `${spriteName} is napping until you finish your lesson!`
                         : "Start New Session"
                     }
-                    className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-white shadow-sm transition ${
+                    className={`absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full shadow-sm ring-2 ring-white transition ${
                       isSnoozing
-                        ? "bg-indigo-500 text-white cursor-not-allowed"
+                        ? "cursor-not-allowed bg-indigo-500 text-white"
                         : "bg-emerald-500 text-white hover:scale-110 hover:bg-emerald-600"
                     }`}
                   >
@@ -117,18 +116,16 @@ export function SpriteChatHeader({
                       {spriteName}
                     </h3>
 
-                    {/* Status Badge */}
                     {isSnoozing ? (
-                      <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                      <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-indigo-600 uppercase">
                         💤 Snoozing
                       </span>
                     ) : (
-                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-600">
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-blue-600 uppercase">
                         AI Tutor
                       </span>
                     )}
 
-                    {/* ⚡ 3-Slot Energy Meter */}
                     <div
                       className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5"
                       title={`${energyCount} of ${maxEnergy} Energy Charges available`}
@@ -159,12 +156,21 @@ export function SpriteChatHeader({
                   </p>
                 </div>
               </div>
+
+              {/* TOP-RIGHT CLOSE BUTTON */}
+              <button
+                onClick={onClose}
+                title="Close Assistant"
+                className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 active:translate-y-0.5 active:border-b-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* SLEEK SINGLE-LINE COMMAND BAR */}
+      {/* ROW 2: COMMAND BAR (Session | History + Single | Multi) */}
       <div className="flex flex-nowrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {isCollapsed && (
@@ -179,7 +185,7 @@ export function SpriteChatHeader({
               }
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] transition ${
                 isSnoozing
-                  ? "border-indigo-200 bg-indigo-50 text-indigo-400 cursor-not-allowed"
+                  ? "cursor-not-allowed border-indigo-200 bg-indigo-50 text-indigo-400"
                   : "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
               }`}
             >
@@ -191,38 +197,40 @@ export function SpriteChatHeader({
             </button>
           )}
 
-          {/* 3D Tactile Tab Switcher */}
+          {/* 2-Tab Switcher: Session | History */}
           <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
             {(
               [
                 { id: "session", label: "Session", Icon: MessageSquare },
-                { id: "briefing", label: "Briefing", Icon: Target },
                 {
                   id: "history",
                   label: `History (${sessionsCount})`,
                   Icon: History,
                 },
               ] as const
-            ).map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                onClick={() => onSelectTab(id)}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition ${
-                  activeTab === id
-                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{label}</span>
-              </button>
-            ))}
+            ).map(({ id, label, Icon }) => {
+              const active =
+                id === "session" ? isSessionTab : activeTab === "history";
+              return (
+                <button
+                  key={id}
+                  onClick={() => onSelectTab(id)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-black transition ${
+                    active
+                      ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Compact Energy Pill in Collapsed Mode */}
           {isCollapsed && (
             <div
-              className="hidden sm:flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1"
+              className="hidden items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 sm:flex"
               title={`${energyCount} of ${maxEnergy} Energy Charges`}
             >
               <Zap
@@ -240,43 +248,45 @@ export function SpriteChatHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Single / Multi View Switcher */}
-          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => onChangeViewMode("single")}
-              title="Single Stage View"
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
-                viewMode === "single"
-                  ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <RectangleHorizontal className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Single</span>
-            </button>
+          {/* Single / Multi View Switcher (Only on Session tab) */}
+          {isSessionTab && (
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => onChangeViewMode("single")}
+                title="Single Stage View"
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  viewMode === "single"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <RectangleHorizontal className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Single</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => onChangeViewMode("multi")}
-              title="Multi Thread View"
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
-                viewMode === "multi"
-                  ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <MessagesSquare className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Multi</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => onChangeViewMode("multi")}
+                title="Multi Thread View"
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  viewMode === "multi"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <MessagesSquare className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Multi</span>
+              </button>
+            </div>
+          )}
 
-          {activeTab === "session" && isSessionActive && (
+          {isSessionTab && isSessionActive && (
             <button
               type="button"
               onClick={() => setManualExpand((prev) => !prev)}
               title={isCollapsed ? "Show Lesson Info" : "Compact Fullscreen"}
-              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-blue-600 transition"
+              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-blue-600"
             >
               {isCollapsed ? (
                 <ChevronDown className="h-4 w-4" />
@@ -286,13 +296,16 @@ export function SpriteChatHeader({
             </button>
           )}
 
-          <button
-            onClick={onClose}
-            title="Close Assistant"
-            className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {/* Only show X on Row 2 when Row 1 is collapsed */}
+          {isCollapsed && (
+            <button
+              onClick={onClose}
+              title="Close Assistant"
+              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-1.5 text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

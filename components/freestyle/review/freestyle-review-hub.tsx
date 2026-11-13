@@ -31,6 +31,7 @@ import { useSprite } from "@/context/sprite-context";
 import { WordAudioProvider } from "@/context/word-audio-context";
 import { getAlphaGrade, type TrickyWordItem } from "@/lib/freestyle/grades";
 import { getFreestyleTutor } from "@/lib/freestyle/tutors";
+import { ReviewData, SessionData, SpriteOutro } from "./review-types";
 
 type Step = 1 | 2 | 3 | "celebration";
 
@@ -438,6 +439,21 @@ export function FreestyleReviewHub({
 
               {/* Right 6 Cols: Strengths + #1 Grammar Focus + Guided CTA */}
               <div className="flex flex-col justify-between gap-4 lg:col-span-6">
+                {review.overallFeedback.bestMoment && (
+                  <div className="rounded-3xl border-2 border-b-[5px] border-emerald-300 border-b-emerald-400 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                    <span className="flex items-center gap-1.5 text-[10px] font-black tracking-widest text-emerald-700 uppercase">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                      Your Best Line of the Call
+                    </span>
+                    <p className="mt-1.5 text-lg font-black text-emerald-950">
+                      &ldquo;{review.overallFeedback.bestMoment.quote}&rdquo;
+                    </p>
+                    <p className="mt-1 text-xs font-semibold leading-relaxed text-emerald-800 sm:text-sm">
+                      {review.overallFeedback.bestMoment.compliment}
+                    </p>
+                  </div>
+                )}
+
                 {review.overallFeedback.strengths &&
                   review.overallFeedback.strengths.length > 0 && (
                     <div className="rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
@@ -617,67 +633,3 @@ export function FreestyleReviewHub({
   );
 }
 
-// ------------------------------
-// TYPES
-// ------------------------------
-export interface ReviewMetrics {
-  overallScore: number;
-  grammarScore: number;
-  vocabScore: number;
-  pronunciationScore: number | null;
-  fluencyScore: number;
-}
-
-export interface ReviewMistake {
-  category: "GENDER" | "GRAMMAR" | "PRONUNCIATION" | "VOCABULARY";
-  severity: "MINOR" | "MAJOR" | "CRITICAL";
-  mistake: string;
-  correction: string;
-  explanation: string;
-  context?: string;
-}
-
-export interface ReviewOverallFeedback {
-  summary: string;
-  strengths?: string[];
-  focusAreas?: string[];
-  encouragement: string;
-}
-
-export interface GrammarAnalysis {
-  topWeakness: string;
-  explanation: string;
-}
-
-export interface VocabUpgrade {
-  original: string;
-  better: string;
-  explanation: string;
-}
-
-export interface SpriteOutro {
-  spriteName?: string;
-  nativeLine: string;
-  targetLine: string;
-  nativeAudioUrl?: string | null;
-  targetAudioUrl?: string | null;
-}
-
-export interface ReviewData {
-  metrics: ReviewMetrics;
-  mistakes: ReviewMistake[];
-  overallFeedback: ReviewOverallFeedback;
-  grammarAnalysis?: GrammarAnalysis;
-  vocabUpgrades?: VocabUpgrade[];
-  spriteOutro?: SpriteOutro | null;
-}
-
-export interface SessionData {
-  id: string;
-  nativeLanguage: string;
-  targetLanguage: string;
-  level: string;
-  mode: string;
-  topic?: string | null;
-  duration: number;
-}

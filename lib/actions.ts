@@ -792,15 +792,19 @@ export async function updateAccountSettings(
   data: {
     // User fields
     displayUsername?: string;
+    username?: string;
     firstName?: string;
     lastName?: string;
+    phone?: string | null;
     nativeLanguage?: string;
     targetLanguage?: string;
     gender?: string;
     image?: string | null;
+    avatarUrl?: string | null;
     // SpriteProfile fields
     spriteSlug?: string; // "vox" | "vivi"
     targetVoiceId?: string;
+    nativeVoiceId?: string;
     // AccountSettings fields (Notifications & Sharing)
     dailyEmails?: boolean;
     weeklyEmails?: boolean;
@@ -809,18 +813,30 @@ export async function updateAccountSettings(
     shareConversationActivity?: boolean;
     shareAchievements?: boolean;
     shareLessonsAndCourses?: boolean;
-  }
+  },
 ) {
   try {
     // 1. Update core User fields if provided
     const userUpdateData: Record<string, unknown> = {};
-    if (data.displayUsername !== undefined) userUpdateData.displayUsername = data.displayUsername;
+    if (data.displayUsername !== undefined)
+      userUpdateData.displayUsername = data.displayUsername;
+    if (data.username !== undefined) userUpdateData.username = data.username;
     if (data.firstName !== undefined) userUpdateData.firstName = data.firstName;
     if (data.lastName !== undefined) userUpdateData.lastName = data.lastName;
-    if (data.nativeLanguage !== undefined) userUpdateData.nativeLanguage = data.nativeLanguage;
-    if (data.targetLanguage !== undefined) userUpdateData.targetLanguage = data.targetLanguage;
+    if (data.phone !== undefined) userUpdateData.phone = data.phone;
+    if (data.nativeLanguage !== undefined)
+      userUpdateData.nativeLanguage = data.nativeLanguage;
+    if (data.targetLanguage !== undefined)
+      userUpdateData.targetLanguage = data.targetLanguage;
     if (data.gender !== undefined) userUpdateData.gender = data.gender;
-    if (data.image !== undefined) userUpdateData.image = data.image;
+
+    // Sync BOTH image and avatarUrl so whichever getter is used always reflects the new avatar!
+    const nextAvatar =
+      data.avatarUrl !== undefined ? data.avatarUrl : data.image;
+    if (nextAvatar !== undefined) {
+      userUpdateData.image = nextAvatar;
+      userUpdateData.avatarUrl = nextAvatar;
+    }
 
     if (Object.keys(userUpdateData).length > 0) {
       await prisma.user.update({
@@ -829,8 +845,14 @@ export async function updateAccountSettings(
       });
     }
 
-    // 2. Update SpriteProfile if sprite or voice changed
-    if (data.spriteSlug || data.targetVoiceId) {
+    // 2. Update SpriteProfile if sprite, voice, or language changed
+    if (
+      data.spriteSlug ||
+      data.targetVoiceId ||
+      data.nativeVoiceId ||
+      data.targetLanguage ||
+      data.nativeLanguage
+    ) {
       const sprite = data.spriteSlug
         ? await prisma.sprite.findUnique({ where: { slug: data.spriteSlug } })
         : null;
@@ -840,8 +862,13 @@ export async function updateAccountSettings(
         data: {
           ...(sprite ? { spriteId: sprite.id } : {}),
           ...(data.targetVoiceId ? { targetVoiceId: data.targetVoiceId } : {}),
-          ...(data.targetLanguage ? { targetLanguage: data.targetLanguage } : {}),
-          ...(data.nativeLanguage ? { nativeLanguage: data.nativeLanguage } : {}),
+          ...(data.nativeVoiceId ? { nativeVoiceId: data.nativeVoiceId } : {}),
+          ...(data.targetLanguage
+            ? { targetLanguage: data.targetLanguage }
+            : {}),
+          ...(data.nativeLanguage
+            ? { nativeLanguage: data.nativeLanguage }
+            : {}),
         },
       });
     }
@@ -876,6 +903,9 @@ export async function updateAccountSettings(
     }
 
     revalidatePath("/account");
+    revalidatePath("/dashboard");
+    revalidatePath("/learning-hub");
+    revalidatePath("/conversation");
     return { success: true };
   } catch (error) {
     console.error("Failed to update account settings:", error);

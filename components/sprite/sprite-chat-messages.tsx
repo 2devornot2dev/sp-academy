@@ -24,7 +24,6 @@ import type {
 } from "./sprite-chat-utils";
 import type { SpriteSessionData } from "@/lib/schema/sprite-schema";
 import { SpriteChatHistoryTab } from "./sprite-chat-history-tab";
-import { SpriteChatBriefingTab } from "./sprite-chat-briefing-tab";
 import { SpriteChatSessionTab } from "./sprite-chat-session-tab";
 
 interface SpriteChatMessagesProps {
@@ -73,7 +72,6 @@ export function SpriteChatMessages({
   onSelectSession,
   onDeleteSession,
   onSelectTurnIndex,
-  onTriggerPractice,
   onQuickPrompt,
 }: SpriteChatMessagesProps) {
   const {
@@ -89,8 +87,9 @@ export function SpriteChatMessages({
 
   const [showErrorDetails, setShowErrorDetails] = useState(false);
 
+  const isSessionTab = activeTab !== "history";
   const isSingleStageActive =
-    activeTab === "session" &&
+    isSessionTab &&
     viewMode === "single" &&
     turns.length > 0 &&
     Boolean(activeTurn);
@@ -101,8 +100,8 @@ export function SpriteChatMessages({
         isSingleStageActive ? "p-0" : "px-5 py-4"
       }`}
     >
-      {/* ================= LIVE GENERATION / ERROR LOG BANNER (LIGHT 3D TACTILE) ================= */}
-      {liveTask && activeTab !== "history" && activeTab !== "briefing" && (
+      {/* ================= LIVE GENERATION / ERROR LOG BANNER ================= */}
+      {liveTask && isSessionTab && (
         <div
           className={`${
             isSingleStageActive ? "mx-5 mt-4" : "mb-4"
@@ -120,7 +119,7 @@ export function SpriteChatMessages({
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-600" />
               )}
               <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase ${
                   liveTask.status === "FAILED"
                     ? "border border-rose-300 bg-rose-100 text-rose-800"
                     : "border border-sky-200 bg-sky-50 text-blue-700"
@@ -222,14 +221,14 @@ export function SpriteChatMessages({
       )}
 
       {/* ================= IN-CHAT SPRITE NOTIFICATION BANNER ================= */}
-      {current && activeTab !== "history" && activeTab !== "briefing" && (
+      {current && isSessionTab && (
         <div
           className={`${
             isSingleStageActive ? "mx-5 my-3" : "mb-4"
           } shrink-0 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-white p-4 shadow-xs`}
         >
           <div className="flex items-start justify-between gap-3">
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-blue-600">
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-blue-600 uppercase">
               {current.badge || `${spriteName} Dispatch`}
             </span>
             <button
@@ -290,7 +289,7 @@ export function SpriteChatMessages({
         </div>
       )}
 
-      {/* ================= TAB ROUTER ================= */}
+      {/* ================= TAB ROUTER (Session | History) ================= */}
       {activeTab === "history" ? (
         <SpriteChatHistoryTab
           spriteName={spriteName}
@@ -299,12 +298,6 @@ export function SpriteChatMessages({
           hasActiveTurns={turns.length > 0}
           onSelectSession={onSelectSession}
           onDeleteSession={onDeleteSession}
-        />
-      ) : activeTab === "briefing" ? (
-        <SpriteChatBriefingTab
-          spriteName={spriteName}
-          aiBrain={aiBrain}
-          onTriggerPractice={onTriggerPractice}
         />
       ) : (
         <SpriteChatSessionTab

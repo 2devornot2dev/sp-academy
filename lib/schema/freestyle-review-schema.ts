@@ -23,8 +23,15 @@ export const FreestyleMetricsSchema = z.object({
 export const FreestyleOverallFeedbackSchema = z.object({
   summary: z.string().min(1),
   strengths: z.array(z.string()).optional(),
-  focusAreas: z.array(z.string()).optional(), // Made optional just in case the LLM skips it
+  focusAreas: z.array(z.string()).optional(),
   encouragement: z.string().min(1),
+  bestMoment: z
+    .object({
+      quote: z.string().min(1),
+      compliment: z.string().min(1),
+    })
+    .nullable()
+    .optional(),
 });
 
 // Grammar Analysis Schema

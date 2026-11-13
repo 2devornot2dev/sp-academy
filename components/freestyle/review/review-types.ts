@@ -23,6 +23,7 @@ export interface ReviewOverallFeedback {
   strengths?: string[];
   focusAreas?: string[];
   encouragement: string;
+  bestMoment?: { quote: string; compliment: string } | null;
 }
 
 export interface GrammarAnalysis {
@@ -34,24 +35,6 @@ export interface VocabUpgrade {
   original: string;
   better: string;
   explanation: string;
-}
-
-export interface ReviewData {
-  metrics: ReviewMetrics;
-  mistakes: ReviewMistake[];
-  overallFeedback: ReviewOverallFeedback;
-  grammarAnalysis?: GrammarAnalysis;
-  vocabUpgrades?: VocabUpgrade[];
-}
-
-export interface SessionData {
-  id: string;
-  nativeLanguage: string;
-  targetLanguage: string;
-  level: string;
-  mode: string;
-  topic?: string | null;
-  duration: number;
 }
 
 export interface SpriteOutro {
@@ -69,4 +52,14 @@ export interface ReviewData {
   grammarAnalysis?: GrammarAnalysis;
   vocabUpgrades?: VocabUpgrade[];
   spriteOutro?: SpriteOutro | null;
+}
+
+export interface SessionData {
+  id: string;
+  nativeLanguage: string;
+  targetLanguage: string;
+  level: string;
+  mode: string;
+  topic?: string | null;
+  duration: number;
 }

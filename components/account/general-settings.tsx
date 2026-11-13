@@ -1,9 +1,8 @@
-// @/components/account/general-settings.tsx
+// components/account/general-settings.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,17 +26,16 @@ import {
   X,
   CheckCircle2,
   Zap,
-  Bot,
+  Check,
+  Phone,
 } from "lucide-react";
 import { updateAccountSettings, type UserDetails } from "@/lib/actions";
 
-/* =========================================================================
-   TypeScript Interfaces
-   ========================================================================= */
 export interface GeneralSettingsValues {
   displayUsername: string;
   firstName: string;
   lastName: string;
+  phone: string;
   nativeLanguage: string;
   targetLanguage: string;
   gender: string;
@@ -51,9 +49,48 @@ interface GeneralSettingsProps {
   userId: string;
 }
 
-/* =========================================================================
-   Component
-   ========================================================================= */
+function normalizeLanguageSelect(
+  raw: string | null | undefined,
+  fallback: string,
+): string {
+  if (!raw) return fallback;
+  const u = raw.trim().toUpperCase();
+  if (u === "FRENCH" || u === "FR" || u === "FR-FR") return "fr-FR";
+  if (u === "SPANISH" || u === "ES" || u === "ES-ES") return "es-ES";
+  if (u === "ENGLISH" || u === "EN" || u === "EN-US") return "en-US";
+  if (u === "GERMAN" || u === "DE" || u === "DE-DE") return "de-DE";
+  if (u === "ITALIAN" || u === "IT" || u === "IT-IT") return "it-IT";
+  return fallback;
+}
+
+function normalizeGenderSelect(raw: string | null | undefined): string {
+  if (!raw) return "PREFER_NOT_TO_SAY";
+  const u = raw.trim().toUpperCase();
+  if (u === "M" || u === "MALE") return "MALE";
+  if (u === "F" || u === "FEMALE") return "FEMALE";
+  if (u === "NB" || u === "NON_BINARY") return "NON_BINARY";
+  return "PREFER_NOT_TO_SAY";
+}
+
+const SPRITE_OPTIONS = [
+  {
+    slug: "vox",
+    name: "Vox",
+    role: "High-Energy Mic Master",
+    avatar: "/sprite-m.png",
+    voiceSuffix: "boy-01",
+    desc: "Upbeat, punchy pronunciation coach who hypes up every win.",
+  },
+  {
+    slug: "vivi",
+    name: "Vivi",
+    role: "Warm Expression Guide",
+    avatar: "/sprite-f.png",
+    voiceSuffix: "girl-01",
+    desc: "Calm, clear, audio-focused guide who breaks down tricky phrases.",
+  },
+] as const;
+
 export function GeneralSettings({
   initialSettings,
   initialImageUrl = null,
@@ -61,29 +98,39 @@ export function GeneralSettings({
 }: GeneralSettingsProps) {
   const router = useRouter();
 
-  // Map state directly to the new Prisma User + SpriteProfile schema
+  const initTargetLang = normalizeLanguageSelect(
+    initialSettings?.targetLanguage ||
+      initialSettings?.spriteProfile?.targetLanguage,
+    "fr-FR",
+  );
+  const initNativeLang = normalizeLanguageSelect(
+    initialSettings?.nativeLanguage ||
+      initialSettings?.spriteProfile?.nativeLanguage,
+    "en-US",
+  );
+  const initSpriteSlug =
+    initialSettings?.spriteProfile?.sprite?.slug === "vivi" ? "vivi" : "vox";
+
   const [settings, setSettings] = useState<GeneralSettingsValues>({
     displayUsername:
       initialSettings?.displayUsername || initialSettings?.username || "",
     firstName: initialSettings?.firstName || "",
     lastName: initialSettings?.lastName || "",
-    nativeLanguage:
-      initialSettings?.nativeLanguage ||
-      initialSettings?.spriteProfile?.nativeLanguage ||
-      "ENGLISH",
-    targetLanguage:
-      initialSettings?.targetLanguage ||
-      initialSettings?.spriteProfile?.targetLanguage ||
-      "FRENCH",
-    gender: initialSettings?.gender || "PREFER_NOT_TO_SAY",
-    spriteSlug: initialSettings?.spriteProfile?.sprite?.slug || "vox",
+    phone: initialSettings?.phone || "",
+    nativeLanguage: initNativeLang,
+    targetLanguage: initTargetLang,
+    gender: normalizeGenderSelect(initialSettings?.gender),
+    spriteSlug: initSpriteSlug,
     targetVoiceId:
-      initialSettings?.spriteProfile?.targetVoiceId || "fr-FR-girl-01",
+      initialSettings?.spriteProfile?.targetVoiceId ||
+      `${initTargetLang}-${initSpriteSlug === "vivi" ? "girl-01" : "boy-01"}`,
   });
 
-  // Image & AI Avatar state
   const [imageUrl, setImageUrl] = useState<string | null>(
-    initialImageUrl ?? initialSettings?.image ?? null,
+    initialImageUrl ??
+      initialSettings?.avatarUrl ??
+      initialSettings?.image ??
+      null,
   );
   const [generationsRemaining, setGenerationsRemaining] = useState<number>(5);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -98,27 +145,49 @@ export function GeneralSettings({
 
   const spriteProfile = initialSettings?.spriteProfile;
 
+  const handleSelectSprite = (slug: "vox" | "vivi") => {
+    const suffix = slug === "vivi" ? "girl-01" : "boy-01";
+    const langPrefix = ["fr-FR", "es-ES", "en-US"].includes(
+      settings.targetLanguage,
+    )
+      ? settings.targetLanguage
+      : "fr-FR";
+    setSettings((prev) => ({
+      ...prev,
+      spriteSlug: slug,
+      targetVoiceId: `${langPrefix}-${suffix}`,
+    }));
+  };
+
   // 1. Handle general settings submit
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      const voiceSuffix = settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
+      const nativePrefix = ["fr-FR", "es-ES", "en-US"].includes(
+        settings.nativeLanguage,
+      )
+        ? settings.nativeLanguage
+        : "en-US";
+
       await updateAccountSettings(userId, {
-        displayUsername: settings.displayUsername,
-        firstName: settings.firstName,
-        lastName: settings.lastName,
+        displayUsername: settings.displayUsername.trim(),
+        firstName: settings.firstName.trim(),
+        lastName: settings.lastName.trim(),
+        phone: settings.phone.trim() || null,
         nativeLanguage: settings.nativeLanguage,
         targetLanguage: settings.targetLanguage,
         gender: settings.gender,
         spriteSlug: settings.spriteSlug,
         targetVoiceId: settings.targetVoiceId,
+        nativeVoiceId: `${nativePrefix}-${voiceSuffix}`,
       });
       router.refresh();
-      toast.success("Profile & Sprite settings updated!");
+      toast.success("Profile & Sprite settings saved!");
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to update settings.";
-      console.error("Failed to update settings:", error);
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -150,14 +219,16 @@ export function GeneralSettings({
       }
 
       setImageUrl(data.url);
-      await updateAccountSettings(userId, { image: data.url || null });
-      toast.success("Profile picture updated successfully!");
+      await updateAccountSettings(userId, {
+        image: data.url || null,
+        avatarUrl: data.url || null,
+      });
+      toast.success("Profile picture updated!");
       setUnsavedAvatar(false);
       router.refresh();
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to upload image.";
-      console.error("Failed to upload image:", error);
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -199,19 +270,18 @@ export function GeneralSettings({
 
       setAiImageUrl(data.imageUrl);
       setGenerationsRemaining((prev) => Math.max(0, prev - 1));
-      toast.success("Avatar generated successfully!");
+      toast.success("Avatar generated!");
       setUnsavedAvatar(true);
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to generate avatar.";
-      console.error("Avatar generation error:", error);
       toast.error(msg);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 4. Handle saving AI Avatar to user profile (`User.image`)
+  // 4. Handle saving AI Avatar to user profile
   const handleSaveAvatar = async () => {
     const urlToSave = aiImageUrl;
     if (!urlToSave) return;
@@ -232,7 +302,10 @@ export function GeneralSettings({
         throw new Error(data.error || "Failed to save AI avatar");
 
       setImageUrl(urlToSave);
-      await updateAccountSettings(userId, { image: urlToSave });
+      await updateAccountSettings(userId, {
+        image: urlToSave,
+        avatarUrl: urlToSave,
+      });
       toast.success("AI avatar saved as your profile picture!");
       setUnsavedAvatar(false);
       router.refresh();
@@ -246,81 +319,36 @@ export function GeneralSettings({
   };
 
   return (
-    <div className="space-y-10">
-      {/* ========================================================= */}
-      {/* 1. General Profile & Sprite Companion Settings            */}
-      {/* ========================================================= */}
+    <div className="space-y-6">
+      {/* =========================================================
+          1. GENERAL PROFILE & SPRITE COMPANION SETTINGS
+          ========================================================= */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
+        className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8"
       >
         <div className="space-y-6">
-          <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              General Profile & Learning Preferences
-            </h2>
-            <p className="text-xs text-slate-500">
-              Manage your identity, languages, and AI Sprite companion.
-            </p>
+          <div className="flex items-center gap-3.5 border-b border-slate-100 pb-5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
+              <User className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-black text-slate-900">
+                Profile Identity &amp; Language Track
+              </h2>
+              <p className="text-xs font-semibold text-slate-500">
+                Update your personal details, grammatical gender, and active
+                languages.
+              </p>
+            </div>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Display Username */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="displayUsername"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
-              >
-                Display Username
-              </Label>
-              <Input
-                id="displayUsername"
-                value={settings.displayUsername}
-                placeholder="e.g. paul_h"
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    displayUsername: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            {/* Gender */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="gender"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
-              >
-                Gender (Used for grammatical agreement)
-              </Label>
-              <Select
-                value={settings.gender}
-                onValueChange={(value) => {
-                  if (value !== null) {
-                    setSettings((prev) => ({ ...prev, gender: value }));
-                  }
-                }}
-              >
-                <SelectTrigger id="gender" className="w-full">
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">Male</SelectItem>
-                  <SelectItem value="FEMALE">Female</SelectItem>
-                  <SelectItem value="NON_BINARY">Non-Binary</SelectItem>
-                  <SelectItem value="PREFER_NOT_TO_SAY">
-                    Prefer not to say
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid gap-5 sm:grid-cols-2">
             {/* First Name */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="firstName"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
               >
                 First Name
               </Label>
@@ -328,6 +356,7 @@ export function GeneralSettings({
                 id="firstName"
                 value={settings.firstName}
                 placeholder="e.g. Paul"
+                className="h-11 rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900 focus:border-blue-500 focus:bg-white"
                 onChange={(e) =>
                   setSettings((prev) => ({
                     ...prev,
@@ -338,10 +367,10 @@ export function GeneralSettings({
             </div>
 
             {/* Last Name */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="lastName"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
               >
                 Last Name
               </Label>
@@ -349,45 +378,98 @@ export function GeneralSettings({
                 id="lastName"
                 value={settings.lastName}
                 placeholder="e.g. Hendricks"
+                className="h-11 rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900 focus:border-blue-500 focus:bg-white"
                 onChange={(e) =>
                   setSettings((prev) => ({ ...prev, lastName: e.target.value }))
                 }
               />
             </div>
 
-            {/* Native Language */}
-            <div className="space-y-2">
+            {/* Display Username */}
+            <div className="space-y-1.5">
               <Label
-                htmlFor="nativeLanguage"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                htmlFor="displayUsername"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
               >
-                Native Language
+                Display Username
+              </Label>
+              <Input
+                id="displayUsername"
+                value={settings.displayUsername}
+                placeholder="e.g. paul_h"
+                className="h-11 rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900 focus:border-blue-500 focus:bg-white"
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    displayUsername: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="phone"
+                className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase"
+              >
+                <Phone className="h-3 w-3 text-slate-400" />
+                <span>Phone (Optional)</span>
+              </Label>
+              <Input
+                id="phone"
+                value={settings.phone}
+                placeholder="+1 (555) 000-0000"
+                className="h-11 rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900 focus:border-blue-500 focus:bg-white"
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="gender"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
+              >
+                Grammatical Gender
               </Label>
               <Select
-                value={settings.nativeLanguage}
+                value={settings.gender}
                 onValueChange={(value) => {
-                 if (value !== null) {
-             
-                  setSettings((prev) => ({ ...prev, nativeLanguage: value }));
-                }
-              }}
+                  if (value !== null) {
+                    setSettings((prev) => ({ ...prev, gender: value }));
+                  }
+                }}
               >
-                <SelectTrigger id="nativeLanguage" className="w-full">
-                  <SelectValue placeholder="Select native language" />
+                <SelectTrigger
+                  id="gender"
+                  className="h-11 w-full rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900"
+                >
+                  <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ENGLISH">English</SelectItem>
-                  <SelectItem value="FRENCH">French</SelectItem>
-                  <SelectItem value="SPANISH">Spanish</SelectItem>
+                  <SelectItem value="MALE">Male (Masculine forms)</SelectItem>
+                  <SelectItem value="FEMALE">
+                    Female (Feminine forms)
+                  </SelectItem>
+                  <SelectItem value="NON_BINARY">Non-Binary</SelectItem>
+                  <SelectItem value="PREFER_NOT_TO_SAY">
+                    Prefer not to say
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Target Language */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="targetLanguage"
-                className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
               >
                 Target Learning Language
               </Label>
@@ -395,53 +477,48 @@ export function GeneralSettings({
                 value={settings.targetLanguage}
                 onValueChange={(value) => {
                   if (value !== null) {
-                    setSettings((prev) => ({ ...prev, targetLanguage: value }));
+                    const suffix =
+                      settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
+                    setSettings((prev) => ({
+                      ...prev,
+                      targetLanguage: value,
+                      targetVoiceId: `${value}-${suffix}`,
+                    }));
                   }
                 }}
               >
-                <SelectTrigger id="targetLanguage" className="w-full">
+                <SelectTrigger
+                  id="targetLanguage"
+                  className="h-11 w-full rounded-2xl border-2 border-sky-200 bg-sky-50/40 font-black text-slate-900"
+                >
                   <SelectValue placeholder="Select target language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FRENCH">French</SelectItem>
-                  <SelectItem value="SPANISH">Spanish</SelectItem>
-                  <SelectItem value="ENGLISH">English</SelectItem>
+                  <SelectItem value="fr-FR">🇫🇷 French (fr-FR)</SelectItem>
+                  <SelectItem value="es-ES">🇪🇸 Spanish (es-ES)</SelectItem>
+                  <SelectItem value="en-US">🇺🇸 English (en-US)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* ========================================================= */}
-          {/* Sprite Companion Sub-Section                              */}
-          {/* ========================================================= */}
-          <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/30 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          {/* =========================================================
+              SPRITE COMPANION 3D SELECTOR
+              ========================================================= */}
+          <div className="rounded-3xl border-2 border-slate-200/90 bg-slate-50/70 p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
-                {spriteProfile?.sprite?.avatarUrl ? (
-                  <img
-                    src={spriteProfile.sprite.avatarUrl}
-                    alt={spriteProfile.sprite.name}
-                    className="h-10 w-10 rounded-full border border-indigo-200 bg-white object-cover"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    AI Sprite Companion
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {spriteProfile?.sprite?.persona ||
-                      "Choose your interactive AI partner and voice."}
-                  </p>
-                </div>
+              <div>
+                <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                  AI Sidekick &amp; Voice
+                </span>
+                <h3 className="text-base font-black text-slate-900">
+                  Choose Your Sprite Companion
+                </h3>
               </div>
 
               {spriteProfile && (
-                <div className="flex items-center gap-1.5 rounded-full bg-amber-100/80 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                  <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-800">
+                  <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
                   <span>
                     Energy: {spriteProfile.energy} / {spriteProfile.maxEnergy}
                   </span>
@@ -449,43 +526,85 @@ export function GeneralSettings({
               )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Sprite Character Selection */}
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              {SPRITE_OPTIONS.map((sp) => {
+                const active = settings.spriteSlug === sp.slug;
+                return (
+                  <button
+                    key={sp.slug}
+                    type="button"
+                    onClick={() => handleSelectSprite(sp.slug)}
+                    className={`flex items-start gap-3.5 rounded-2xl border-2 border-b-4 p-4 text-left transition-all ${
+                      active
+                        ? "border-blue-600 border-b-blue-800 bg-white shadow-sm"
+                        : "border-slate-200 border-b-slate-300 bg-white/70 hover:border-sky-300 hover:bg-white"
+                    }`}
+                  >
+                    <img
+                      src={sp.avatar}
+                      alt={sp.name}
+                      className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 object-cover object-top"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-black text-slate-900">
+                          {sp.name}
+                        </span>
+                        {active && (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <Check className="h-3 w-3 stroke-[3.5]" />
+                          </span>
+                        )}
+                      </div>
+                      <span className="block text-[10px] font-extrabold text-blue-600 uppercase">
+                        {sp.role}
+                      </span>
+                      <p className="mt-1 text-xs font-medium leading-snug text-slate-500">
+                        {sp.desc}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label
-                  htmlFor="spriteSlug"
-                  className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                  htmlFor="nativeLanguage"
+                  className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
                 >
-                  Companion Character
+                  Explanation / Native Language
                 </Label>
                 <Select
-                  value={settings.spriteSlug}
+                  value={settings.nativeLanguage}
                   onValueChange={(value) => {
                     if (value !== null) {
-                      setSettings((prev) => ({ ...prev, spriteSlug: value }));
+                      setSettings((prev) => ({
+                        ...prev,
+                        nativeLanguage: value,
+                      }));
                     }
                   }}
                 >
                   <SelectTrigger
-                    id="spriteSlug"
-                    className="w-full bg-white dark:bg-slate-900"
+                    id="nativeLanguage"
+                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white text-xs font-bold text-slate-900"
                   >
-                    <SelectValue placeholder="Select Sprite" />
+                    <SelectValue placeholder="Select native language" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vox">Vox (Male Companion)</SelectItem>
-                    <SelectItem value="vivi">
-                      Vivi (Female Companion)
-                    </SelectItem>
+                    <SelectItem value="en-US">🇺🇸 English (en-US)</SelectItem>
+                    <SelectItem value="fr-FR">🇫🇷 French (fr-FR)</SelectItem>
+                    <SelectItem value="es-ES">🇪🇸 Spanish (es-ES)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Target Voice ID */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label
                   htmlFor="targetVoiceId"
-                  className="text-xs font-semibold text-slate-700 dark:text-slate-300"
+                  className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
                 >
                   Target Voice Persona
                 </Label>
@@ -493,34 +612,37 @@ export function GeneralSettings({
                   value={settings.targetVoiceId}
                   onValueChange={(value) => {
                     if (value !== null) {
-                      setSettings((prev) => ({ ...prev, targetVoiceId: value }));
+                      setSettings((prev) => ({
+                        ...prev,
+                        targetVoiceId: value,
+                      }));
                     }
                   }}
                 >
                   <SelectTrigger
                     id="targetVoiceId"
-                    className="w-full bg-white dark:bg-slate-900"
+                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white text-xs font-bold text-slate-900"
                   >
                     <SelectValue placeholder="Select voice" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fr-FR-girl-01">
-                      Vivi - French Female (Soft & Natural)
+                      Vivi • French Female
                     </SelectItem>
                     <SelectItem value="fr-FR-boy-01">
-                      Vox - French Male (Clear & Articulate)
+                      Vox • French Male
                     </SelectItem>
                     <SelectItem value="es-ES-girl-01">
-                      Vivi - Spanish Female
+                      Vivi • Spanish Female
                     </SelectItem>
                     <SelectItem value="es-ES-boy-01">
-                      Vox - Spanish Male
+                      Vox • Spanish Male
                     </SelectItem>
                     <SelectItem value="en-US-girl-01">
-                      Vivi - English Female
+                      Vivi • English Female
                     </SelectItem>
                     <SelectItem value="en-US-boy-01">
-                      Vox - English Male
+                      Vox • English Male
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -528,11 +650,11 @@ export function GeneralSettings({
             </div>
           </div>
 
-          <div className="flex justify-end pt-2">
-            <Button
+          <div className="flex justify-end border-t border-slate-100 pt-4">
+            <button
               type="submit"
               disabled={isLoading}
-              className="gap-2 bg-blue-600 text-white shadow-xs hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-xs font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:text-sm"
             >
               {isLoading ? (
                 <>
@@ -545,42 +667,41 @@ export function GeneralSettings({
                   <span>Save General Settings</span>
                 </>
               )}
-            </Button>
+            </button>
           </div>
         </div>
       </form>
 
-      {/* ========================================================= */}
-      {/* 2. Profile Picture & AI Avatar Studio                     */}
-      {/* ========================================================= */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+      {/* =========================================================
+          2. PROFILE PICTURE & AI AVATAR STUDIO
+          ========================================================= */}
+      <div className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-              Profile Avatar
+            <h2 className="text-lg font-black text-slate-900">
+              Profile Avatar &amp; AI Studio
             </h2>
-            <p className="text-xs text-slate-500">
-              Upload your own picture or generate a bespoke AI avatar.
+            <p className="text-xs font-semibold text-slate-500">
+              Upload your own photo or generate a custom illustrated persona.
             </p>
           </div>
 
           {!showAvatarGenerator && (
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={() => setShowAvatarGenerator(true)}
-              className="gap-2 border-indigo-200 bg-indigo-50/50 text-indigo-600 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-400"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
             >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>AI Avatar Studio</span>
-            </Button>
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              <span>Open AI Avatar Studio</span>
+            </button>
           )}
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Current Avatar & File Upload */}
-          <div className="flex flex-col items-center justify-center space-y-4 rounded-xl border border-dashed border-slate-200 p-6 dark:border-slate-800">
-            <div className="relative flex aspect-square w-32 items-center justify-center overflow-hidden rounded-full shadow-inner ring-4 ring-slate-100 dark:ring-slate-800">
+          <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6">
+            <div className="relative flex aspect-square w-28 items-center justify-center overflow-hidden rounded-3xl border-2 border-b-4 border-sky-300 bg-white shadow-md">
               {imageUrl ? (
                 <img
                   src={imageUrl}
@@ -588,9 +709,7 @@ export function GeneralSettings({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400 dark:bg-slate-800">
-                  <User className="h-12 w-12" />
-                </div>
+                <User className="h-12 w-12 text-slate-300" />
               )}
             </div>
 
@@ -604,67 +723,55 @@ export function GeneralSettings({
               />
               <Label
                 htmlFor="profile-picture-input"
-                className="block w-full cursor-pointer"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 shadow-2xs transition hover:border-sky-300 hover:bg-sky-50"
               >
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="pointer-events-none w-full gap-2"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4 text-slate-500" />
-                  )}
-                  <span>Upload Image</span>
-                </Button>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 text-blue-600" />
+                )}
+                <span>Upload Photo</span>
               </Label>
-              <p className="text-[11px] text-slate-400">
-                Supports JPG, PNG or WEBP (Max 5MB)
+              <p className="text-[11px] font-semibold text-slate-400">
+                JPG, PNG or WEBP (Max 5MB)
               </p>
             </div>
           </div>
 
-          {/* AI Avatar Studio (Collapsible Panel) */}
+          {/* AI Avatar Studio */}
           {showAvatarGenerator ? (
-            <div className="relative col-span-2 flex flex-col gap-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-sky-50/20 p-6 shadow-xs dark:border-indigo-900/50 dark:from-slate-900 dark:to-indigo-950/20 md:flex-row">
+            <div className="relative col-span-2 flex flex-col gap-6 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/30 p-5 md:flex-row">
               <button
                 type="button"
                 onClick={() => setShowAvatarGenerator(false)}
-                className="absolute top-3 right-3 rounded-md p-1 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800"
+                className="absolute top-3 right-3 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-4 w-4" />
               </button>
 
-              {/* Controls */}
               <div className="flex-1 space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+                <div className="flex items-center gap-2 pr-8">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-xl border-b-2 border-indigo-800 bg-indigo-600 text-white">
                     <Wand2 className="h-3.5 w-3.5" />
                   </span>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <h3 className="text-sm font-black text-slate-900">
                     Generate with AI
                   </h3>
-                  <span className="ml-auto rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                  <span className="ml-auto rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-black text-indigo-700 uppercase">
                     {generationsRemaining} left
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
                       Type
                     </Label>
                     <Select
                       value={avatarType}
-                      onValueChange={(value) => {
-                        if (value !== null) {
-                          setAvatarType(value);
-                        }
-                      }}
+                      onValueChange={(v) => v && setAvatarType(v)}
                     >
-                      <SelectTrigger className="h-9 text-xs">
+                      <SelectTrigger className="h-9 rounded-xl border-2 border-slate-200 bg-white text-xs font-bold">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -681,19 +788,15 @@ export function GeneralSettings({
                     </Select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
                       Aesthetic
                     </Label>
                     <Select
                       value={avatarStyle}
-                      onValueChange={(value) => {
-                        if (value !== null) {
-                          setAvatarStyle(value);
-                        }
-                      }}
+                      onValueChange={(v) => v && setAvatarStyle(v)}
                     >
-                      <SelectTrigger className="h-9 text-xs">
+                      <SelectTrigger className="h-9 rounded-xl border-2 border-slate-200 bg-white text-xs font-bold">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -709,24 +812,23 @@ export function GeneralSettings({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
                     Prompt Description
                   </Label>
                   <Textarea
-                    placeholder="e.g. A smiling French teacher wearing round glasses in a cozy Parisian library..."
+                    placeholder="e.g. A smiling French speaker wearing round glasses in a Parisian café..."
                     value={avatarDescription}
                     onChange={(e) => setAvatarDescription(e.target.value)}
-                    className="min-h-[85px] resize-none text-xs"
+                    className="min-h-[80px] resize-none rounded-xl border-2 border-slate-200 bg-white text-xs font-medium"
                   />
                 </div>
 
-                <Button
+                <button
                   type="button"
                   onClick={handleGenerateAvatar}
                   disabled={isGenerating || generationsRemaining <= 0}
-                  className="w-full gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
-                  size="sm"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-indigo-800 bg-indigo-600 py-3 text-xs font-black text-white shadow-md transition hover:bg-indigo-500 disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <>
@@ -736,15 +838,15 @@ export function GeneralSettings({
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      <span>Create Avatar</span>
+                      <span>Create AI Avatar</span>
                     </>
                   )}
-                </Button>
+                </button>
               </div>
 
               {/* AI Output Preview */}
-              <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/60 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-900/40 md:w-44">
-                <div className="relative flex aspect-square w-28 items-center justify-center overflow-hidden rounded-full shadow-md ring-2 ring-indigo-500/20">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 md:w-44">
+                <div className="relative flex aspect-square w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-indigo-200 bg-slate-50 shadow-inner">
                   {aiImageUrl ? (
                     <img
                       src={aiImageUrl}
@@ -752,56 +854,51 @@ export function GeneralSettings({
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300 dark:bg-slate-800">
-                      <Sparkles className="h-8 w-8" />
-                    </div>
+                    <Sparkles className="h-7 w-7 text-slate-300" />
                   )}
                 </div>
 
-                <span className="mt-2 text-[11px] font-medium text-slate-500">
-                  {aiImageUrl ? "Generated Result" : "Waiting for prompt"}
+                <span className="mt-2 text-[11px] font-bold text-slate-400">
+                  {aiImageUrl ? "Generated Result" : "Preview"}
                 </span>
 
                 {aiImageUrl && unsavedAvatar && (
-                  <Button
+                  <button
                     type="button"
-                    size="sm"
                     onClick={handleSaveAvatar}
                     disabled={isLoading}
-                    className="mt-3 h-8 w-full gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-b-2 border-emerald-700 bg-emerald-500 py-2 text-xs font-black text-white transition hover:bg-emerald-600"
                   >
                     {isLoading ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     )}
-                    <span>Set as Avatar</span>
-                  </Button>
+                    <span>Use This Avatar</span>
+                  </button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="col-span-2 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center dark:border-slate-800 dark:bg-slate-900/30">
-              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+            <div className="col-span-2 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
+              <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border-b-2 border-indigo-800 bg-indigo-600 text-white shadow-xs">
                 <Wand2 className="h-5 w-5" />
               </div>
-              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Want a custom illustrated persona?
+              <h4 className="text-sm font-black text-slate-900">
+                Want a custom AI-illustrated avatar?
               </h4>
-              <p className="mt-0.5 mb-3 max-w-xs text-[11px] text-slate-400">
-                Use AI Avatar Studio to create a unique character representing
-                your learning journey.
+              <p className="mt-0.5 mb-4 max-w-xs text-xs font-medium text-slate-500">
+                Describe your vibe and generate a bespoke 3D or illustrated
+                portrait for your profile and leaderboards.
               </p>
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => setShowAvatarGenerator(true)}
-                className="gap-2 text-xs"
+                className="inline-flex items-center gap-2 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-2.5 text-xs font-black text-slate-800 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50"
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Open Studio</span>
-              </Button>
+                <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                <span>Launch AI Studio</span>
+              </button>
             </div>
           )}
         </div>
