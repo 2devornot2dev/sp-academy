@@ -27,28 +27,38 @@ export const FreestyleOverallFeedbackSchema = z.object({
   encouragement: z.string().min(1),
 });
 
-// NEW: Grammar Analysis Schema
+// Grammar Analysis Schema
 export const FreestyleGrammarAnalysisSchema = z.object({
   topWeakness: z.string().min(1),
   explanation: z.string().min(1),
 });
 
-// NEW: Vocabulary Upgrade Schema
+// Vocabulary Upgrade Schema
 export const FreestyleVocabUpgradeSchema = z.object({
   original: z.string().min(1),
   better: z.string().min(1),
   explanation: z.string().min(1),
 });
 
-// The review data itself
+// Sprite outro (must be declared before FreestyleReviewDataSchema uses it)
+export const FreestyleSpriteOutroSchema = z.object({
+  spriteName: z.string().optional(),
+  nativeLine: z.string().min(1),
+  targetLine: z.string().min(1),
+  nativeAudioKey: z.string().nullable().optional(),
+  targetAudioKey: z.string().nullable().optional(),
+});
+
+// The review data itself (single declaration)
 export const FreestyleReviewDataSchema = z.object({
   metrics: FreestyleMetricsSchema,
-  mistakes: z.array(FreestyleMistakeSchema), // Removed .max(5) so long sessions don't fail validation
+  mistakes: z.array(FreestyleMistakeSchema), // No .max() so long sessions don't fail validation
   overallFeedback: FreestyleOverallFeedbackSchema,
-  
-  // Attach our new fields here as optional (in case of partial failures)
+
+  // Optional in case of partial failures
   grammarAnalysis: FreestyleGrammarAnalysisSchema.optional(),
   vocabUpgrades: z.array(FreestyleVocabUpgradeSchema).optional(),
+  spriteOutro: FreestyleSpriteOutroSchema.nullable().optional(),
 });
 
 // Main webhook payload from Lambda
@@ -67,3 +77,4 @@ export type FreestyleMistake = z.infer<typeof FreestyleMistakeSchema>;
 export type FreestyleMetrics = z.infer<typeof FreestyleMetricsSchema>;
 export type FreestyleGrammarAnalysis = z.infer<typeof FreestyleGrammarAnalysisSchema>;
 export type FreestyleVocabUpgrade = z.infer<typeof FreestyleVocabUpgradeSchema>;
+export type FreestyleSpriteOutro = z.infer<typeof FreestyleSpriteOutroSchema>;

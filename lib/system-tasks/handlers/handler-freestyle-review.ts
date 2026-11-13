@@ -8,7 +8,6 @@ import {
 } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { FreestyleReviewWebhookSchema } from "@/lib/schema/freestyle-review-schema";
-import z from "zod";
 import { pusherServer } from "@/lib/pusher-server";
 import { invalidateDossierCache } from "@/lib/sprites/get-cached-dossier";
 
@@ -26,12 +25,16 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
     if (!parsedResult.success) {
       console.error(
         "❌ [FREESTYLE REVIEW] Invalid Webhook Payload:",
-        parsedResult.error.flatten ? parsedResult.error.flatten() : parsedResult.error,
+        parsedResult.error.flatten
+          ? parsedResult.error.flatten()
+          : parsedResult.error,
       );
       return NextResponse.json(
         {
           message: "Invalid payload",
-          errors: parsedResult.error.flatten ? parsedResult.error.flatten() : parsedResult.error,
+          errors: parsedResult.error.flatten
+            ? parsedResult.error.flatten()
+            : parsedResult.error,
         },
         { status: 400 },
       );
@@ -41,7 +44,10 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
 
     // 🚨 2. HANDLE FAILURE
     if (status === "FAILED") {
-      console.error(`❌ [FREESTYLE REVIEW] Lambda failed for session ${sessionId}:`, error);
+      console.error(
+        `❌ [FREESTYLE REVIEW] Lambda failed for session ${sessionId}:`,
+        error,
+      );
 
       await prisma.freestyleReview.upsert({
         where: { freestyleSessionId: sessionId },
@@ -76,9 +82,22 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
     console.log("📈 METRICS:", JSON.stringify(review.metrics, null, 2));
     console.log("⚠️ MISTAKES COUNT:", review.mistakes?.length ?? 0);
     console.log("⚠️ MISTAKES LIST:", JSON.stringify(review.mistakes, null, 2));
-    console.log("🧠 GRAMMAR ANALYSIS:", JSON.stringify(review.grammarAnalysis, null, 2));
-    console.log("💡 VOCAB UPGRADES:", JSON.stringify(review.vocabUpgrades, null, 2));
-    console.log("💬 OVERALL FEEDBACK:", JSON.stringify(review.overallFeedback, null, 2));
+    console.log(
+      "🧠 GRAMMAR ANALYSIS:",
+      JSON.stringify(review.grammarAnalysis, null, 2),
+    );
+    console.log(
+      "💡 VOCAB UPGRADES:",
+      JSON.stringify(review.vocabUpgrades, null, 2),
+    );
+    console.log(
+      "💬 OVERALL FEEDBACK:",
+      JSON.stringify(review.overallFeedback, null, 2),
+    );
+    console.log(
+      "🤖 SPRITE OUTRO:",
+      JSON.stringify(review.spriteOutro, null, 2),
+    );
     console.log("====================================================");
 
     const {
@@ -87,7 +106,12 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       metrics,
       grammarAnalysis,
       vocabUpgrades,
+      spriteOutro,
     } = review;
+
+    const feedbackWithOutro = spriteOutro
+      ? { ...overallFeedback, spriteOutro }
+      : overallFeedback;
 
     const jsonOrNull = (v: unknown) =>
       v ? (v as Prisma.InputJsonValue) : Prisma.JsonNull;
@@ -96,7 +120,7 @@ export async function handleFreestyleReview(task: SystemTask, body: unknown) {
       const data = {
         lambdaStatus: LambdaStatus.SUCCESS,
         mistakes: mistakes as Prisma.InputJsonValue[],
-        overallFeedback: jsonOrNull(overallFeedback),
+        overallFeedback: jsonOrNull(feedbackWithOutro),
         metrics: jsonOrNull(metrics),
         grammarAnalysis: jsonOrNull(grammarAnalysis),
         vocabUpgrades: jsonOrNull(vocabUpgrades),

@@ -162,6 +162,22 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
       targetLanguage || updatedSession.targetLanguage || "fr-FR";
     const resolvedLevel = level || "EASY";
 
+    const [dbUser, spriteProfile] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true },
+      }),
+      prisma.spriteProfile.findUnique({
+        where: { userId },
+        include: { sprite: true },
+      }),
+    ]);
+
+    const userName = dbUser?.firstName || "Learner";
+    const spriteName = spriteProfile?.sprite?.name || "Vox";
+    const spriteGender =
+      spriteProfile?.sprite?.slug === "vivi" ? "F" : "M";
+
     const task = await prisma.systemTask.create({
       data: {
         type: "FREESTYLE_REVIEW",
@@ -189,6 +205,10 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
       level: resolvedLevel,
       nativeLanguage: resolvedNative,
       targetLanguage: resolvedTarget,
+      userName,
+      tutorName: body.tutorName || "Sophie",
+      spriteName,
+      spriteGender,
       duration,
       fullTranscript,
       messages,

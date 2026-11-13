@@ -221,6 +221,7 @@ function LiveFreestyleChatInner({
     translation: session?.starterHintNative,
   });
   const [isHintUpdating, setIsHintUpdating] = useState(false);
+  const  [noteIdx, setNoteIdx] = useState(0);
 
   const isZeroLevel = session?.level === "ZERO";
   const [revealReply, setRevealReply] = useState<boolean>(isZeroLevel);
@@ -600,6 +601,7 @@ function LiveFreestyleChatInner({
           messages,
           mistakes: compiledMistakes,
           duration,
+          tutorName
         }),
       });
 
@@ -656,7 +658,7 @@ function LiveFreestyleChatInner({
     () => [...messages].reverse().find((m) => m.role === "user") || null,
     [messages],
   );
-  const latestNote = notepadNotes[0] || null;
+  const activeNote = notepadNotes[noteIdx] || notepadNotes[0] || null;
 
   const handleEndSessionRef = useRef(handleEndSession);
   handleEndSessionRef.current = handleEndSession;
@@ -1010,62 +1012,91 @@ function LiveFreestyleChatInner({
                 </div>
               )}
             </div>
-
-            {/* Bottom of Single Stage: #1 SOPHIE'S LIVE NOTEPAD ("Here's how it should have been said!") */}
+{/* Bottom of Single Stage: SOPHIE'S LIVE NOTEPAD (Taller & Easier to Read!) */}
             <div className="mt-5 w-full">
-              <div className="overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
+              <div className="min-h-[132px] overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
-                      <PenTool className="h-3.5 w-3.5" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
+                      <PenTool className="h-4 w-4" />
                     </span>
                     <span className="text-xs font-black tracking-wider text-slate-900 uppercase">
                       {tutorName}&apos;s Live Notepad
                     </span>
-                    {latestNote && (
+                    {activeNote && (
                       <span
-                        className={`rounded-md px-2 py-0.5 text-[9px] font-black uppercase ${
-                          latestNote.hasCorrection
+                        className={`rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                          activeNote.hasCorrection
                             ? "border border-rose-200 bg-rose-100 text-rose-800"
                             : "border border-emerald-200 bg-emerald-100 text-emerald-800"
                         }`}
                       >
-                        {latestNote.hasCorrection
-                          ? `${latestNote.category} Polish`
+                        {activeNote.hasCorrection
+                          ? `${activeNote.category} Polish`
                           : "Native Upgrade"}
                       </span>
                     )}
                   </div>
 
-                  {isAnalyzingNote && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Jotting note...
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isAnalyzingNote && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Jotting note...
+                      </span>
+                    )}
+
+                    {notepadNotes.length > 1 && (
+                      <div className="flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-black text-slate-700">
+                        <button
+                          type="button"
+                          disabled={noteIdx === 0}
+                          onClick={() => setNoteIdx((i) => Math.max(0, i - 1))}
+                          className="px-1 hover:text-blue-600 disabled:opacity-30"
+                        >
+                          ‹
+                        </button>
+                        <span>
+                          {noteIdx + 1}/{notepadNotes.length}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={noteIdx >= notepadNotes.length - 1}
+                          onClick={() =>
+                            setNoteIdx((i) =>
+                              Math.min(notepadNotes.length - 1, i + 1),
+                            )
+                          }
+                          className="px-1 hover:text-blue-600 disabled:opacity-30"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {latestNote ? (
-                  <div className="mt-2.5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                        {latestNote.hasCorrection && (
+                {activeNote ? (
+                  <div className="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2.5 text-sm sm:text-base">
+                        {activeNote.hasCorrection && (
                           <>
                             <span className="font-bold text-rose-500 line-through">
-                              &ldquo;{latestNote.userSaid}&rdquo;
+                              &ldquo;{activeNote.userSaid}&rdquo;
                             </span>
                             <span className="font-black text-slate-400">➜</span>
                           </>
                         )}
                         <span className="font-black text-emerald-700">
-                          &ldquo;{latestNote.nativeWay}&rdquo;
+                          &ldquo;{activeNote.nativeWay}&rdquo;
                         </span>
                       </div>
-                      <p className="text-xs font-semibold text-slate-600">
-                        💡 {latestNote.quickWhy}
-                        {latestNote.nativeTranslation && (
-                          <span className="ml-1 text-slate-400">
-                            ({latestNote.nativeTranslation})
+                      <p className="text-xs sm:text-sm font-semibold leading-relaxed text-slate-600">
+                        💡 {activeNote.quickWhy}
+                        {activeNote.nativeTranslation && (
+                          <span className="ml-1.5 font-medium text-slate-400">
+                            ({activeNote.nativeTranslation})
                           </span>
                         )}
                       </p>
@@ -1074,16 +1105,16 @@ function LiveFreestyleChatInner({
                     <button
                       type="button"
                       onClick={() =>
-                        handlePlayPhraseAudio(latestNote.nativeWay)
+                        handlePlayPhraseAudio(activeNote.nativeWay)
                       }
-                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border-2 border-b-[3px] border-emerald-600 bg-emerald-500 px-3.5 py-2 text-xs font-black text-white shadow-2xs transition hover:bg-emerald-600 sm:self-center"
+                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-2xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:brightness-105 sm:self-center"
                     >
-                      <Volume2 size={14} />
+                      <Volume2 size={15} />
                       <span>Hear Native Way</span>
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                  <p className="mt-3 text-xs sm:text-sm font-semibold text-slate-500">
                     Speak a sentence and {tutorName} will jot down real-time
                     native phrasing tips and grammar upgrades right here!
                   </p>
