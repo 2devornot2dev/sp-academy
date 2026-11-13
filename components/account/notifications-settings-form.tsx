@@ -2,8 +2,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   Loader2,
   Bell,
@@ -97,13 +95,25 @@ export function NotificationSettingsForm({
           return (
             <div
               key={item.key}
+              role="switch"
+              aria-checked={active}
+              tabIndex={0}
               onClick={() =>
                 setNotifications((prev) => ({
                   ...prev,
                   [item.key]: !prev[item.key],
                 }))
               }
-              className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border-2 border-b-4 p-4 transition-all ${
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setNotifications((prev) => ({
+                    ...prev,
+                    [item.key]: !prev[item.key],
+                  }));
+                }
+              }}
+              className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border-2 border-b-4 p-4 transition-all select-none ${
                 active
                   ? "border-sky-300 border-b-sky-400 bg-sky-50/40"
                   : "border-slate-200 border-b-slate-300 bg-white hover:bg-slate-50/70"
@@ -116,29 +126,37 @@ export function NotificationSettingsForm({
                   <Icon className="h-5 w-5" />
                 </span>
                 <div>
-                  <Label
-                    htmlFor={item.key}
-                    className="cursor-pointer text-sm font-black text-slate-900"
-                  >
+                  <span className="block text-sm font-black text-slate-900">
                     {item.title}
-                  </Label>
+                  </span>
                   <p className="mt-0.5 text-xs font-medium text-slate-500">
                     {item.description}
                   </p>
                 </div>
               </div>
 
-              <div onClick={(e) => e.stopPropagation()}>
-                <Switch
-                  id={item.key}
-                  checked={active}
-                  onCheckedChange={(checked) =>
-                    setNotifications((prev) => ({
-                      ...prev,
-                      [item.key]: checked,
-                    }))
-                  }
-                />
+              {/* High-Contrast 3D Tactile Toggle Switch */}
+              <div className="flex shrink-0 items-center gap-2.5">
+                <span
+                  className={`text-[10px] font-black tracking-wider uppercase ${
+                    active ? "text-blue-600" : "text-slate-400"
+                  }`}
+                >
+                  {active ? "ON" : "OFF"}
+                </span>
+                <div
+                  className={`relative h-7 w-12 rounded-full border-2 p-0.5 transition-colors duration-200 ${
+                    active
+                      ? "border-blue-700 bg-gradient-to-r from-sky-400 to-blue-600"
+                      : "border-slate-300 bg-slate-200"
+                  }`}
+                >
+                  <div
+                    className={`h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                      active ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </div>
               </div>
             </div>
           );

@@ -125,6 +125,7 @@ export function GeneralSettings({
   const [showAvatarGenerator, setShowAvatarGenerator] =
     useState<boolean>(false);
   const [unsavedAvatar, setUnsavedAvatar] = useState<boolean>(false);
+  const [brokenSprites, setBrokenSprites] = useState<Record<string, boolean>>({});
 
   const spriteProfile = initialSettings?.spriteProfile;
 
@@ -490,7 +491,7 @@ export function GeneralSettings({
             </div>
           </div>
 
-          {/* =========================================================
+    {/* =========================================================
               SPRITE COMPANION 3D SELECTOR
               ========================================================= */}
           <div className="rounded-3xl border-2 border-slate-200/90 bg-slate-50/70 p-5">
@@ -528,10 +529,16 @@ export function GeneralSettings({
                         : "border-slate-200 border-b-slate-300 bg-white/70 hover:border-sky-300 hover:bg-white"
                     }`}
                   >
-                    {sp.avatar ? (
+                    {sp.avatar && !brokenSprites[sp.slug] ? (
                       <img
                         src={sp.avatar}
                         alt={sp.name}
+                        onError={() =>
+                          setBrokenSprites((prev) => ({
+                            ...prev,
+                            [sp.slug]: true,
+                          }))
+                        }
                         className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 object-cover object-top"
                       />
                     ) : (
