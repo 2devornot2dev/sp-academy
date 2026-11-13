@@ -18,8 +18,10 @@ import {
   MessagesSquare,
   ShieldCheck,
   Compass,
+  History,
 } from "lucide-react";
 import { getTutorAvatarByMood } from "@/lib/freestyle/tutors";
+import Link from "next/link";
 const MODES = [
   {
     id: "FOCUSED",
@@ -176,6 +178,7 @@ export default function FreestyleSetup({
   onStart,
   defaultNative = "en-US",
   defaultTarget = "fr-FR",
+  reviewsCount = 0
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState("FOCUSED");
@@ -253,7 +256,7 @@ export default function FreestyleSetup({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-xs font-extrabold text-amber-300 shadow-sm backdrop-blur-md">
                 <Timer className="h-3.5 w-3.5 text-amber-400" />
                 <span>3-Min Unscripted Arena</span>
@@ -262,6 +265,13 @@ export default function FreestyleSetup({
                 <Mic className="h-3.5 w-3.5 text-emerald-400" />
                 <span>Live AI Speech Feedback</span>
               </div>
+              <Link
+                href="/conversation/review"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur-md transition hover:bg-white/25"
+              >
+                <History className="h-3.5 w-3.5 text-sky-300" />
+                <span>Past Reviews ({reviewsCount})</span>
+              </Link>
             </div>
           </div>
 

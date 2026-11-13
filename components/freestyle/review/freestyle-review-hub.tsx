@@ -13,8 +13,6 @@ import {
   AlertCircle,
   BookOpen,
   Swords,
-  Mic,
-  Zap,
   Loader2,
 } from "lucide-react";
 import { FreestyleAvatarReview } from "./freestyle-avatar-review";
@@ -23,7 +21,6 @@ import { FreestylePronunciationReview } from "./freestyle-pronunciation-review";
 import { useReviewTTS } from "@/hooks/use-review-tts";
 import { useSpeak } from "@/hooks/use-speak";
 import { useSprite } from "@/context/sprite-context";
-import { ReviewData, SessionData, SpriteOutro, } from "./review-types";
 
 type Phase =
   | "landing"
@@ -35,27 +32,31 @@ type Phase =
   | "outro"
   | "celebration";
 
-interface ApiResponse {
+export interface ReviewApiResponse {
   session: SessionData;
   review: ReviewData;
 }
 
 interface Props {
   sessionId: string;
+  initialData?: ReviewApiResponse | null;
   onComplete?: () => void;
 }
 
-
-
-export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
+export function FreestyleReviewHub({
+  sessionId,
+  initialData = null,
+  onComplete,
+}: Props) {
   const [phase, setPhase] = useState<Phase>("landing");
-  const [data, setData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReviewApiResponse | null>(initialData);
+  const [loading, setLoading] = useState(!initialData);
   const { isSpeaking, speak } = useReviewTTS();
   const { speak: speakTarget } = useSpeak();
-  const { avatarSrc, spriteName } = useSprite()
+  const { avatarSrc, spriteName } = useSprite();
 
   useEffect(() => {
+    if (initialData) return;
     fetch(`/api/freestyle/review/${sessionId}`)
       .then((r) => r.json())
       .then((res) => {
@@ -63,7 +64,25 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, initialData]);
+
+  const playSpriteOutroAudio = async (outro?: SpriteOutro | null) => {
+    if (!outro) return;
+    const playUrl = (url: string) =>
+      new Promise<void>((resolve) => {
+        const audio = new Audio(url);
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+      });
+
+    if (outro.nativeAudioUrl) {
+      await playUrl(outro.nativeAudioUrl);
+    }
+    if (outro.targetAudioUrl) {
+      await playUrl(outro.targetAudioUrl);
+    }
+  };
 
   const getGrade = (score: number) => {
     if (score >= 90)
@@ -94,7 +113,7 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100/80 p-6">
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100 p-6">
         <div className="flex flex-col items-center gap-3 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white px-10 py-8 shadow-sm">
           <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
           <p className="text-sm font-black tracking-wide text-slate-700 uppercase">
@@ -107,7 +126,7 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100/80 p-6">
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100 p-6">
         <div className="max-w-md space-y-4 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-8 text-center shadow-sm">
           <p className="text-base font-extrabold text-slate-700">
             Your AI Review is still baking...
@@ -142,14 +161,31 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
   const hasGrammar = grammarMistakes.length > 0;
   const hasPronunciation = practicePhrases.length > 0;
 
+  const finishWithCelebration = () => {
+    setPhase("celebration");
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#6366F1", "#10B981", "#F59E0B", "#EC4899"],
+    });
+    if (review.spriteOutro) {
+      void playSpriteOutroAudio(review.spriteOutro);
+    }
+  };
+
   const startReview = () => {
     setPhase("preparing");
     setTimeout(() => {
       if (!hasGrammar && !hasPronunciation) {
         setPhase("outro");
-        speak(review.overallFeedback.encouragement, session.nativeLanguage, () =>
-          setPhase("celebration"),
-        );
+        if (review.spriteOutro) {
+          finishWithCelebration();
+        } else {
+          speak(review.overallFeedback.encouragement, session.nativeLanguage, () =>
+            finishWithCelebration(),
+          );
+        }
         return;
       }
 
@@ -174,58 +210,38 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
       );
     } else {
       setPhase("outro");
-      speak(review.overallFeedback.encouragement, session.nativeLanguage, () =>
-        setPhase("celebration"),
-      );
+      if (review.spriteOutro) {
+        finishWithCelebration();
+      } else {
+        speak(review.overallFeedback.encouragement, session.nativeLanguage, () =>
+          finishWithCelebration(),
+        );
+      }
     }
   };
 
   const handlePronunciationComplete = () => {
     setPhase("outro");
-    const text = `${review.overallFeedback.encouragement} You did amazing today!`;
-    speak(text, session.nativeLanguage, () => {
-      setPhase("celebration");
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ["#6366F1", "#10B981", "#F59E0B", "#EC4899"],
-      });
-    });
-  };
-
-  const playSpriteOutroAudio = async (outro?: SpriteOutro | null) => {
-    if (!outro) return;
-    const playUrl = (url: string) =>
-      new Promise<void>((resolve) => {
-        const audio = new Audio(url);
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.play().catch(() => resolve());
-      });
-
-    if (outro.nativeAudioUrl) {
-      await playUrl(outro.nativeAudioUrl);
-    }
-    if (outro.targetAudioUrl) {
-      await playUrl(outro.targetAudioUrl);
+    if (review.spriteOutro) {
+      finishWithCelebration();
+    } else {
+      const text = `${review.overallFeedback.encouragement} You did amazing today!`;
+      speak(text, session.nativeLanguage, () => finishWithCelebration());
     }
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-100/80 font-sans text-slate-900 lg:h-screen lg:overflow-hidden">
-      {/* =====================================================================
-          COMPACT TOP COMMAND BAR (No oversized banner eating space!)
-          ===================================================================== */}
+    <div className="flex min-h-screen w-full flex-col bg-slate-100 font-sans text-slate-900 lg:h-screen lg:overflow-hidden">
+      {/* COMPACT TOP COMMAND BAR */}
       <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-3 shadow-2xs">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="scale-75 origin-left -my-3">
+            <div className="-my-3 origin-left scale-75">
               <FreestyleAvatarReview isSpeaking={isSpeaking} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
+                <h1 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
                   AI Session Report
                 </h1>
                 <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-black tracking-wider text-indigo-700 uppercase">
@@ -233,7 +249,8 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500">
-                {session.targetLanguage} • {Math.max(1, Math.round(session.duration / 60))} min live voice
+                {session.targetLanguage} •{" "}
+                {Math.max(1, Math.round(session.duration / 60))} min live voice
               </p>
             </div>
           </div>
@@ -248,10 +265,16 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                 ← Back to Report
               </button>
             )}
+            <Link
+              href="/conversation/review"
+              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
+            >
+              All Reviews
+            </Link>
             <button
               type="button"
               onClick={onComplete}
-              className="rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-4 py-1.5 text-xs font-black text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
+              className="rounded-xl border-2 border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-1.5 text-xs font-black text-white transition hover:brightness-105"
             >
               Done
             </button>
@@ -259,16 +282,12 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
         </div>
       </header>
 
-      {/* =====================================================================
-          MAIN VIEWPORT AREA (NO PAGE SCROLL ON LANDING)
-          ===================================================================== */}
+      {/* MAIN VIEWPORT AREA */}
       <main className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-6 py-5 lg:overflow-hidden">
-        {/* 1. LANDING: 12-COL NO-SCROLL WIDESCREEN DASHBOARD */}
         {phase === "landing" && (
-          <div className="grid h-full min-h-0 w-full grid-cols-1 gap-6 lg:grid-cols-12 animate-in fade-in duration-300">
-            {/* LEFT COLUMN (5 Cols): Grade Hero + 4 Metrics + Strengths + CTA */}
+          <div className="grid h-full min-h-0 w-full grid-cols-1 gap-6 animate-in fade-in duration-300 lg:grid-cols-12">
+            {/* LEFT COLUMN (5 Cols) */}
             <div className="flex min-h-0 flex-col justify-between gap-4 lg:col-span-5">
-              {/* Dark 3D Score Card */}
               <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-br from-slate-950 via-[#131D36] to-indigo-950 p-6 text-white shadow-xl">
                 <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl" />
 
@@ -289,13 +308,12 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                       <Sparkles className="h-3 w-3 text-amber-300" />
                       Performance Summary
                     </span>
-                    <p className="mt-1 text-xs sm:text-sm font-semibold leading-snug text-slate-200 line-clamp-3">
+                    <p className="mt-1 line-clamp-3 text-xs font-semibold leading-snug text-slate-200 sm:text-sm">
                       {review.overallFeedback.summary}
                     </p>
                   </div>
                 </div>
 
-                {/* 4 Metric Pills */}
                 <div className="relative z-10 mt-5 grid grid-cols-4 gap-2">
                   {[
                     { label: "Grammar", value: review.metrics.grammarScore },
@@ -321,7 +339,6 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                 </div>
               </div>
 
-              {/* Strengths Card */}
               {review.overallFeedback.strengths &&
                 review.overallFeedback.strengths.length > 0 && (
                   <div className="flex-1 overflow-y-auto rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-xs">
@@ -333,7 +350,7 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                       {review.overallFeedback.strengths.map((s, i) => (
                         <li
                           key={i}
-                          className="flex items-start gap-2.5 text-xs sm:text-sm font-semibold leading-snug text-slate-700"
+                          className="flex items-start gap-2.5 text-xs font-semibold leading-snug text-slate-700 sm:text-sm"
                         >
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                           <span>{s}</span>
@@ -343,13 +360,12 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                   </div>
                 )}
 
-              {/* Primary CTA Pinned Right Above the Fold */}
               <button
                 onClick={startReview}
                 className="flex w-full shrink-0 items-center justify-between gap-3 rounded-3xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-4 text-left text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <div>
-                  <span className="block text-sm sm:text-base font-black">
+                  <span className="block text-sm font-black sm:text-base">
                     Start Interactive Mistake Repair
                   </span>
                   <span className="block text-[11px] font-bold text-sky-100">
@@ -363,25 +379,23 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
               </button>
             </div>
 
-            {/* RIGHT COLUMN (7 Cols): Top Grammar Weakness + Vocab Upgrades Deck */}
+            {/* RIGHT COLUMN (7 Cols) */}
             <div className="flex min-h-0 flex-col gap-4 lg:col-span-7">
-              {/* Top Grammar Weakness */}
               {review.grammarAnalysis && (
                 <div className="shrink-0 rounded-3xl border-2 border-b-[5px] border-rose-200 border-b-rose-300 bg-gradient-to-r from-rose-50 via-white to-amber-50/40 p-5 shadow-xs">
                   <div className="flex items-center gap-2 text-[10px] font-black tracking-widest text-rose-600 uppercase">
                     <AlertCircle className="h-3.5 w-3.5" />
                     <span>Top Grammar Focus</span>
                   </div>
-                  <h3 className="mt-1 text-base sm:text-lg font-black text-slate-900">
+                  <h3 className="mt-1 text-base font-black text-slate-900 sm:text-lg">
                     {review.grammarAnalysis.topWeakness}
                   </h3>
-                  <p className="mt-1 text-xs sm:text-sm font-medium leading-relaxed text-slate-600">
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600 sm:text-sm">
                     {review.grammarAnalysis.explanation}
                   </p>
                 </div>
               )}
 
-              {/* Vocabulary Upgrades (Scrolls neatly INSIDE the card, never the page!) */}
               {review.vocabUpgrades && review.vocabUpgrades.length > 0 && (
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-xs">
                   <div className="mb-3 flex shrink-0 items-center justify-between border-b border-slate-100 pb-2.5">
@@ -441,10 +455,8 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
           </div>
         )}
 
-        {/* 2. INTERACTIVE REPAIR PHASES (Centered Full-Height Stage) */}
         {phase !== "landing" && (
           <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-4">
-            {/* Phase Progress Pill */}
             {(phase === "grammar" || phase === "pronunciation") && (
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-black text-slate-600 shadow-2xs">
                 <span
@@ -521,6 +533,7 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                   </p>
                 </div>
 
+                {/* Personalized Vox / Vivi Outro Dispatch Card */}
                 {review.spriteOutro && (
                   <div className="rounded-2xl border-2 border-sky-200 bg-sky-50/70 p-4 text-left">
                     <div className="flex items-center justify-between gap-3">
@@ -530,7 +543,7 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
                           alt={review.spriteOutro.spriteName || spriteName}
                           className="h-9 w-9 rounded-xl border border-sky-300 object-cover object-top"
                         />
-                        <span className="text-xs font-black uppercase tracking-wider text-blue-700">
+                        <span className="text-xs font-black tracking-wider text-blue-700 uppercase">
                           {review.spriteOutro.spriteName || spriteName} Dispatch
                         </span>
                       </div>
@@ -585,3 +598,67 @@ export function FreestyleReviewHub({ sessionId, onComplete }: Props) {
   );
 }
 
+// ------------------------------
+// TYPES
+// ------------------------------
+export interface ReviewMetrics {
+  overallScore: number;
+  grammarScore: number;
+  vocabScore: number;
+  pronunciationScore: number | null;
+  fluencyScore: number;
+}
+
+export interface ReviewMistake {
+  category: "GENDER" | "GRAMMAR" | "PRONUNCIATION" | "VOCABULARY";
+  severity: "MINOR" | "MAJOR" | "CRITICAL";
+  mistake: string;
+  correction: string;
+  explanation: string;
+  context?: string;
+}
+
+export interface ReviewOverallFeedback {
+  summary: string;
+  strengths?: string[];
+  focusAreas?: string[];
+  encouragement: string;
+}
+
+export interface GrammarAnalysis {
+  topWeakness: string;
+  explanation: string;
+}
+
+export interface VocabUpgrade {
+  original: string;
+  better: string;
+  explanation: string;
+}
+
+export interface SpriteOutro {
+  spriteName?: string;
+  nativeLine: string;
+  targetLine: string;
+  nativeAudioUrl?: string | null;
+  targetAudioUrl?: string | null;
+}
+
+export interface ReviewData {
+  metrics: ReviewMetrics;
+  mistakes: ReviewMistake[];
+  overallFeedback: ReviewOverallFeedback;
+  grammarAnalysis?: GrammarAnalysis;
+  vocabUpgrades?: VocabUpgrade[];
+  spriteOutro?: SpriteOutro | null;
+}
+
+export interface SessionData {
+  id: string;
+  nativeLanguage: string;
+  targetLanguage: string;
+  level: string;
+  mode: string;
+  topic?: string | null;
+  duration: number;
+}

@@ -2,13 +2,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 
 import FreestyleSetup from "./freestyle-setup";
 import FreestyleChat from "./freestyle-chat";
-import { FreestyleReviewHub } from "./review/freestyle-review-hub";
 import { FreestyleCooldownHub } from "./review/freestyle-cooldown-hub";
 import { getTutorAvatarByMood } from "@/lib/freestyle/tutors";
 
@@ -42,15 +41,6 @@ const LEVEL_INSTRUCTIONS: Record<
     "ADVANCED / FLUENT (C1+): Speak at full native speed with rich vocabulary, nuanced expressions, and engaging debate.",
 };
 
-interface CompletedSessionItem {
-  id: string;
-  status: string;
-  topic: string | null;
-  mode: string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-}
-
 interface FreestyleWrapperProps {
   userId: string;
   userName?: string | null;
@@ -62,7 +52,7 @@ interface FreestyleWrapperProps {
   } | null;
   dailySessionsUsed?: number;
   dailySessionsMax?: number;
-  completedSessions?: CompletedSessionItem[];
+  reviewsCount?: number;
 }
 
 export default function FreestyleWrapper({
@@ -72,9 +62,9 @@ export default function FreestyleWrapper({
   initialCooldown = null,
   dailySessionsUsed = 0,
   dailySessionsMax = 5,
+  reviewsCount = 0,
 }: FreestyleWrapperProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [activeSession, setActiveSession] =
     useState<FreestyleSessionConfig | null>(null);
@@ -84,16 +74,14 @@ export default function FreestyleWrapper({
   } | null>(null);
 
   const [cooldownSessionId, setCooldownSessionId] = useState<string | null>(
-    () => initialCooldown?.sessionId ?? searchParams.get("sessionId"),
+    () => initialCooldown?.sessionId ?? null,
   );
-  // If initialCooldown is null (cooldown expired or older session in URL), initialize to 0 — NEVER 300!
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState<number>(
     () => initialCooldown?.remainingSeconds ?? 0,
   );
-  
+
   const [dailyUsed, setDailyUsed] = useState<number>(dailySessionsUsed);
   const [isReviewReady, setIsReviewReady] = useState(false);
-  const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);
   const [incompleteReason, setIncompleteReason] = useState<string | null>(null);
 
   // 1. Cooldown Countdown Timer
@@ -235,7 +223,6 @@ export default function FreestyleWrapper({
         result.reason ||
           "You need at least 3–4 spoken replies in your target language for a session to count!",
       );
-      router.replace("/conversation?status=incomplete", { scroll: false });
       return;
     }
 
@@ -245,26 +232,14 @@ export default function FreestyleWrapper({
       setCooldownSecondsLeft(300);
       setDailyUsed((prev) => Math.min(dailySessionsMax, prev + 1));
       setIsReviewReady(false);
-      router.replace(
-        `/conversation?status=cooldown&sessionId=${finalSessionId}`,
-        { scroll: false },
-      );
-    }
-  };
-
-  const handleReviewComplete = () => {
-    setReviewSessionId(null);
-    if (cooldownSecondsLeft <= 0) {
-      setCooldownSessionId(null);
-      router.replace("/conversation", { scroll: false });
     }
   };
 
   return (
     <div className="relative flex min-h-screen w-full flex-1 flex-col bg-slate-100">
       <AnimatePresence mode="wait">
-        {/* 1. COOLDOWN & REVIEW HUB */}
-        {!activeSession && cooldownSessionId && !reviewSessionId && (
+        {/* 1. COOLDOWN HUB */}
+        {!activeSession && cooldownSessionId && (
           <motion.div
             key="cooldown-hub"
             initial={{ opacity: 0 }}
@@ -278,17 +253,16 @@ export default function FreestyleWrapper({
               isReviewReady={isReviewReady}
               dailyUsed={dailyUsed}
               dailyMax={dailySessionsMax}
-              onOpenReview={() => setReviewSessionId(cooldownSessionId)}
-              onStartAnother={() => {
-                setCooldownSessionId(null);
-                router.replace("/conversation", { scroll: false });
-              }}
+              onOpenReview={() =>
+                router.push(`/conversation/${cooldownSessionId}`)
+              }
+              onStartAnother={() => setCooldownSessionId(null)}
             />
           </motion.div>
         )}
 
         {/* 2. SETUP SCREEN */}
-        {!activeSession && !cooldownSessionId && !reviewSessionId && (
+        {!activeSession && !cooldownSessionId && (
           <motion.div
             key="setup"
             initial={{ opacity: 0 }}
@@ -302,7 +276,7 @@ export default function FreestyleWrapper({
                 <div className="flex items-center justify-between gap-4 rounded-2xl border-2 border-rose-300 bg-rose-50 px-5 py-3.5 text-rose-950 shadow-sm">
                   <div className="flex items-center gap-3">
                     <AlertTriangle className="h-5 w-5 shrink-0 text-rose-600" />
-                    <p className="text-xs sm:text-sm font-bold">
+                    <p className="text-xs font-bold sm:text-sm">
                       <strong className="font-black uppercase">
                         Session Not Counted:{" "}
                       </strong>
@@ -324,6 +298,7 @@ export default function FreestyleWrapper({
               onStart={handleStartSession}
               defaultNative={defaultNative}
               defaultTarget={defaultTarget}
+              reviewsCount={reviewsCount}
             />
           </motion.div>
         )}
@@ -343,23 +318,6 @@ export default function FreestyleWrapper({
               livekitToken={livekitData.token}
               livekitUrl={livekitData.wsUrl}
               onEnd={handleEndSession}
-            />
-          </motion.div>
-        )}
-
-        {/* 4. FULL REVIEW SCREEN */}
-        {reviewSessionId && (
-          <motion.div
-            key="review"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="flex min-h-screen w-full flex-col overflow-y-auto"
-          >
-            <FreestyleReviewHub
-              sessionId={reviewSessionId}
-              onComplete={handleReviewComplete}
             />
           </motion.div>
         )}

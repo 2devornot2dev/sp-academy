@@ -13,31 +13,34 @@ export default async function ConversationPage() {
   const user = await requireUser();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [{ lang }, redisState, recentSessions] = await Promise.all([
-    getUserLanguage(user.id),
-    getFreestyleRedisState(user.id),
-    prisma.freestyleSession.findMany({
-      where: {
-        userId: user.id,
-        status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
-        createdAt: { gte: twentyFourHoursAgo },
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        status: true,
-        topic: true,
-        mode: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    }),
-  ]);
+  const [{ lang }, redisState, recentSessions, totalReviewsCount] =
+    await Promise.all([
+      getUserLanguage(user.id),
+      getFreestyleRedisState(user.id),
+      prisma.freestyleSession.findMany({
+        where: {
+          userId: user.id,
+          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+          createdAt: { gte: twentyFourHoursAgo },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.freestyleSession.count({
+        where: {
+          userId: user.id,
+          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+        },
+      }),
+    ]);
 
   const defaultNative = lang?.nativeLanguage ?? "ENGLISH";
   const defaultTarget = lang?.targetLanguage ?? "fr-FR";
 
-  // Resolve cooldown from Redis TTL, or fall back to DB session updatedAt if < 5 min ago
   let initialCooldown: {
     sessionId: string;
     remainingSeconds: number;
@@ -78,7 +81,7 @@ export default async function ConversationPage() {
         initialCooldown={initialCooldown}
         dailySessionsUsed={dailySessionsUsed}
         dailySessionsMax={redisState.dailyMax}
-        completedSessions={recentSessions}
+        reviewsCount={totalReviewsCount}
       />
     </div>
   );
