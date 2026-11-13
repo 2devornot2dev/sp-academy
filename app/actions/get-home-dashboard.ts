@@ -136,7 +136,7 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
     prisma.freestyleSession.findMany({
       where: {
         userId: user.id,
-        status: { in: ["REVIEW_PENDING", "COMPLETED"] },
+        status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
       },
       select: {
         id: true,

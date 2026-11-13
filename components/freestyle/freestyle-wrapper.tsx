@@ -42,6 +42,15 @@ const LEVEL_INSTRUCTIONS: Record<
     "ADVANCED / FLUENT (C1+): Speak at full native speed with rich vocabulary, nuanced expressions, and engaging debate.",
 };
 
+interface CompletedSessionItem {
+  id: string;
+  status: string;
+  topic: string | null;
+  mode: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 interface FreestyleWrapperProps {
   userId: string;
   userName?: string | null;
@@ -53,6 +62,7 @@ interface FreestyleWrapperProps {
   } | null;
   dailySessionsUsed?: number;
   dailySessionsMax?: number;
+  completedSessions?: CompletedSessionItem[];
 }
 
 export default function FreestyleWrapper({
@@ -73,13 +83,14 @@ export default function FreestyleWrapper({
     wsUrl: string;
   } | null>(null);
 
-  // Server-backed Redis cooldown takes priority over URL params so clicking around never loses state!
   const [cooldownSessionId, setCooldownSessionId] = useState<string | null>(
     () => initialCooldown?.sessionId ?? searchParams.get("sessionId"),
   );
+  // If initialCooldown is null (cooldown expired or older session in URL), initialize to 0 — NEVER 300!
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState<number>(
-    () => initialCooldown?.remainingSeconds ?? 300,
+    () => initialCooldown?.remainingSeconds ?? 0,
   );
+  
   const [dailyUsed, setDailyUsed] = useState<number>(dailySessionsUsed);
   const [isReviewReady, setIsReviewReady] = useState(false);
   const [reviewSessionId, setReviewSessionId] = useState<string | null>(null);

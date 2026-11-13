@@ -264,7 +264,7 @@ export async function getLearningPath(userId: string) {
     prisma.freestyleSession.findMany({
       where: {
         userId,
-        status: { in: ["REVIEW_PENDING", "COMPLETED"] },
+        status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
       },
       orderBy: { createdAt: "asc" },
       select: {
