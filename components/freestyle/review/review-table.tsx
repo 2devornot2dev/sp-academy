@@ -24,6 +24,8 @@ import {
   Sparkles,
   AlertCircle,
   BookOpen,
+  Flame,
+  Crown,
 } from "lucide-react";
 import type { UserReviewListItem } from "@/app/actions/get-user-reviews";
 
@@ -35,64 +37,84 @@ const MODE_LABELS: Record<string, string> = {
   ARGUMENTATIVE: "Debate",
 };
 
-function getGradeMeta(score: number | null) {
-  if (score === null) {
+export function getAlphaGrade(score: number | null) {
+  if (score === null || Number.isNaN(score)) {
     return {
       letter: "—",
-      pill: "border-slate-200 bg-slate-100 text-slate-500",
-      heroRing: "border-slate-500 bg-slate-800 text-slate-300",
+      tier: "Pending",
+      pill: "border-slate-200 border-b-slate-300 bg-slate-100 text-slate-400",
+      tile: "border-white/10 bg-slate-900/70 text-slate-400",
+      heroEmblem:
+        "border-slate-700 bg-gradient-to-b from-slate-700 to-slate-900 text-slate-300",
     };
   }
-  if (score >= 90) {
+
+  let letter = "D-";
+  if (score >= 97) letter = "A+";
+  else if (score >= 93) letter = "A";
+  else if (score >= 90) letter = "A-";
+  else if (score >= 87) letter = "B+";
+  else if (score >= 83) letter = "B";
+  else if (score >= 80) letter = "B-";
+  else if (score >= 77) letter = "C+";
+  else if (score >= 73) letter = "C";
+  else if (score >= 70) letter = "C-";
+  else if (score >= 65) letter = "D+";
+  else if (score >= 60) letter = "D";
+
+  if (letter.startsWith("A")) {
     return {
-      letter: "A+",
-      pill: "border-emerald-300 bg-emerald-50 text-emerald-700",
-      heroRing: "border-emerald-400 bg-emerald-500/20 text-emerald-300",
+      letter,
+      tier: "Native Flow",
+      pill: "border-emerald-300 border-b-emerald-500 bg-emerald-100 text-emerald-900",
+      tile: "border-emerald-400/40 bg-emerald-500/20 text-emerald-300",
+      heroEmblem:
+        "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-slate-950 shadow-emerald-500/35",
     };
   }
-  if (score >= 80) {
+
+  if (letter.startsWith("B")) {
     return {
-      letter: "A",
-      pill: "border-emerald-300 bg-emerald-50 text-emerald-700",
-      heroRing: "border-emerald-400 bg-emerald-500/20 text-emerald-300",
+      letter,
+      tier: "Strong Pace",
+      pill: "border-sky-300 border-b-sky-500 bg-sky-100 text-sky-900",
+      tile: "border-sky-400/40 bg-sky-500/20 text-sky-300",
+      heroEmblem:
+        "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/35",
     };
   }
-  if (score >= 70) {
+
+  if (letter.startsWith("C")) {
     return {
-      letter: "B",
-      pill: "border-sky-300 bg-sky-50 text-sky-700",
-      heroRing: "border-sky-400 bg-sky-500/20 text-sky-300",
+      letter,
+      tier: "Building Up",
+      pill: "border-amber-300 border-b-orange-400 bg-amber-100 text-amber-900",
+      tile: "border-amber-400/40 bg-amber-500/20 text-amber-300",
+      heroEmblem:
+        "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/35",
     };
   }
-  if (score >= 60) {
-    return {
-      letter: "C",
-      pill: "border-amber-300 bg-amber-50 text-amber-700",
-      heroRing: "border-amber-400 bg-amber-500/20 text-amber-300",
-    };
-  }
+
   return {
-    letter: "D",
-    pill: "border-rose-300 bg-rose-50 text-rose-700",
-    heroRing: "border-rose-400 bg-rose-500/20 text-rose-300",
+    letter,
+    tier: "Needs Polish",
+    pill: "border-rose-300 border-b-rose-500 bg-rose-100 text-rose-900",
+    tile: "border-rose-400/40 bg-rose-500/20 text-rose-300",
+    heroEmblem:
+      "border-rose-900 bg-gradient-to-b from-rose-500 to-red-600 text-white shadow-rose-500/35",
   };
 }
 
-function ScoreCell({ value }: { value: number | null }) {
+function GradeCell({ value }: { value: number | null }) {
   if (value === null) {
-    return <span className="text-xs font-bold text-slate-300">—</span>;
+    return <span className="text-xs font-black text-slate-300">—</span>;
   }
-  const color =
-    value >= 80
-      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-      : value >= 65
-        ? "text-sky-700 bg-sky-50 border-sky-200"
-        : "text-amber-700 bg-amber-50 border-amber-200";
+  const g = getAlphaGrade(value);
   return (
     <span
-      className={`inline-flex min-w-[44px] items-center justify-center rounded-lg border px-2 py-0.5 text-xs font-black ${color}`}
+      className={`inline-flex min-w-[42px] items-center justify-center rounded-xl border border-b-[3px] px-2.5 py-1 text-xs font-black ${g.pill}`}
     >
-      {value}%
+      {g.letter}
     </span>
   );
 }
@@ -138,8 +160,8 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             day: "numeric",
           });
           return (
-            <div className="min-w-[200px] py-1">
-              <div className="font-black text-slate-900 text-sm">
+            <div className="min-w-[210px] py-0.5">
+              <div className="text-sm font-black text-slate-900">
                 {item.topic || "Live Conversation Practice"}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-400">
@@ -168,7 +190,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             }
             className="inline-flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase hover:text-slate-900"
           >
-            <span>Grade</span>
+            <span>Overall</span>
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
@@ -182,13 +204,12 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
               </span>
             );
           }
-          const g = getGradeMeta(item.overallScore);
+          const g = getAlphaGrade(item.overallScore);
           return (
             <span
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-black ${g.pill}`}
+              className={`inline-flex min-w-[48px] items-center justify-center rounded-xl border border-b-[3px] px-3 py-1 text-sm font-black ${g.pill}`}
             >
-              <span>{g.letter}</span>
-              <span className="opacity-75">({item.overallScore}%)</span>
+              {g.letter}
             </span>
           );
         },
@@ -207,7 +228,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
-        cell: ({ row }) => <ScoreCell value={row.original.grammarScore} />,
+        cell: ({ row }) => <GradeCell value={row.original.grammarScore} />,
       },
       {
         accessorKey: "vocabScore",
@@ -223,7 +244,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
-        cell: ({ row }) => <ScoreCell value={row.original.vocabScore} />,
+        cell: ({ row }) => <GradeCell value={row.original.vocabScore} />,
       },
       {
         accessorKey: "pronunciationScore",
@@ -240,7 +261,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
           </button>
         ),
         cell: ({ row }) => (
-          <ScoreCell value={row.original.pronunciationScore} />
+          <GradeCell value={row.original.pronunciationScore} />
         ),
       },
       {
@@ -257,7 +278,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
-        cell: ({ row }) => <ScoreCell value={row.original.fluencyScore} />,
+        cell: ({ row }) => <GradeCell value={row.original.fluencyScore} />,
       },
       {
         accessorKey: "topWeakness",
@@ -269,7 +290,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
         cell: ({ row }) => {
           const item = row.original;
           return (
-            <div className="max-w-[240px]">
+            <div className="max-w-[230px]">
               <p className="truncate text-xs font-bold text-slate-700">
                 {item.topWeakness ||
                   (item.isReady ? "Solid overall structure" : "Analyzing...")}
@@ -292,7 +313,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             <Link
               href={`/conversation/${item.id}`}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3.5 py-1.5 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3.5 py-2 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 whitespace-nowrap"
             >
               <span>{item.isReady ? "Open" : "Status"}</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -357,28 +378,33 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
     );
   }
 
-  const selectedGrade = getGradeMeta(selectedReview?.overallScore ?? null);
+  const selectedGrade = getAlphaGrade(selectedReview?.overallScore ?? null);
+  const gGrade = getAlphaGrade(selectedReview?.grammarScore ?? null);
+  const vGrade = getAlphaGrade(selectedReview?.vocabScore ?? null);
+  const sGrade = getAlphaGrade(selectedReview?.pronunciationScore ?? null);
+  const fGrade = getAlphaGrade(selectedReview?.fluencyScore ?? null);
 
   return (
     <div className="space-y-6">
       {/* =====================================================================
-          1. FEATURED / SELECTED REVIEW HERO CARD (Updates when clicking rows!)
+          1. PLAYFUL, TALLER 3D FEATURED / SELECTED REVIEW HERO CARD
           ===================================================================== */}
       {selectedReview && (
-        <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-r from-[#0F172A] via-[#131D36] to-[#1E1B4B] p-6 text-white shadow-xl sm:p-8">
-          <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-12 h-56 w-56 rounded-full bg-sky-500/15 blur-3xl" />
+        <div className="group relative overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-br from-[#0F172A] via-[#171F3F] to-[#241645] p-7 text-white shadow-2xl sm:p-10">
+          {/* Playful Ambient Glows */}
+          <div className="pointer-events-none absolute -top-24 -right-12 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-10 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
 
-          <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-12">
-            {/* Left Info (7 cols) */}
-            <div className="space-y-4 lg:col-span-7">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/35 bg-sky-500/20 px-3 py-1 text-[10px] font-black tracking-wider text-sky-300 uppercase">
-                  <Sparkles className="h-3 w-3 text-amber-300" />
-                  {isLatest ? "Latest Session Review" : "Selected Session"}
+          <div className="relative z-10 grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
+            {/* Left Showcase (7 cols) */}
+            <div className="space-y-5 lg:col-span-7">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/20 px-3.5 py-1 text-[11px] font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                  {isLatest ? "Latest Session Spotlight" : "Selected Spotlight"}
                 </span>
 
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black tracking-wider text-slate-200 uppercase">
+                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black tracking-wider text-slate-200 uppercase">
                   {MODE_LABELS[selectedReview.mode] || selectedReview.mode} •{" "}
                   {selectedReview.level}
                 </span>
@@ -394,29 +420,37 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
                 </span>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div
-                  className={`flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-2xl border-2 shadow-lg ${selectedGrade.heroRing}`}
-                >
-                  {selectedReview.isReady ? (
-                    <>
-                      <span className="text-3xl font-black leading-none">
-                        {selectedGrade.letter}
-                      </span>
-                      <span className="mt-1 text-[11px] font-extrabold text-white/90">
-                        {selectedReview.overallScore}%
-                      </span>
-                    </>
-                  ) : (
-                    <Loader2 className="h-7 w-7 animate-spin text-amber-300" />
+              {/* Big Tilted 3D Grade Shield + Title */}
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="relative shrink-0 self-start sm:self-center">
+                  <div
+                    className={`flex h-24 w-24 -rotate-3 flex-col items-center justify-center rounded-3xl border-b-[6px] shadow-xl transition-transform duration-300 group-hover:rotate-0 ${selectedGrade.heroEmblem}`}
+                  >
+                    {selectedReview.isReady ? (
+                      <>
+                        <span className="text-4xl font-black leading-none tracking-tight">
+                          {selectedGrade.letter}
+                        </span>
+                        <span className="mt-1 text-[10px] font-black tracking-wider uppercase opacity-85">
+                          {selectedGrade.tier}
+                        </span>
+                      </>
+                    ) : (
+                      <Loader2 className="h-8 w-8 animate-spin text-amber-300" />
+                    )}
+                  </div>
+                  {selectedReview.isReady && (
+                    <span className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-950 bg-amber-300 text-slate-950 shadow-md">
+                      <Crown className="h-3.5 w-3.5 fill-current" />
+                    </span>
                   )}
                 </div>
 
-                <div className="min-w-0">
-                  <h2 className="truncate text-2xl font-black tracking-tight text-white sm:text-3xl">
+                <div className="min-w-0 space-y-1.5">
+                  <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                     {selectedReview.topic || "Live Conversation Practice"}
                   </h2>
-                  <p className="mt-1 line-clamp-2 text-xs sm:text-sm font-medium leading-relaxed text-slate-300">
+                  <p className="line-clamp-3 text-xs font-medium leading-relaxed text-slate-300 sm:text-sm">
                     {selectedReview.summary ||
                       (selectedReview.isReady
                         ? "Open this session to review your grammar fixes and practice your pronunciation."
@@ -425,22 +459,22 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
                 </div>
               </div>
 
-              {/* Quick Insights Chips */}
+              {/* Playful Highlight Chips */}
               {selectedReview.isReady && (
                 <div className="flex flex-wrap gap-2.5 pt-1">
                   {selectedReview.topWeakness && (
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-200">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
-                      <span className="truncate max-w-[260px]">
+                    <div className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/35 bg-rose-500/15 px-3.5 py-2 text-xs font-bold text-rose-200">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                      <span className="max-w-[270px] truncate">
                         Focus: {selectedReview.topWeakness}
                       </span>
                     </div>
                   )}
 
                   {selectedReview.topUpgrade && (
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200">
-                      <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                      <span className="truncate max-w-[260px]">
+                    <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-400/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-bold text-emerald-200">
+                      <BookOpen className="h-4 w-4 shrink-0 text-emerald-400" />
+                      <span className="max-w-[270px] truncate">
                         Upgrade: {selectedReview.topUpgrade.better}
                       </span>
                     </div>
@@ -449,25 +483,35 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
               )}
             </div>
 
-            {/* Right Metrics & CTA (5 cols) */}
-            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.05] p-5 lg:col-span-5">
-              <div className="grid grid-cols-4 gap-2 text-center">
+            {/* Right 3D Grade Board & Action (5 cols) */}
+            <div className="flex flex-col justify-between gap-5 rounded-3xl border border-white/15 bg-white/[0.06] p-5 backdrop-blur-md lg:col-span-5">
+              <div className="flex items-center justify-between text-[10px] font-black tracking-widest text-slate-300 uppercase">
+                <span className="flex items-center gap-1.5">
+                  <Flame className="h-3.5 w-3.5 text-amber-400" />
+                  Skill Scorecard
+                </span>
+                <span>
+                  {selectedReview.mistakesCount} Fixes •{" "}
+                  {selectedReview.vocabUpgradesCount} Upgrades
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2.5 text-center">
                 {[
-                  { label: "Grammar", val: selectedReview.grammarScore },
-                  { label: "Vocab", val: selectedReview.vocabScore },
-                  { label: "Speech", val: selectedReview.pronunciationScore },
-                  { label: "Fluency", val: selectedReview.fluencyScore },
+                  { label: "Grammar", meta: gGrade },
+                  { label: "Vocab", meta: vGrade },
+                  { label: "Speech", meta: sGrade },
+                  { label: "Fluency", meta: fGrade },
                 ].map((m) => (
                   <div
                     key={m.label}
-                    className="rounded-xl border border-white/10 bg-slate-900/70 py-2.5"
+                    className={`rounded-2xl border py-3 ${m.meta.tile}`}
                   >
-                    <span className="block text-[9px] font-black tracking-wider text-slate-400 uppercase">
+                    <span className="block text-[9px] font-black tracking-wider uppercase opacity-80">
                       {m.label}
                     </span>
-                    <span className="mt-0.5 block text-base font-black text-white">
-                      {m.val ?? "—"}
-                      {m.val !== null ? "%" : ""}
+                    <span className="mt-1 block text-xl font-black">
+                      {m.meta.letter}
                     </span>
                   </div>
                 ))}
@@ -475,7 +519,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
 
               <Link
                 href={`/conversation/${selectedReview.id}`}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
               >
                 <span>
                   {selectedReview.isReady
@@ -490,31 +534,31 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
       )}
 
       {/* =====================================================================
-          2. FULL-WIDTH TANSTACK TABLE CARD
+          2. ZEBRA-STRIPED TANSTACK TABLE CARD
           ===================================================================== */}
-      <div className="overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm">
-        {/* Table Toolbar: Search & Mode Filter */}
-        <div className="flex flex-col justify-between gap-4 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center">
+      <div className="overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white shadow-md">
+        {/* Table Toolbar */}
+        <div className="flex flex-col justify-between gap-4 border-b-2 border-slate-100 bg-slate-50/70 px-6 py-4 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-2">
-            {(["ALL", "FOCUSED", "RANDOM", "SPECIFIC", "ARGUMENTATIVE"] as const).map(
-              (modeKey) => {
-                const active = modeFilter === modeKey;
-                return (
-                  <button
-                    key={modeKey}
-                    type="button"
-                    onClick={() => setModeFilter(modeKey)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                      active
-                        ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                    }`}
-                  >
-                    {MODE_LABELS[modeKey]}
-                  </button>
-                );
-              },
-            )}
+            {(
+              ["ALL", "FOCUSED", "RANDOM", "SPECIFIC", "ARGUMENTATIVE"] as const
+            ).map((modeKey) => {
+              const active = modeFilter === modeKey;
+              return (
+                <button
+                  key={modeKey}
+                  type="button"
+                  onClick={() => setModeFilter(modeKey)}
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                    active
+                      ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {MODE_LABELS[modeKey]}
+                </button>
+              );
+            })}
           </div>
 
           <div className="relative w-full sm:w-72">
@@ -524,7 +568,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Search topic or grammar focus..."
-              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-2 pr-4 pl-10 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-white py-2 pr-4 pl-10 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
             />
           </div>
         </div>
@@ -536,7 +580,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr
                   key={headerGroup.id}
-                  className="border-b border-slate-100 bg-slate-50/70"
+                  className="border-b-2 border-slate-200/80 bg-slate-100/80"
                 >
                   {headerGroup.headers.map((header) => (
                     <th key={header.id} className="px-5 py-3.5">
@@ -552,7 +596,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
               ))}
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200/60">
               {table.getRowModel().rows.length === 0 ? (
                 <tr>
                   <td
@@ -563,20 +607,23 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
                   </td>
                 </tr>
               ) : (
-                table.getRowModel().rows.map((row) => {
+                table.getRowModel().rows.map((row, idx) => {
                   const isSelected = row.original.id === selectedReview?.id;
+                  const isEvenRow = idx % 2 === 1;
                   return (
                     <tr
                       key={row.id}
                       onClick={() => setSelectedId(row.original.id)}
                       className={`cursor-pointer transition-colors ${
                         isSelected
-                          ? "bg-sky-50/70 hover:bg-sky-50"
-                          : "hover:bg-slate-50/80"
+                          ? "bg-sky-100/70 ring-2 ring-inset ring-sky-400/50"
+                          : isEvenRow
+                            ? "bg-slate-100/75 hover:bg-sky-50/60"
+                            : "bg-white hover:bg-sky-50/60"
                       }`}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-5 py-3.5 align-middle">
+                        <td key={cell.id} className="px-5 py-4 align-middle">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),
@@ -592,7 +639,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
         </div>
 
         {/* Pagination Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-slate-100 bg-slate-50 px-6 py-4">
           <span className="text-xs font-bold text-slate-500">
             Showing{" "}
             <strong className="font-black text-slate-900">
@@ -602,7 +649,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             <strong className="font-black text-slate-900">
               {table.getFilteredRowModel().rows.length}
             </strong>{" "}
-            sessions • Click any row to preview above
+            sessions • Click any row to spotlight above
           </span>
 
           <div className="flex items-center gap-2">
