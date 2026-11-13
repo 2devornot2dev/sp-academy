@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Flame,
   Mic,
   RotateCcw,
@@ -14,10 +15,13 @@ import {
 } from "lucide-react";
 import { usePronunciation } from "@/context/pronunciation-context";
 import { useSpeak } from "@/hooks/use-speak";
+import { useWordAudio } from "@/context/word-audio-context";
 import { getAlphaGrade, type TrickyWordItem } from "@/lib/freestyle/grades";
+import type { RepairCardItem } from "./freestyle-grammar-review";
 
 interface Props {
   phrases: string[];
+  repairCards?: RepairCardItem[];
   trickyWords?: TrickyWordItem[];
   targetLanguage: string;
   onBack?: () => void;
@@ -26,7 +30,7 @@ interface Props {
 
 export function FreestylePronunciationReview({
   phrases,
-  trickyWords = [],
+  repairCards = [],
   targetLanguage,
   onBack,
   onComplete,
@@ -34,18 +38,28 @@ export function FreestylePronunciationReview({
   const { isRecording, score, error, assessSpeech, reset } =
     usePronunciation();
   const { speak, isPlaying } = useSpeak();
+  const { playWord } = useWordAudio();
+
   const [index, setIndex] = useState(0);
+  const [completedScores, setCompletedScores] = useState<
+    Record<number, number>
+  >({});
   const [activeWordKey, setActiveWordKey] = useState<string | null>(null);
 
   const handleSpeakWord = async (rawWord: string, key: string) => {
-    const clean = rawWord.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    const clean = rawWord.replace(/^[^\p{L}\p{N}'’-]+|[^\p{L}\p{N}'’-]+$/gu, "");
     if (!clean) return;
     setActiveWordKey(key);
-    await speak(clean, targetLanguage, 0.85);
-    setActiveWordKey((cur) => (cur === key ? null : cur));
+    try {
+      await playWord(clean);
+    } catch {
+      await speak(clean, targetLanguage, 0.85);
+    } finally {
+      setActiveWordKey((cur) => (cur === key ? null : cur));
+    }
   };
 
-  if (!phrases.length && !trickyWords.length) {
+  if (!phrases.length) {
     return (
       <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-8 text-center shadow-sm animate-in fade-in">
         <p className="text-sm font-bold text-slate-600">
@@ -74,11 +88,26 @@ export function FreestylePronunciationReview({
     );
   }
 
-  const current = phrases[index] || trickyWords[0]?.word || "";
-  const totalPhrases = Math.max(1, phrases.length);
+  const current = phrases[index] || phrases[0];
+  const totalPhrases = phrases.length;
   const isLast = index >= totalPhrases - 1;
-  const progressPct = Math.round(((index + 1) / totalPhrases) * 100);
   const phraseWords = current.trim().split(/\s+/);
+
+  const matchedCard = repairCards.find(
+    (c) => c.improved.trim().toLowerCase() === current.trim().toLowerCase(),
+  );
+
+  const selectPhrase = (newIdx: number) => {
+    if (score?.pronunciationScore) {
+      setCompletedScores((prev) => ({
+        ...prev,
+        [index]: score.pronunciationScore,
+      }));
+    }
+    reset();
+    setActiveWordKey(null);
+    setIndex(newIdx);
+  };
 
   const handlePractice = async () => {
     reset();
@@ -86,6 +115,12 @@ export function FreestylePronunciationReview({
   };
 
   const handleContinue = () => {
+    if (score?.pronunciationScore) {
+      setCompletedScores((prev) => ({
+        ...prev,
+        [index]: score.pronunciationScore,
+      }));
+    }
     if (isLast) {
       onComplete();
     } else {
@@ -94,137 +129,167 @@ export function FreestylePronunciationReview({
     }
   };
 
-  const hasLab = trickyWords.length > 0;
-
   return (
-    <div
-      className={
-        hasLab
-          ? "grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12 animate-in fade-in"
-          : "mx-auto max-w-3xl animate-in fade-in"
-      }
-    >
-      {/* LEFT (4 Cols): WORD SOUND LAB */}
-      {hasLab && (
-        <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md lg:col-span-4">
-          <div>
-            <div className="flex items-center justify-between gap-2">
+    <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 animate-in fade-in">
+      {/* =====================================================================
+          LEFT (5 Cols): SPEAKING DRILL QUEUE (Shows all 3 phrases & grades!)
+          ===================================================================== */}
+      <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm lg:col-span-5">
+        <div>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+            <div>
               <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
-                Word Sound Lab
+                Speaking Drill Queue
               </span>
-              <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-500 uppercase">
-                {trickyWords.length} Words
-              </span>
+              <h3 className="text-base font-black text-slate-900">
+                Practice Your Upgraded Phrases ({index + 1}/{totalPhrases})
+              </h3>
             </div>
-            <h3 className="mt-1 text-base font-black text-slate-900">
-              Tap any word from your call
-            </h3>
-            <p className="mt-0.5 text-xs font-medium text-slate-500">
-              Hear individual words pronounced slowly before speaking the full
-              phrase.
-            </p>
+          </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {trickyWords.map((item, idx) => {
-                const g = getAlphaGrade(item.score);
-                const key = `lab-${idx}-${item.word}`;
+          <div className="mt-3.5 space-y-2.5">
+            {phrases.map((p, i) => {
+              const isSelected = i === index;
+              const savedScore =
+                i === index && score?.pronunciationScore
+                  ? score.pronunciationScore
+                  : completedScores[i];
+              const g =
+                savedScore !== undefined ? getAlphaGrade(savedScore) : null;
+              const sourceCard = repairCards.find(
+                (c) =>
+                  c.improved.trim().toLowerCase() === p.trim().toLowerCase(),
+              );
+
+              return (
+                <button
+                  key={`${p}-${i}`}
+                  type="button"
+                  onClick={() => selectPhrase(i)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-b-4 px-4 py-3.5 text-left transition-all ${
+                    isSelected
+                      ? "border-blue-600 border-b-blue-800 bg-sky-50/80 shadow-2xs"
+                      : "border-slate-200 border-b-slate-300 bg-white hover:border-sky-300 hover:bg-slate-50/70"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    {sourceCard && (
+                      <span className="block truncate text-[11px] font-bold text-slate-400 line-through">
+                        {sourceCard.original}
+                      </span>
+                    )}
+                    <p className="truncate text-sm font-black text-slate-900">
+                      {p}
+                    </p>
+                  </div>
+
+                  {g ? (
+                    <span
+                      className={`inline-flex min-w-[40px] items-center justify-center rounded-xl border border-b-2 px-2.5 py-1 text-xs font-black ${g.pill}`}
+                    >
+                      {g.letter}
+                    </span>
+                  ) : (
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                        isSelected
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back to Fix Deck</span>
+            </button>
+          ) : (
+            <span />
+          )}
+          <span className="text-[11px] font-bold text-slate-400">
+            Tap any word on the right to hear it
+          </span>
+        </div>
+      </div>
+
+      {/* =====================================================================
+          RIGHT (7 Cols): SPEAKING STAGE WITH UNIFIED 3D WORD BUTTONS
+          ===================================================================== */}
+      <div className="flex flex-col justify-between space-y-5 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 text-center shadow-sm sm:p-7 lg:col-span-7">
+        <div className="flex items-center justify-between">
+          <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-black tracking-wider text-blue-700 uppercase">
+            Speak It Back • Phrase {index + 1} of {totalPhrases}
+          </span>
+          <button
+            type="button"
+            disabled={isPlaying}
+            onClick={() => void speak(current, targetLanguage, 0.9)}
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-sky-200 border-b-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-black text-blue-600 transition hover:bg-sky-100 disabled:opacity-50"
+          >
+            <Volume2 className="h-3.5 w-3.5" />
+            <span>{isPlaying ? "Playing..." : "Hear Full Phrase"}</span>
+          </button>
+        </div>
+
+        {/* Context Strip if from a mistake/upgrade */}
+        {matchedCard && (
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-left text-xs">
+            <span className="font-bold text-slate-400">Instead of: </span>
+            <span className="font-bold text-rose-500 line-through">
+              &ldquo;{matchedCard.original}&rdquo;
+            </span>
+          </div>
+        )}
+
+        {/* Unified 3D Tactile Word Buttons Stage */}
+        <div className="rounded-3xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-gradient-to-br from-slate-50 via-white to-sky-50/40 px-6 py-7">
+          <span className="block text-[10px] font-black tracking-widest text-slate-400 uppercase">
+            Tap any word to hear its MP3, then record the full phrase
+          </span>
+
+          {score?.words?.length ? (
+            <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+              {score.words.map((w: any, idx: number) => {
+                const acc = w.accuracyScore ?? 0;
+                const key = `scored-${idx}`;
                 const isActive = activeWordKey === key;
+                const tileStyle = isActive
+                  ? "border-blue-700 border-b-blue-900 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                  : acc >= 80
+                    ? "border-emerald-300 border-b-emerald-500 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
+                    : acc >= 60
+                      ? "border-amber-300 border-b-amber-500 bg-amber-50 text-amber-950 hover:bg-amber-100"
+                      : "border-rose-300 border-b-rose-500 bg-rose-50 text-rose-950 hover:bg-rose-100";
+
                 return (
                   <button
                     key={key}
                     type="button"
-                    onClick={() => void handleSpeakWord(item.word, key)}
-                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] px-3 py-1.5 text-xs sm:text-sm font-black transition-all active:translate-y-0.5 ${
-                      isActive
-                        ? "border-blue-700 bg-blue-600 text-white shadow-sm"
-                        : "border-slate-200 border-b-slate-300 bg-slate-50 text-slate-900 hover:border-sky-400 hover:bg-sky-50"
-                    }`}
+                    onClick={() => void handleSpeakWord(w.word, key)}
+                    title={`Grade: ${getAlphaGrade(acc).letter} — Tap to hear word`}
+                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-lg font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${tileStyle}`}
                   >
-                    <Volume2
-                      className={`h-3.5 w-3.5 ${
-                        isActive ? "text-white" : "text-blue-600"
-                      }`}
-                    />
-                    <span>{item.word}</span>
-                    <span
-                      className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
-                        isActive
-                          ? "border-white/30 bg-white/20 text-white"
-                          : g.pill
-                      }`}
-                    >
-                      {g.letter}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-[11px] font-semibold leading-relaxed text-sky-900">
-            💡 <strong className="font-black">Tip:</strong> Tap individual words
-            inside the dark stage on the right too!
-          </div>
-        </div>
-      )}
-
-      {/* RIGHT (8 Cols): SPEAK IT BACK */}
-      <div
-        className={`flex flex-col justify-between space-y-4 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 text-center shadow-sm transition-all duration-200 hover:shadow-md sm:p-6 ${
-          hasLab ? "lg:col-span-8" : ""
-        }`}
-      >
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-black tracking-wider text-blue-700 uppercase">
-              Speak It Back
-            </span>
-            <span className="text-xs font-black text-slate-400">
-              Phrase {index + 1} of {totalPhrases}
-            </span>
-          </div>
-
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Target Phrase Stage Card */}
-        <div className="rounded-2xl border-2 border-indigo-950 bg-gradient-to-b from-slate-900 to-indigo-950 px-5 py-5 text-white shadow-inner">
-          <span className="block text-[10px] font-black tracking-widest text-sky-300 uppercase">
-            Tap any word to hear it, then record the full phrase
-          </span>
-
-          {score?.words?.length ? (
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {score.words.map((w: any, idx: number) => {
-                const acc = w.accuracyScore ?? 0;
-                const pill =
-                  acc >= 80
-                    ? "bg-emerald-500/25 text-emerald-300 border-emerald-400/50"
-                    : acc >= 60
-                      ? "bg-amber-500/25 text-amber-200 border-amber-400/50"
-                      : "bg-rose-500/25 text-rose-200 border-rose-400/50";
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() =>
-                      void handleSpeakWord(w.word, `scored-${idx}`)
-                    }
-                    title={`Grade: ${getAlphaGrade(acc).letter} (Tap to hear)`}
-                    className={`rounded-xl border px-3 py-1 text-lg font-black transition hover:scale-105 sm:text-xl ${pill}`}
-                  >
-                    {w.word}
+                    <Volume2 className="h-4 w-4 opacity-70" />
+                    <span>{w.word}</span>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2.5">
               {phraseWords.map((word, wIdx) => {
                 const key = `prompt-${wIdx}`;
                 const isActive = activeWordKey === key;
@@ -233,44 +298,39 @@ export function FreestylePronunciationReview({
                     key={key}
                     type="button"
                     onClick={() => void handleSpeakWord(word, key)}
-                    className={`rounded-xl border px-3 py-1 text-lg font-black transition sm:text-xl ${
+                    title="Tap to hear word audio"
+                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-lg font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${
                       isActive
-                        ? "border-sky-300 bg-sky-500 text-white"
-                        : "border-white/15 bg-white/10 text-white hover:border-sky-300 hover:bg-white/20"
+                        ? "border-blue-700 border-b-blue-900 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                        : "border-slate-200 border-b-slate-300 bg-white text-slate-900 hover:border-sky-400 hover:bg-sky-50"
                     }`}
                   >
-                    {word}
+                    <Volume2
+                      className={`h-4 w-4 ${
+                        isActive ? "text-white" : "text-blue-600"
+                      }`}
+                    />
+                    <span>{word}</span>
                   </button>
                 );
               })}
             </div>
           )}
-
-          <button
-            type="button"
-            disabled={isPlaying}
-            onClick={() => void speak(current, targetLanguage, 0.9)}
-            className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-extrabold text-sky-200 transition hover:bg-white/20 disabled:opacity-50"
-          >
-            <Volume2 className="h-3.5 w-3.5" />
-            <span>{isPlaying ? "Playing..." : "Hear Full Phrase"}</span>
-          </button>
         </div>
 
-        {/* Bottom Control Row */}
+        {/* Bottom Recorder / Score Row */}
         {!score ? (
           <div className="flex items-center justify-between gap-3 pt-1">
             <button
               type="button"
               onClick={() => {
                 if (index > 0) {
-                  setIndex((i) => i - 1);
-                  reset();
+                  selectPhrase(index - 1);
                 } else {
                   onBack?.();
                 }
               }}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>{index > 0 ? "Previous" : "Back"}</span>
@@ -298,7 +358,7 @@ export function FreestylePronunciationReview({
             <button
               type="button"
               onClick={handleContinue}
-              className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-black text-slate-500 transition hover:bg-white hover:text-slate-800"
+              className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-4 py-3 text-xs font-black text-slate-500 transition hover:bg-white hover:text-slate-800"
             >
               <span>Skip</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -341,22 +401,6 @@ export function FreestylePronunciationReview({
             })()}
 
             <div className="flex w-full gap-2.5 sm:w-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  if (index > 0) {
-                    setIndex((i) => i - 1);
-                    reset();
-                  } else {
-                    onBack?.();
-                  }
-                }}
-                className="inline-flex items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 bg-white px-3.5 py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back</span>
-              </button>
-
               <button
                 type="button"
                 onClick={handlePractice}
