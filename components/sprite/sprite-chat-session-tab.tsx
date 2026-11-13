@@ -17,6 +17,9 @@ import {
   Mic,
   Target,
   Layers,
+  AlertTriangle,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import { useSprite, type ChatViewMode } from "@/context/sprite-context";
 import {
@@ -71,7 +74,15 @@ export function SpriteChatSessionTab({
   onQuickPrompt,
 }: SpriteChatSessionTabProps) {
   const router = useRouter();
-  const { closeChat, profile } = useSprite();
+  const {
+    closeChat,
+    profile,
+    dbNotifications = [],
+    dismissDbNotification,
+    retryLiveTask,
+  } = useSprite();
+
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const energyCount = profile?.energy ?? 0;
   const maxEnergy = profile?.maxEnergy ?? 3;
@@ -133,9 +144,122 @@ export function SpriteChatSessionTab({
   /* ================= 1. EMPTY: NEW SESSION STAGE ================= */
   if (turns.length === 0 || !activeTurn) {
     return (
-      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center py-4 text-center">
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-between py-2 text-center">
+        {/* =====================================================================
+            MINI NOTIFICATIONS DECK (Failed Builds, Alerts with Internal Scroll)
+            ===================================================================== */}
+        {dbNotifications.length > 0 && (
+          <div className="mb-3 w-full space-y-2">
+            {dbNotifications.map((notif) => {
+              const isError =
+                notif.kind === "SYSTEM_ERROR" ||
+                notif.kind === "BOSS_BUILD_FAILED" ||
+                notif.kind === "EXERCISE_BUILD_FAILED";
+              const isLogOpen = expandedLogId === notif.id;
+
+              return (
+                <div
+                  key={notif.id}
+                  className={`w-full overflow-hidden rounded-2xl border-2 text-left shadow-xs transition-all ${
+                    isError
+                      ? "border-rose-200 border-b-rose-300 bg-rose-50"
+                      : "border-sky-200 border-b-sky-300 bg-sky-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 p-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white ${
+                          isError ? "bg-rose-600" : "bg-sky-600"
+                        }`}
+                      >
+                        {isError ? (
+                          <AlertTriangle size={14} />
+                        ) : (
+                          <Sparkles size={14} />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <span
+                          className={`block text-[10px] font-black uppercase tracking-wider ${
+                            isError ? "text-rose-700" : "text-sky-700"
+                          }`}
+                        >
+                          {notif.title || (isError ? "Build Issue" : "Notice")}
+                        </span>
+                        <p className="truncate text-xs font-bold text-slate-800">
+                          {notif.body}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {isError && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const taskId = (notif.payload as any)?.taskId;
+                            if (taskId) await retryLiveTask(taskId);
+                            await dismissDbNotification(notif.id);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border-b-2 border-rose-800 bg-rose-600 px-2 py-1 text-[10px] font-black text-white hover:bg-rose-500"
+                        >
+                          <RotateCcw size={11} />
+                          <span>Retry</span>
+                        </button>
+                      )}
+
+                      {notif.detail && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedLogId(isLogOpen ? null : notif.id)
+                          }
+                          className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
+                          title="Toggle Log"
+                        >
+                          {isLogOpen ? (
+                            <ChevronUp size={14} />
+                          ) : (
+                            <ChevronDown size={14} />
+                          )}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => dismissDbNotification(notif.id)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
+                        title="Dismiss"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expandable internal log with max-h so page NEVER scrolls */}
+                  <AnimatePresence>
+                    {isLogOpen && notif.detail && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-rose-200 bg-white p-2.5"
+                      >
+                        <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap font-mono text-[10px] text-rose-800 select-text">
+                          {notif.detail}
+                        </pre>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Sprite Portrait */}
-        <div className="relative mb-4">
+        <div className="relative mb-3">
           <div
             className={`absolute -inset-2 rounded-3xl blur-lg ${
               isSnoozing
@@ -194,38 +318,36 @@ export function SpriteChatSessionTab({
             )}
           </div>
         ) : (
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-3.5">
             {/* ENERGY GUARD BANNER WHEN 0/3 */}
             {!hasEnergy && (
-              <div className="rounded-3xl border-2 border-b-[6px] border-amber-300 border-b-orange-400 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 p-5 text-left shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-2xs">
-                      <Zap className="h-5 w-5 fill-current" />
+              <div className="rounded-3xl border-2 border-b-[6px] border-amber-300 border-b-orange-400 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 p-4 text-left shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-2xs">
+                    <Zap className="h-5 w-5 fill-current" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-black tracking-widest text-orange-700 uppercase">
+                      0 / {maxEnergy} Energy Remaining
                     </span>
-                    <div>
-                      <span className="text-[10px] font-black tracking-widest text-orange-700 uppercase">
-                        0 / {maxEnergy} Energy Remaining
-                      </span>
-                      <h4 className="text-sm font-black text-slate-900">
-                        {spriteName} Needs a Recharge!
-                      </h4>
-                      <p className="mt-0.5 text-xs font-medium leading-relaxed text-slate-600">
-                        Complete one 3-minute live AI Conversation to refill{" "}
-                        {spriteName} to{" "}
-                        <strong className="font-black text-slate-900">
-                          {maxEnergy}/{maxEnergy} ⚡
-                        </strong>{" "}
-                        and unlock more Chalkboard decks!
-                      </p>
-                    </div>
+                    <h4 className="text-sm font-black text-slate-900">
+                      {spriteName} Needs a Recharge!
+                    </h4>
+                    <p className="mt-0.5 text-xs font-medium leading-relaxed text-slate-600">
+                      Complete one 3-minute live AI Conversation to refill{" "}
+                      {spriteName} to{" "}
+                      <strong className="font-black text-slate-900">
+                        {maxEnergy}/{maxEnergy} ⚡
+                      </strong>{" "}
+                      and unlock more Chalkboard decks!
+                    </p>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleNavigate("/conversation")}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                 >
                   <Mic className="h-4 w-4" />
                   <span>Recharge 3/3 ⚡ in Conversation Arena</span>
@@ -235,7 +357,7 @@ export function SpriteChatSessionTab({
             )}
 
             {/* CHALKBOARD DECK LAUNCH CARDS */}
-            <div className="space-y-3 text-left">
+            <div className="space-y-2.5 text-left">
               <div className="px-1">
                 <h3 className="text-base font-black text-slate-900">
                   {hasEnergy
@@ -280,7 +402,8 @@ export function SpriteChatSessionTab({
                         5-Step Lesson Chalkboard
                       </span>
                       <span className="inline-flex items-center gap-0.5 rounded-lg border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900">
-                        1 <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-600" />
+                        1{" "}
+                        <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-600" />
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs font-bold text-blue-600">
