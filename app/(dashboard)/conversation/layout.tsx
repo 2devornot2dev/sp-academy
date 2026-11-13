@@ -1,6 +1,7 @@
 import { PronunciationProvider } from "@/context/pronunciation-context";
 import { SpeechProvider } from "@/context/speech-context";
 import { MatrixProvider } from "@/context/matrix-context";
+import { SpriteProvider } from "@/context/sprite-context";
 
 export default function ConversationLayout({
   children,
