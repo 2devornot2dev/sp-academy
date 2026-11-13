@@ -323,7 +323,7 @@ export default function FoundationHubPage({
 
                         <button
                           type="button"
-                          onClick={() => openChat({ tab: "briefing" })}
+                          onClick={() => openChat({ tab: "session" })}
                           className="inline-flex items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/25 px-4 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-500/40"
                         >
                           <Dumbbell className="h-3.5 w-3.5 text-amber-300" />

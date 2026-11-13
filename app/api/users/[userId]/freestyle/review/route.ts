@@ -152,6 +152,10 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
         },
       }),
       recordValidFreestyleInRedis(userId, sessionId),
+      prisma.spriteProfile.updateMany({
+        where: { userId },
+        data: { energy: 3 },
+      }),
     ]);
 
     const resolvedMode = mode || updatedSession.mode || "FOCUSED";
@@ -175,8 +179,7 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
 
     const userName = dbUser?.firstName || "Learner";
     const spriteName = spriteProfile?.sprite?.name || "Vox";
-    const spriteGender =
-      spriteProfile?.sprite?.slug === "vivi" ? "F" : "M";
+    const spriteGender = spriteProfile?.sprite?.slug === "vivi" ? "F" : "M";
 
     const task = await prisma.systemTask.create({
       data: {

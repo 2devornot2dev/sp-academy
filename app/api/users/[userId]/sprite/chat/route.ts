@@ -254,17 +254,21 @@ FORMAT:
 }
 `;
 
-  // 4. ENERGY: spend 1 charge atomically (free for "Next Step" clicks).
-  // Placed after all early-return validation so a failed setup never costs energy.
+ // 4. ENERGY: spend 1 charge atomically ONLY when starting a brand-new Chalkboard deck.
+  // Turns inside an active Chalkboard (Steps 1..5) cost 0 extra energy!
   let energySpent = false;
-  if (!isManualStepAdvance) {
+  if (!hasActiveBoard && !isManualStepAdvance) {
     const spent = await prisma.spriteProfile.updateMany({
       where: { userId, energy: { gt: 0 } },
       data: { energy: { decrement: 1 } },
     });
     if (spent.count === 0) {
       return NextResponse.json(
-        { error: "Out of energy", code: "NO_ENERGY" },
+        {
+          error:
+            "Out of energy! Complete a 3-min AI Conversation to recharge to 3/3.",
+          code: "NO_ENERGY",
+        },
         { status: 429 },
       );
     }

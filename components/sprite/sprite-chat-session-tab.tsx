@@ -12,6 +12,11 @@ import {
   BookOpen,
   ArrowRight,
   Moon,
+  Zap,
+  Lock,
+  Mic,
+  Target,
+  Layers,
 } from "lucide-react";
 import { useSprite, type ChatViewMode } from "@/context/sprite-context";
 import {
@@ -66,7 +71,11 @@ export function SpriteChatSessionTab({
   onQuickPrompt,
 }: SpriteChatSessionTabProps) {
   const router = useRouter();
-  const { closeChat } = useSprite();
+  const { closeChat, profile } = useSprite();
+
+  const energyCount = profile?.energy ?? 0;
+  const maxEnergy = profile?.maxEnergy ?? 3;
+  const hasEnergy = energyCount > 0;
 
   const [multiBoardOverride, setMultiBoardOverride] =
     useState<ChalkboardData | null>(null);
@@ -80,7 +89,7 @@ export function SpriteChatSessionTab({
     }
   }, [viewMode, turns.length, activeAssistantPayload.spokenText, isLoading]);
 
-  const handleNavigateToLesson = (href: string) => {
+  const handleNavigate = (href: string) => {
     closeChat();
     router.push(href);
   };
@@ -124,20 +133,25 @@ export function SpriteChatSessionTab({
   /* ================= 1. EMPTY: NEW SESSION STAGE ================= */
   if (turns.length === 0 || !activeTurn) {
     return (
-      <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center py-6 text-center">
-        <div className="relative mb-5">
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center py-4 text-center">
+        {/* Sprite Portrait */}
+        <div className="relative mb-4">
           <div
             className={`absolute -inset-2 rounded-3xl blur-lg ${
               isSnoozing
                 ? "bg-gradient-to-r from-indigo-400/25 to-purple-400/25"
-                : "bg-gradient-to-r from-sky-400/30 to-emerald-400/30"
+                : !hasEnergy
+                  ? "bg-gradient-to-r from-amber-400/30 to-orange-400/25"
+                  : "bg-gradient-to-r from-sky-400/30 to-emerald-400/30"
             }`}
           />
           <div
             className={`relative h-20 w-20 overflow-hidden rounded-3xl border-2 border-b-[5px] bg-white shadow-lg ${
               isSnoozing
                 ? "border-indigo-300 border-b-indigo-400 opacity-90"
-                : "border-sky-400 border-b-blue-600"
+                : !hasEnergy
+                  ? "border-amber-400 border-b-orange-500"
+                  : "border-sky-400 border-b-blue-600"
             }`}
           >
             <img
@@ -153,6 +167,7 @@ export function SpriteChatSessionTab({
           )}
         </div>
 
+        {/* SNOOZING GUARD */}
         {isSnoozing ? (
           <div className="w-full rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-xs">
             <h3 className="mb-1.5 text-lg font-black text-slate-900">
@@ -170,7 +185,7 @@ export function SpriteChatSessionTab({
             {aiBrain.activeStepHref && (
               <button
                 type="button"
-                onClick={() => handleNavigateToLesson(aiBrain.activeStepHref!)}
+                onClick={() => handleNavigate(aiBrain.activeStepHref!)}
                 className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               >
                 <span>{aiBrain.activeStepLabel || "Continue Lesson"}</span>
@@ -179,40 +194,148 @@ export function SpriteChatSessionTab({
             )}
           </div>
         ) : (
-          <div className="w-full rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-xs">
-            <h3 className="mb-1.5 text-lg font-black text-slate-900">
-              Ready to practice, {aiBrain.userName}?
-            </h3>
-            <p className="mb-6 text-xs font-medium leading-relaxed text-slate-500">
-              Click a guided activity below to launch your interactive
-              chalkboard for{" "}
-              <span className="font-extrabold text-blue-600">
-                {aiBrain.currentLessonTitle}
-              </span>
-              .
-            </p>
+          <div className="w-full space-y-4">
+            {/* ENERGY GUARD BANNER WHEN 0/3 */}
+            {!hasEnergy && (
+              <div className="rounded-3xl border-2 border-b-[6px] border-amber-300 border-b-orange-400 bg-gradient-to-br from-amber-50 via-white to-orange-50/50 p-5 text-left shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-2xs">
+                      <Zap className="h-5 w-5 fill-current" />
+                    </span>
+                    <div>
+                      <span className="text-[10px] font-black tracking-widest text-orange-700 uppercase">
+                        0 / {maxEnergy} Energy Remaining
+                      </span>
+                      <h4 className="text-sm font-black text-slate-900">
+                        {spriteName} Needs a Recharge!
+                      </h4>
+                      <p className="mt-0.5 text-xs font-medium leading-relaxed text-slate-600">
+                        Complete one 3-minute live AI Conversation to refill{" "}
+                        {spriteName} to{" "}
+                        <strong className="font-black text-slate-900">
+                          {maxEnergy}/{maxEnergy} ⚡
+                        </strong>{" "}
+                        and unlock more Chalkboard decks!
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="flex flex-wrap justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("/conversation")}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                >
+                  <Mic className="h-4 w-4" />
+                  <span>Recharge 3/3 ⚡ in Conversation Arena</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* CHALKBOARD DECK LAUNCH CARDS */}
+            <div className="space-y-3 text-left">
+              <div className="px-1">
+                <h3 className="text-base font-black text-slate-900">
+                  {hasEnergy
+                    ? `Ready to practice, ${aiBrain.userName}?`
+                    : "Chalkboard Activities"}
+                </h3>
+                <p className="text-xs font-semibold text-slate-500">
+                  Each 5-step Chalkboard deck costs{" "}
+                  <strong className="font-black text-amber-600">1 ⚡</strong>{" "}
+                  upfront — all 5 steps inside are included.
+                </p>
+              </div>
+
+              {/* CARD 1: ACTIVE 5-STEP LESSON CHALKBOARD (1 ⚡) */}
               <button
                 type="button"
+                disabled={!hasEnergy || isLoading}
                 onClick={() =>
                   onQuickPrompt(
-                    `Give me a grammar breakdown for ${aiBrain.currentLessonTitle}`,
+                    `Launch a 5-step Lesson Chalkboard for ${aiBrain.currentLessonTitle}`,
                   )
                 }
-                className="rounded-2xl border-2 border-b-4 border-indigo-200 border-b-indigo-300 bg-indigo-50/70 px-4 py-2.5 text-xs font-black text-indigo-700 transition hover:-translate-y-0.5 hover:bg-indigo-100 active:translate-y-0.5 active:border-b-2"
+                className={`group flex w-full items-center justify-between gap-4 rounded-3xl border-2 border-b-[6px] p-4 text-left transition-all ${
+                  hasEnergy
+                    ? "border-sky-300 border-b-blue-600 bg-white shadow-sm hover:-translate-y-0.5 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
+                    : "cursor-not-allowed border-slate-200 border-b-slate-300 bg-slate-50 opacity-65"
+                }`}
               >
-                ✨ Explain Lesson Grammar
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 shadow-2xs ${
+                      hasEnergy
+                        ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                        : "border-slate-300 bg-slate-200 text-slate-400"
+                    }`}
+                  >
+                    <Layers className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-slate-900">
+                        5-Step Lesson Chalkboard
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 rounded-lg border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900">
+                        1 <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-600" />
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs font-bold text-blue-600">
+                      {aiBrain.currentLessonTitle}
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-500">
+                      Concept • Quiz • Visual Scene • Write It • Speak It
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${
+                    hasEnergy
+                      ? "bg-sky-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"
+                      : "bg-slate-200 text-slate-400"
+                  }`}
+                >
+                  {hasEnergy ? (
+                    <ArrowRight className="h-4 w-4" />
+                  ) : (
+                    <Lock className="h-4 w-4" />
+                  )}
+                </span>
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onQuickPrompt(`Quiz me on ${aiBrain.currentLessonTitle}`)
-                }
-                className="rounded-2xl border-2 border-b-4 border-emerald-600 bg-gradient-to-b from-emerald-400 to-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-xs transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-2"
+
+              {/* CARD 2: WEAK WORDS LAB (DISABLED / COMING SOON) */}
+              <div
+                aria-disabled="true"
+                className="flex w-full cursor-not-allowed items-center justify-between gap-4 rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-slate-50/90 p-4 text-left opacity-70"
               >
-                🎯 Start 1-on-1 Quiz
-              </button>
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-slate-300 bg-slate-200 text-slate-500">
+                    <Target className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-slate-700">
+                        Weak Words Matrix Lab
+                      </span>
+                      <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[9px] font-black tracking-wider text-indigo-600 uppercase">
+                        Coming Soon
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] font-medium text-slate-500">
+                      Custom 5-step drills targeting your lowest-scoring Word
+                      Matrix items.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-slate-400">
+                  <Lock className="h-4 w-4" />
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -339,7 +462,7 @@ export function SpriteChatSessionTab({
                   ) : isLastTurn && error ? (
                     <p className="text-xs font-bold text-rose-600">
                       {spriteName} couldn&apos;t respond right now. Please try
-                      asking again.
+                      again.
                     </p>
                   ) : (
                     <p className="text-xs font-medium text-slate-500">
@@ -388,7 +511,6 @@ export function SpriteChatSessionTab({
           );
         })}
 
-        {/* Snooze Banner at the bottom of Multi Mode */}
         {isSnoozing && (
           <div className="mt-2 rounded-2xl border-2 border-b-4 border-indigo-200 border-b-indigo-300 bg-white p-4 shadow-xs">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -415,7 +537,7 @@ export function SpriteChatSessionTab({
               {aiBrain.activeStepHref && (
                 <button
                   type="button"
-                  onClick={() => handleNavigateToLesson(aiBrain.activeStepHref!)}
+                  onClick={() => handleNavigate(aiBrain.activeStepHref!)}
                   className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2 text-xs font-black text-white shadow-xs transition hover:brightness-105"
                 >
                   <span>{aiBrain.activeStepLabel || "Continue Lesson"}</span>
@@ -456,7 +578,7 @@ export function SpriteChatSessionTab({
         lessonTitle: aiBrain.currentLessonTitle,
         actionHref: aiBrain.activeStepHref,
         actionLabel: aiBrain.activeStepLabel,
-        onNavigate: handleNavigateToLesson,
+        onNavigate: handleNavigate,
       }}
       interactiveInput={{
         value: input,
