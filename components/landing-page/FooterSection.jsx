@@ -27,7 +27,7 @@ export default function FooterSection() {
             </p>
             
             {/* Social Links */}
-            <div className="flex gap-4 mt-6 justify-center md:justify-start">
+            {/* <div className="flex gap-4 mt-6 justify-center md:justify-start">
               {footerConfig.social.map((social) => (
                 <a
                   key={social.name}
@@ -40,7 +40,7 @@ export default function FooterSection() {
                   {social.icon}
                 </a>
               ))}
-            </div>
+            </div> */}
           </div>
 
           {/* Links Columns - Hidden on mobile except legal */}
