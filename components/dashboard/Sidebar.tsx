@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
+  Award,
 } from "lucide-react";
 import { navItems, settingItems } from "./NavLinks";
 import { Button } from "@/components/ui/button";
@@ -313,14 +314,19 @@ export const Sidebar = ({
           </SidebarGroupLabel>
 
           <SidebarGroupContent>
-            <SidebarMenu className="gap-2">
+       <SidebarMenu className="gap-2">
               {navItems.map((navItem, idx) => {
+                const isConversation = navItem.href === "/conversation";
+                const isReviewRoute = pathname.startsWith("/conversation/review");
                 const isActive = pathname.includes(navItem.href);
                 const iconTileTheme =
                   ICON_TILE_THEMES[idx % ICON_TILE_THEMES.length];
 
                 return (
-                  <SidebarMenuItem key={navItem.href}>
+                  <SidebarMenuItem
+                    key={navItem.href}
+                    className={isConversation ? "group/conv" : undefined}
+                  >
                     <SidebarMenuButton
                       isActive={isActive}
                       tooltip={navItem.label}
@@ -347,7 +353,7 @@ export const Sidebar = ({
                           {sidebarOpen && (
                             <span
                               className={cn(
-                                "truncate text-sm transition-transform duration-200 ease-out group-hover/navitem:translate-x-0.5",
+                                "flex-1 truncate text-sm transition-transform duration-200 ease-out group-hover/navitem:translate-x-0.5",
                                 isActive
                                   ? "font-black text-white drop-shadow-2xs"
                                   : "font-extrabold text-slate-700 group-hover/navitem:text-slate-900"
@@ -359,6 +365,42 @@ export const Sidebar = ({
                         </Link>
                       }
                     />
+
+                    {/* Smooth CSS Sub-Route Reveal under Conversation (hover + active) */}
+                    {isConversation && sidebarOpen && (
+                      <div
+                        className={cn(
+                          "grid transition-[grid-template-rows,opacity,margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                          isActive
+                            ? "mt-1.5 grid-rows-[1fr] opacity-100"
+                            : "mt-0 grid-rows-[0fr] opacity-0 group-hover/conv:mt-1.5 group-hover/conv:grid-rows-[1fr] group-hover/conv:opacity-100"
+                        )}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="ml-6 border-l-2 border-slate-200/90 pl-3 py-0.5">
+                            <Link
+                              href="/conversation/review"
+                              className={cn(
+                                "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold transition-all",
+                                isReviewRoute
+                                  ? "border border-sky-200 bg-sky-50 text-blue-700 shadow-2xs"
+                                  : "text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-2xs"
+                              )}
+                            >
+                              <Award
+                                className={cn(
+                                  "size-3.5 shrink-0",
+                                  isReviewRoute
+                                    ? "text-blue-600"
+                                    : "text-emerald-500"
+                                )}
+                              />
+                              <span className="truncate">Report Card</span>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </SidebarMenuItem>
                 );
               })}
