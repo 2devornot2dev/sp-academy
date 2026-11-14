@@ -316,8 +316,8 @@ export function TutorExerciseArcade({
     ? `Bravo! You locked in every repair from our conversation.`
     : roundIdx === 0
       ? matchedIds.size >= cards.length
-        ? `Clean sweep! Hit the button to jump into Sentence Dash.`
-        : `Tap a phrase below to hear it, then tap the matching picture scene.`
+        ? `Clean sweep! Hit Next to jump into Sentence Dash.`
+        : `Tap a phrase below, listen to how I pronounce it, then match it to its scene.`
       : roundIdx === 1
         ? trapFeedback
           ? trapFeedback
@@ -328,93 +328,69 @@ export function TutorExerciseArcade({
           ? `3 out of 3! Click Complete Workout to finish.`
           : `Listen once if you need a refresher, then speak the phrase ${requiredReps} times!`;
 
-  const roundProgressBadge =
-    roundIdx === 0
-      ? `${matchedIds.size} / ${cards.length} Matched`
-      : roundIdx === 1
-        ? `Sentence ${dashItemIdx + 1} / ${dashItems.length}`
-        : `${repsDone} / ${requiredReps} Spoken`;
-
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 font-sans text-slate-900">
-      {/* SLIM TOP PROGRESS BAR */}
-      <div className="mx-auto flex w-full max-w-6xl shrink-0 items-center gap-4 px-4 pt-4 sm:px-5">
-        <Link
-          href="/conversation/review"
-          className="inline-flex shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
-          title="Back to Report Card"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-
-        <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-slate-200/90 p-0.5 shadow-inner">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400 transition-all duration-500"
-            style={{
-              width: workoutCompleted
-                ? "100%"
-                : `${Math.round(((roundIdx + 1) / 3) * 100)}%`,
-            }}
-          />
-        </div>
-
-        <span className="shrink-0 text-xs font-black text-slate-500">
-          {workoutCompleted ? "3 / 3" : `${roundIdx + 1} / 3`}
-        </span>
-      </div>
-
-      {/* ZERO-SCROLL STAGE: JUST AI TUTOR (LEFT) + EXERCISE (RIGHT) */}
-      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-5 lg:grid lg:grid-cols-12">
-        {/* LEFT COLUMN: AI TUTOR CARD (4 cols) */}
-        <aside className="flex shrink-0 flex-row items-center gap-4 rounded-[2rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 lg:col-span-4 lg:flex-col lg:items-stretch lg:justify-between lg:p-6">
-          <div className="flex items-center gap-3.5 lg:flex-col lg:items-center lg:text-center">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 p-4 font-sans text-slate-900 sm:p-5">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3.5">
+        {/* 1. HORIZONTAL AI TUTOR BAR */}
+        <div className="flex shrink-0 items-center justify-between gap-4 rounded-[1.75rem] bg-white px-5 py-3.5 shadow-sm ring-1 ring-slate-200/70">
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
             <div className="relative shrink-0">
               <img
                 src={isTutorHappy ? tutor.avatars.happy : tutor.avatars.default}
                 alt={displayTutorName}
-                className="h-14 w-14 rounded-2xl border-2 border-sky-200 object-cover object-top shadow-sm lg:h-28 lg:w-28 lg:rounded-3xl"
+                className="h-12 w-12 rounded-2xl border-2 border-sky-200 object-cover object-top shadow-xs sm:h-14 sm:w-14"
               />
-              <span className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-500" />
+              <span className="absolute -right-1 -bottom-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
             </div>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 lg:justify-center">
-                <h2 className="text-sm font-black text-slate-900 lg:text-lg">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-black text-slate-900">
                   {displayTutorName}
-                </h2>
-                <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-blue-700 uppercase">
-                  {level}
+                </span>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black tracking-wider text-blue-700 uppercase">
+                  AI Tutor • {level}
+                </span>
+                <span className="hidden truncate text-[11px] font-bold text-slate-400 md:inline">
+                  • {title}
                 </span>
               </div>
-              <p className="hidden truncate text-xs font-bold text-slate-400 lg:mt-0.5 lg:block">
-                {title}
+              <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-bold text-slate-600 sm:text-sm">
+                <Quote className="h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
+                <span className="truncate">{tutorCoachMessage}</span>
               </p>
             </div>
           </div>
 
-          {/* Speech Bubble */}
-          <div className="min-w-0 flex-1 rounded-2xl bg-sky-50/80 p-3.5 ring-1 ring-sky-200/80 lg:my-4 lg:flex-none lg:p-4">
-            <div className="flex items-start gap-2">
-              <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
-              <p className="text-xs font-bold leading-relaxed text-slate-700 sm:text-sm">
-                {tutorCoachMessage}
-              </p>
+          <div className="flex shrink-0 items-center gap-2.5">
+            <div className="hidden items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 sm:flex">
+              <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400 transition-all duration-500"
+                  style={{
+                    width: workoutCompleted
+                      ? "100%"
+                      : `${Math.round(((roundIdx + 1) / 3) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[11px] font-black text-slate-600">
+                {workoutCompleted ? "3/3" : `${roundIdx + 1}/3`}
+              </span>
             </div>
-          </div>
 
-          {/* Bottom Progress Pill (Desktop) */}
-          <div className="hidden items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70 lg:flex">
-            <span className="text-[11px] font-black tracking-wider text-slate-500 uppercase">
-              Progress
-            </span>
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">
-              {roundProgressBadge}
-            </span>
+            <Link
+              href="/conversation/review"
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Exit</span>
+            </Link>
           </div>
-        </aside>
+        </div>
 
-        {/* RIGHT COLUMN: EXERCISE STAGE (8 cols, strictly fits inside 100vh) */}
-        <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 sm:p-6 lg:col-span-8">
+        {/* 2. EXERCISE CARD UNDERNEATH (Strictly fills remaining height, no scroll) */}
+        <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 sm:p-6">
           {workoutCompleted ? (
             /* ================= WORKOUT COMPLETE ================= */
             <motion.div
@@ -454,14 +430,14 @@ export function TutorExerciseArcade({
             </motion.div>
           ) : roundIdx === 0 ? (
             /* ================= ROUND 1: VISUAL MATCH ================= */
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-3.5">
               <div className="flex shrink-0 items-center justify-between gap-2">
                 <p className="text-xs font-black text-slate-800 sm:text-sm">
                   {content.visualMatch?.instruction ||
                     "Select a phrase below, then tap its matching scene"}
                 </p>
                 <span className="shrink-0 rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black text-blue-700">
-                  {matchedIds.size} / {cards.length}
+                  {matchedIds.size} / {cards.length} Matched
                 </span>
               </div>
 
@@ -780,7 +756,7 @@ export function TutorExerciseArcade({
             </div>
           )}
         </section>
-      </main>
+      </div>
     </div>
   );
 }
