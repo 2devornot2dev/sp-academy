@@ -127,14 +127,14 @@ export function FreestyleGrammarReview({
               </h3>
             </div>
 
-            <button
+            {/* <button
               type="button"
               onClick={onComplete}
               className="inline-flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-blue-600 transition hover:bg-sky-100"
             >
               <span>Step 3: Speak</span>
               <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            </button> */}
           </div>
 
           <div className="mt-3 max-h-[380px] space-y-2 overflow-y-auto pr-1">

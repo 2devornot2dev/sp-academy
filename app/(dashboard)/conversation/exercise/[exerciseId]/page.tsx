@@ -29,9 +29,9 @@ export default async function ExercisePage({ params }: Params) {
     redirect("/conversation/review");
   }
 
-  return (
-    <div className="flex min-h-screen flex-col bg-slate-100 px-4 py-8 sm:px-6 lg:px-8">
-      {!exercise.content || exercise.status === "BUILDING" ? (
+  if (!exercise.content || exercise.status === "BUILDING") {
+    return (
+      <div className="flex min-h-screen flex-col bg-slate-100 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto my-auto flex max-w-md flex-col items-center justify-center rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-10 text-center shadow-md">
           <BuildingWorkoutPoller sessionId={exercise.sessionId} />
           <Loader2 className="mb-4 h-10 w-10 animate-spin text-indigo-600" />
@@ -50,17 +50,21 @@ export default async function ExercisePage({ params }: Params) {
             <span>Back to Report Card</span>
           </Link>
         </div>
-      ) : (
-        <TutorExerciseArcade
-          userId={user.id}
-          exerciseId={exercise.id}
-          sessionId={exercise.sessionId}
-          title={exercise.title}
-          tutorName={exercise.tutorName}
-          targetLanguage={exercise.targetLanguage}
-          content={exercise.content}
-        />
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <TutorExerciseArcade
+      userId={user.id}
+      exerciseId={exercise.id}
+      sessionId={exercise.sessionId}
+      title={exercise.title}
+      tutorName={exercise.tutorName}
+      voiceGender={exercise.voiceGender}
+      level={exercise.level}
+      targetLanguage={exercise.targetLanguage}
+      content={exercise.content}
+    />
   );
 }

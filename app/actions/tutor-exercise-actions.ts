@@ -66,6 +66,8 @@ export interface HydratedTutorExercise {
   status: string;
   targetLanguage: string;
   tutorName: string;
+  voiceGender: "male" | "female";
+  level: string;
   content: HydratedTutorExerciseContent | null;
 }
 
@@ -82,6 +84,8 @@ export async function getTutorExercise(
             select: {
               id: true,
               targetLanguage: true,
+              voiceGender: true,
+              level: true,
             },
           },
         },
@@ -94,8 +98,15 @@ export async function getTutorExercise(
   const rawFeedback = (ex.review?.overallFeedback as Record<string, any>) || {};
   const tutorName = rawFeedback.tutorName || "Sophie";
   const targetLanguage = ex.review?.session?.targetLanguage || "fr-FR";
+  const voiceGender: "male" | "female" =
+    rawFeedback.voiceGender === "male" ||
+    ex.review?.session?.voiceGender === "MALE"
+      ? "male"
+      : "female";
+  const level = ex.review?.session?.level || "EASY";
 
   const rawContent = ex.content as unknown as TutorExerciseContent | null;
+
   if (!rawContent || ex.status === "BUILDING" || ex.status === "FAILED") {
     return {
       id: ex.id,
@@ -106,6 +117,8 @@ export async function getTutorExercise(
       status: ex.status,
       targetLanguage,
       tutorName,
+      voiceGender,
+      level,
       content: null,
     };
   }
@@ -151,6 +164,8 @@ export async function getTutorExercise(
     status: ex.status,
     targetLanguage,
     tutorName,
+    voiceGender,
+    level,
     content: {
       visualMatch: {
         type: "visual_match",
@@ -207,7 +222,9 @@ export async function completeTutorExercise({
   }
 }
 
-export async function markReviewCompleted(sessionId: string): Promise<{ ok: boolean }> {
+export async function markReviewCompleted(
+  sessionId: string,
+): Promise<{ ok: boolean }> {
   try {
     const user = await requireUser();
     await prisma.freestyleReview.updateMany({

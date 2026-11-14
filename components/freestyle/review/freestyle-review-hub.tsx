@@ -635,7 +635,7 @@ const triggerCelebration = () => {
                   <span>
                     {workoutLoading
                       ? "Preparing 3-Min AI Workout..."
-                      : "Start 3-Min AI Workout from This Call"}
+                      : "Start 3-Min AI Workout from This Convo"}
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
