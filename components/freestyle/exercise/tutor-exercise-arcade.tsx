@@ -329,7 +329,7 @@ export function TutorExerciseArcade({
           : `Listen once if you need a refresher, then speak the phrase ${requiredReps} times!`;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 p-4 font-sans text-slate-900 sm:p-5">
+    <div className="flex h-screen flex-col overflow-hidden animate-bg p-4 font-sans text-slate-900 sm:p-5">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3.5">
         {/* 1. HORIZONTAL AI TUTOR BAR */}
         <div className="flex shrink-0 items-center justify-between gap-4 rounded-[1.75rem] bg-white px-5 py-3.5 shadow-sm ring-1 ring-slate-200/70">
