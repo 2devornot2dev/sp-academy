@@ -60,6 +60,13 @@ export async function invokeTutorExercise({
       };
     }
 
+    if (!session.review.hasUserReviewed) {
+      return {
+        ok: false,
+        error: "Complete your Interactive AI Review first to unlock this 3-Min Workout!",
+      };
+    }
+
     const review = session.review;
 
     // If exercise already exists (and didn't fail), return it immediately

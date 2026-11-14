@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 import type { TutorExerciseContent } from "@/lib/schema/ai-tutor-exercise-schema";
+import { requireUser } from "@/lib/auth-guard";
 
 async function safePresign(key?: string | null): Promise<string | null> {
   if (!key) return null;
@@ -202,6 +203,25 @@ export async function completeTutorExercise({
     return { ok: true };
   } catch (err) {
     console.error("❌ [completeTutorExercise] failed:", err);
+    return { ok: false };
+  }
+}
+
+export async function markReviewCompleted(sessionId: string): Promise<{ ok: boolean }> {
+  try {
+    const user = await requireUser();
+    await prisma.freestyleReview.updateMany({
+      where: {
+        freestyleSessionId: sessionId,
+        session: { userId: user.id },
+      },
+      data: {
+        hasUserReviewed: true,
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error("❌ [markReviewCompleted] failed:", err);
     return { ok: false };
   }
 }

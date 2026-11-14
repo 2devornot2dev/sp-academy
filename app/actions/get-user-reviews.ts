@@ -43,6 +43,7 @@ export interface UserReviewListItem {
   // 🟢 AI Tutor 3-Min Exercise fields
   tutorExerciseId: string | null;
   tutorExerciseStatus: "BUILDING" | "READY" | "COMPLETED" | "FAILED" | null;
+  hasUserReviewed: boolean;
 }
 
 export async function getUserReviews(
@@ -105,6 +106,7 @@ export async function getUserReviews(
       isReady,
       tutorExerciseId: ex?.id ?? null,
       tutorExerciseStatus: (ex?.status as UserReviewListItem["tutorExerciseStatus"]) ?? null,
+      hasUserReviewed: Boolean(rev?.hasUserReviewed),
     };
   });
 }

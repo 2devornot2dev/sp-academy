@@ -32,6 +32,10 @@ import { WordAudioProvider } from "@/context/word-audio-context";
 import { getAlphaGrade, type TrickyWordItem } from "@/lib/freestyle/grades";
 import { getFreestyleTutor } from "@/lib/freestyle/tutors";
 import { ReviewData, SessionData, SpriteOutro } from "./review-types";
+import { useRouter } from "next/navigation";
+import { Dumbbell } from "lucide-react"; // or add Dumbbell to your existing lucide-react import
+import { markReviewCompleted } from "@/app/actions/tutor-exercise-actions";
+import { invokeTutorExercise } from "@/app/actions/invoke-tutor-exercise";
 
 type Step = 1 | 2 | 3 | "celebration";
 
@@ -70,6 +74,9 @@ export function FreestyleReviewHub({
   const [data, setData] = useState<ReviewApiResponse | null>(initialData);
   const [loading, setLoading] = useState(!initialData);
   const { avatarSrc, spriteName } = useSprite();
+  const router = useRouter();
+  const [workoutLoading, setWorkoutLoading] = useState(false);
+  const [workoutErr, setWorkoutErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) return;
@@ -199,8 +206,9 @@ export function FreestyleReviewHub({
     { label: "Fluency", score: review.metrics.fluencyScore },
   ];
 
-  const triggerCelebration = () => {
+const triggerCelebration = () => {
     setStep("celebration");
+    void markReviewCompleted(sessionId); // <-- Unlocks the 3-Min Workout!
     confetti({
       particleCount: 150,
       spread: 70,
@@ -212,6 +220,18 @@ export function FreestyleReviewHub({
     }
   };
 
+  const handleStartWorkoutFromCelebration = async () => {
+    setWorkoutErr(null);
+    setWorkoutLoading(true);
+    await markReviewCompleted(sessionId);
+    const res = await invokeTutorExercise({ sessionId });
+    setWorkoutLoading(false);
+    if (!res.ok) {
+      setWorkoutErr(res.error);
+      return;
+    }
+    router.push(`/conversation/exercise/${res.exerciseId}`);
+  };
   return (
     <WordAudioProvider targetLang={session.targetLanguage || "fr-FR"}>
       <div className="flex min-h-screen flex-col bg-slate-100 font-sans text-slate-900 selection:bg-indigo-100">
@@ -546,7 +566,7 @@ export function FreestyleReviewHub({
           {/* =================================================================
               FINALE: CELEBRATION + VOX / VIVI PERSONALIZED OUTRO
               ================================================================= */}
-          {step === "celebration" && (
+        {step === "celebration" && (
             <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border-2 border-b-[6px] border-emerald-200 bg-white p-8 text-center shadow-xl animate-in zoom-in-95 duration-300">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-4xl text-white shadow-lg">
                 🏆
@@ -557,7 +577,7 @@ export function FreestyleReviewHub({
                 </h2>
                 <p className="mt-1.5 text-sm font-semibold text-slate-500">
                   Your fixes and native upgrades are saved in your Word Matrix,
-                  and your Milestone Boss is ready!
+                  and your 3-Min AI Workout is now unlocked!
                 </p>
               </div>
 
@@ -599,11 +619,39 @@ export function FreestyleReviewHub({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-3">
+              {/* Unlocked Primary Next Step: 3-Min AI Workout */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled={workoutLoading}
+                  onClick={handleStartWorkoutFromCelebration}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-60"
+                >
+                  {workoutLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Dumbbell className="h-4 w-4 text-amber-300" />
+                  )}
+                  <span>
+                    {workoutLoading
+                      ? "Preparing 3-Min AI Workout..."
+                      : "Start 3-Min AI Workout from This Call"}
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+
+                {workoutErr && (
+                  <p className="text-xs font-bold text-rose-600">
+                    {workoutErr}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 bg-white px-4 py-4 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 bg-white px-4 py-3.5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   <span>Scorecard</span>
@@ -611,7 +659,7 @@ export function FreestyleReviewHub({
 
                 <Link
                   href="/learning-hub"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 px-5 py-4 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-110 sm:text-sm"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 px-5 py-3.5 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-110 sm:text-sm"
                 >
                   <Swords className="h-4 w-4" />
                   <span>Challenge Boss</span>
@@ -619,7 +667,7 @@ export function FreestyleReviewHub({
 
                 <button
                   onClick={onComplete}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-5 py-4 text-xs font-black text-slate-800 transition hover:bg-white sm:text-sm"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-5 py-3.5 text-xs font-black text-slate-800 transition hover:bg-white sm:text-sm"
                 >
                   <BookOpen className="h-4 w-4 text-blue-600" />
                   <span>All Reviews</span>
