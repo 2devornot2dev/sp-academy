@@ -58,7 +58,7 @@ export default async function ConversationReviewsListPage() {
 
           <div className="max-w-3xl">
             <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl md:text-4xl">
-              <span>Conversation Report Card</span>
+              <span>Conversation Review</span>
               <MessagesSquare className="h-7 w-7 text-white/90 sm:h-9 sm:w-9" />
             </h1>
             <p className="mt-1.5 text-sm font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">

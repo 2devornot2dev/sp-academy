@@ -423,7 +423,7 @@ export function TutorExerciseArcade({
                   href="/conversation/review"
                   className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-5 py-3.5 text-xs font-black text-white shadow-md transition hover:brightness-105"
                 >
-                  <span>Back to Report Card</span>
+                  <span>Back to Review Page</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
