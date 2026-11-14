@@ -88,6 +88,7 @@ export default function OnboardingShell({
   const [goal, setGoal] = useState("");
   const [sprite, setSprite] = useState<SpriteSlug>("vox");
   const [voiceId, setVoiceId] = useState<string>("");
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
   // NEW: user typing goes through this so it's always lowercase
   const handleUsernameChange = (value: string) => {
@@ -124,6 +125,14 @@ export default function OnboardingShell({
       router.replace(newUrl, { scroll: false });
     }
   }, [urlErrorCode, searchParams, router]);
+
+  // Only sign out stale sessions on initial mount at Step 1 (never after Step 1 signup!)
+  useEffect(() => {
+    if (!isOAuth && step === 1 && !createdUserId) {
+      authClient.signOut();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isOAuth || !session?.user) return;
@@ -183,13 +192,18 @@ export default function OnboardingShell({
     }
   };
 
-  // 2. Replace handleCompleteOnboarding (lines 166-206) with this:
   const handleCompleteOnboarding = async () => {
-    const userId = session?.user?.id;
+    let userId = createdUserId || session?.user?.id;
+
+    // Fallback: fetch fresh session directly from authClient if hook hasn't updated yet
+    if (!userId) {
+      const fresh = await authClient.getSession();
+      userId = fresh?.data?.user?.id ?? undefined; // was: ?? null
+    }
 
     if (!userId) {
       console.error("No user ID found");
-      setError("User session not found. Please try refreshing the page.");
+      setError("User session not found. Please sign in again.");
       return;
     }
 
@@ -201,13 +215,13 @@ export default function OnboardingShell({
         voiceId.split("-").slice(2).join("-") ||
         (sprite === "vivi" ? "girl-01" : "boy-01");
 
+      // Always prefix with the actual selected languages so switching languages never mismatches voiceId
       const resolvedNativeVoiceId = `${nativeLanguage}-${voiceSuffix}`;
-      const resolvedTargetVoiceId =
-        voiceId || `${targetLanguage}-${voiceSuffix}`;
+      const resolvedTargetVoiceId = `${targetLanguage}-${voiceSuffix}`;
 
       const commonPayload = {
         userId,
-        firstName,
+        firstName: firstName.trim(),
         gender: gender || Gender.M,
         spoon: 1,
         nativeLanguage,
@@ -222,13 +236,12 @@ export default function OnboardingShell({
         targetVoiceId: resolvedTargetVoiceId,
       };
 
-      // 🟢 BRANCH: Paid with Stripe vs. Free Trial Milestone 1
       const isPaid = Boolean(sessionId);
       const builderAction = isPaid
         ? invokeEduBuilder({ ...commonPayload, sessionId })
         : invokeTrialBuilder(commonPayload);
 
-      const [_, setupToken] = await Promise.all([
+      const [builderRes, setupToken] = await Promise.all([
         builderAction,
         setUserGeneration({
           firstName: firstName.trim(),
@@ -243,11 +256,20 @@ export default function OnboardingShell({
         }),
       ]);
 
+      if (builderRes && (builderRes as any).ok === false) {
+        throw new Error(
+          (builderRes as any).error ||
+            "Failed to initialize your first lesson.",
+        );
+      }
+
       router.push(`/learning-hub?setup=${setupToken}`);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save onboarding:", err);
-      setError("Failed to save your preferences. Please try again.");
+      setError(
+        err?.message || "Failed to save your preferences. Please try again.",
+      );
       setSubmitting(false);
     }
   };
@@ -263,26 +285,34 @@ export default function OnboardingShell({
         const first = firstName.trim();
         const last = lastName.trim();
         const name = `${first} ${last}`;
-        const cleanUsername = normalizeUsername(username); // NEW
+        const cleanUsername = normalizeUsername(username);
 
         if (hasAccount) {
-          const { error } = await authClient.updateUser({
+          const { data, error } = await authClient.updateUser({
             name,
             firstName: first,
             lastName: last,
-            username: cleanUsername, // CHANGED
+            username: cleanUsername,
           });
           if (error) throw error;
+          if ((data as any)?.user?.id || session?.user?.id) {
+            setCreatedUserId(
+              (data as any)?.user?.id || session?.user?.id || null,
+            );
+          }
         } else {
-          const { error } = await authClient.signUp.email({
+          const { data, error } = await authClient.signUp.email({
             email: emailValue.trim(),
             password,
             name,
             firstName: first,
             lastName: last,
-            username: cleanUsername, // CHANGED
+            username: cleanUsername,
           });
           if (error) throw error;
+          if (data?.user?.id) {
+            setCreatedUserId(data.user.id);
+          }
         }
         setStep(2);
       } catch (err) {
@@ -302,7 +332,6 @@ export default function OnboardingShell({
       await handleCompleteOnboarding();
     }
   };
-
   const previousStep = () => {
     if (step > 2) setStep((current) => current - 1);
   };

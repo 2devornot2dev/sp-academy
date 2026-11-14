@@ -121,10 +121,34 @@ model FreestyleReview {
 
   hasUserReviewed Boolean @default(false)
 
+  // 1-to-1 AI Tutor Exercise pinned to this review
+  tutorExercise   TutorExercise?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model TutorExercise {
+  id                 String          @id @default(cuid())
+  userId             String
+  freestyleSessionId String          @unique
+  freestyleReviewId  String          @unique
+  review             FreestyleReview @relation(fields: [freestyleReviewId], references: [id], onDelete: Cascade)
+
+  title          String    @default("3-Min AI Tutor Workout")
+  status         String    @default("BUILDING") // "BUILDING" | "READY" | "COMPLETED" | "FAILED"
+  sourceMistakes Json      @default("[]")
+  vocabUpgrades  Json      @default("[]")
+  content        Json?     // { visualMatch, sentenceDash, speechBurst }
+
+  score          Float?
+  completedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+}
 enum LambdaStatus {
   PENDING
   SUCCESS

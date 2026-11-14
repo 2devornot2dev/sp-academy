@@ -1,8 +1,9 @@
 // components/freestyle/review/review-table.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -26,8 +27,11 @@ import {
   BookOpen,
   Flame,
   Crown,
+  Dumbbell,
+  CheckCircle2,
 } from "lucide-react";
 import type { UserReviewListItem } from "@/app/actions/get-user-reviews";
+import { invokeTutorExercise } from "@/app/actions/invoke-tutor-exercise";
 import { getAlphaGrade } from "@/lib/freestyle/grades";
 
 const MODE_LABELS: Record<string, string> = {
@@ -37,7 +41,6 @@ const MODE_LABELS: Record<string, string> = {
   SPECIFIC: "Custom",
   ARGUMENTATIVE: "Debate",
 };
-
 
 function GradeCell({ value }: { value: number | null }) {
   if (value === null) {
@@ -54,10 +57,61 @@ function GradeCell({ value }: { value: number | null }) {
 }
 
 export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string>(reviews[0]?.id ?? "");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [modeFilter, setModeFilter] = useState<string>("ALL");
+
+  // Track optimistic building state by sessionId
+  const [localBuildingSessionId, setLocalBuildingSessionId] = useState<
+    string | null
+  >(null);
+  const [workoutError, setWorkoutError] = useState<string | null>(null);
+
+  // Check if ANY review currently has a workout building (1-at-a-time lock)
+  const activeBuildingSessionId = useMemo(() => {
+    if (localBuildingSessionId) return localBuildingSessionId;
+    const found = reviews.find((r) => r.tutorExerciseStatus === "BUILDING");
+    return found?.id ?? null;
+  }, [reviews, localBuildingSessionId]);
+
+  // Clear optimistic "BUILDING" state once server returns READY / COMPLETED / FAILED
+  useEffect(() => {
+    if (!localBuildingSessionId) return;
+    const match = reviews.find((r) => r.id === localBuildingSessionId);
+    if (
+      match?.tutorExerciseStatus === "READY" ||
+      match?.tutorExerciseStatus === "COMPLETED" ||
+      match?.tutorExerciseStatus === "FAILED"
+    ) {
+      setLocalBuildingSessionId(null);
+    }
+  }, [reviews, localBuildingSessionId]);
+
+  // Poll every 3s ONLY while a workout is building, then stop automatically
+  useEffect(() => {
+    if (!activeBuildingSessionId) return;
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeBuildingSessionId, router]);
+
+  const handleGenerateWorkout = (sessionId: string) => {
+    setWorkoutError(null);
+    setLocalBuildingSessionId(sessionId);
+    startTransition(async () => {
+      const res = await invokeTutorExercise({ sessionId });
+      if (!res.ok) {
+        setLocalBuildingSessionId(null);
+        setWorkoutError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
 
   const filteredByMode = useMemo(() => {
     if (modeFilter === "ALL") return reviews;
@@ -243,20 +297,49 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
         header: () => <span className="sr-only">Open</span>,
         cell: ({ row }) => {
           const item = row.original;
+          const isThisBuilding =
+            item.tutorExerciseStatus === "BUILDING" ||
+            localBuildingSessionId === item.id;
+
           return (
-            <Link
-              href={`/conversation/${item.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3.5 py-2 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 whitespace-nowrap"
-            >
-              <span>{item.isReady ? "Open" : "Status"}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex items-center justify-end gap-2">
+              {isThisBuilding && (
+                <span className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[10px] font-black text-violet-700">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Workout</span>
+                </span>
+              )}
+              {(item.tutorExerciseStatus === "READY" ||
+                item.tutorExerciseStatus === "COMPLETED") &&
+                item.tutorExerciseId && (
+                  <Link
+                    href={`/conversation/exercise/${item.tutorExerciseId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-xl border border-b-[3px] border-violet-700 bg-gradient-to-b from-violet-500 to-purple-600 px-2.5 py-1.5 text-[11px] font-black text-white shadow-2xs transition hover:brightness-105"
+                  >
+                    <Dumbbell className="h-3 w-3" />
+                    <span>
+                      {item.tutorExerciseStatus === "COMPLETED"
+                        ? "Done"
+                        : "Play"}
+                    </span>
+                  </Link>
+                )}
+
+              <Link
+                href={`/conversation/${item.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3.5 py-2 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 whitespace-nowrap"
+              >
+                <span>{item.isReady ? "Open" : "Status"}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           );
         },
       },
     ],
-    [],
+    [localBuildingSessionId],
   );
 
   const table = useReactTable({
@@ -317,6 +400,17 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
   const vGrade = getAlphaGrade(selectedReview?.vocabScore ?? null);
   const sGrade = getAlphaGrade(selectedReview?.pronunciationScore ?? null);
   const fGrade = getAlphaGrade(selectedReview?.fluencyScore ?? null);
+
+  const selectedExerciseStatus =
+    selectedReview && localBuildingSessionId === selectedReview.id
+      ? "BUILDING"
+      : selectedReview?.tutorExerciseStatus ?? null;
+
+  const isAnotherSessionBuilding = Boolean(
+    activeBuildingSessionId &&
+      selectedReview &&
+      activeBuildingSessionId !== selectedReview.id,
+  );
 
   return (
     <div className="space-y-6">
@@ -418,7 +512,7 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             </div>
 
             {/* Right 3D Grade Board & Action (5 cols) */}
-            <div className="flex flex-col justify-between gap-5 rounded-3xl border border-white/15 bg-white/[0.06] p-5 backdrop-blur-md lg:col-span-5">
+            <div className="flex flex-col justify-between gap-4 rounded-3xl border border-white/15 bg-white/[0.06] p-5 backdrop-blur-md lg:col-span-5">
               <div className="flex items-center justify-between text-[10px] font-black tracking-widest text-slate-300 uppercase">
                 <span className="flex items-center gap-1.5">
                   <Flame className="h-3.5 w-3.5 text-amber-400" />
@@ -451,17 +545,74 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
                 ))}
               </div>
 
-              <Link
-                href={`/conversation/${selectedReview.id}`}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
-              >
-                <span>
-                  {selectedReview.isReady
-                    ? "Open Interactive AI Review"
-                    : "Check Report Status"}
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="space-y-2.5">
+                <Link
+                  href={`/conversation/${selectedReview.id}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                >
+                  <span>
+                    {selectedReview.isReady
+                      ? "Open Interactive AI Review"
+                      : "Check Report Status"}
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+
+                {/* 🟢 3-MINUTE AI TUTOR WORKOUT BUTTON */}
+                {selectedReview.isReady && (
+                  <>
+                    {(selectedExerciseStatus === "READY" ||
+                      selectedExerciseStatus === "COMPLETED") &&
+                    selectedReview.tutorExerciseId ? (
+                      <Link
+                        href={`/conversation/exercise/${selectedReview.tutorExerciseId}`}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-violet-800 bg-gradient-to-b from-violet-500 to-purple-600 px-6 py-3 text-xs font-black text-white shadow-lg shadow-violet-500/25 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                      >
+                        {selectedExerciseStatus === "COMPLETED" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                        ) : (
+                          <Dumbbell className="h-4 w-4 text-amber-300" />
+                        )}
+                        <span>
+                          {selectedExerciseStatus === "COMPLETED"
+                            ? "Replay 3-Min AI Workout"
+                            : "Start 3-Min AI Workout"}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : selectedExerciseStatus === "BUILDING" ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/20 px-6 py-3 text-xs font-black text-violet-200"
+                      >
+                        <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
+                        <span>Building 3-Min AI Workout...</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending || isAnotherSessionBuilding}
+                        onClick={() => handleGenerateWorkout(selectedReview.id)}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-violet-600 px-6 py-3 text-xs font-black text-white shadow-lg shadow-indigo-500/25 transition hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Dumbbell className="h-4 w-4 text-amber-300" />
+                        <span>
+                          {isAnotherSessionBuilding
+                            ? "Another Workout is Building..."
+                            : "Generate 3-Min AI Workout ⚡"}
+                        </span>
+                      </button>
+                    )}
+
+                    {workoutError && (
+                      <p className="text-center text-[11px] font-bold text-rose-300">
+                        {workoutError}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

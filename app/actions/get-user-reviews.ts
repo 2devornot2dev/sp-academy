@@ -40,6 +40,9 @@ export interface UserReviewListItem {
   mistakesCount: number;
   vocabUpgradesCount: number;
   isReady: boolean;
+  // 🟢 AI Tutor 3-Min Exercise fields
+  tutorExerciseId: string | null;
+  tutorExerciseStatus: "BUILDING" | "READY" | "COMPLETED" | "FAILED" | null;
 }
 
 export async function getUserReviews(
@@ -52,7 +55,16 @@ export async function getUserReviews(
     },
     orderBy: { createdAt: "desc" },
     include: {
-      review: true,
+      review: {
+        include: {
+          tutorExercise: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -66,6 +78,7 @@ export async function getUserReviews(
       : [];
     const mistakes = Array.isArray(rev?.mistakes) ? rev.mistakes : [];
     const isReady = Boolean(rev && rev.lambdaStatus === "SUCCESS");
+    const ex = rev?.tutorExercise ?? null;
 
     return {
       id: s.id,
@@ -90,6 +103,8 @@ export async function getUserReviews(
       mistakesCount: mistakes.length,
       vocabUpgradesCount: upgrades.length,
       isReady,
+      tutorExerciseId: ex?.id ?? null,
+      tutorExerciseStatus: (ex?.status as UserReviewListItem["tutorExerciseStatus"]) ?? null,
     };
   });
 }

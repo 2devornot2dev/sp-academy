@@ -20,11 +20,23 @@ export async function advanceMilestoneBuildChain({
     const course = await prisma.foundationCourse.findUnique({
       where: { id: courseId },
       include: {
-        user: { select: { id: true, firstName: true, gender: true } },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            gender: true,
+            BillingInformation: { select: { paymentStatus: true } },
+          },
+        },
       },
     });
 
     if (!course) return;
+
+    // 🛑 TRIAL GUARD: Spoons 1-3, Bridges 1-3, and Boss 1 are already built in one go!
+    if (course.user?.BillingInformation?.paymentStatus === "TRIAL") {
+      return;
+    }
 
     if (subStep === 1 || subStep === 2) {
       const currentLesson = await prisma.foundationLesson.findUnique({
@@ -120,9 +132,22 @@ export async function startNextMilestoneDaisyChain({
   try {
     const course = await prisma.foundationCourse.findUnique({
       where: { id: courseId },
-      include: { user: { select: { firstName: true, gender: true } } },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            gender: true,
+            BillingInformation: { select: { paymentStatus: true } },
+          },
+        },
+      },
     });
     if (!course) return;
+
+    // 🛑 TRIAL GUARD: Do NOT build Milestone 2 (Spoon 4) while user is on TRIAL
+    if (course.user?.BillingInformation?.paymentStatus === "TRIAL") {
+      return;
+    }
 
     // Do NOT auto-trigger the next spoon if Standard Track reached Milestone 10 (Spoon 30)
     if (!course.isHardMode && currentMilestoneIndex === 10) {

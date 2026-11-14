@@ -45,7 +45,9 @@ export async function setupNextLesson(
       });
 
       if (!sprite) {
-        throw new Error(`Sprite "${chosenSlug}" not found. Run seed-sprites first.`);
+        throw new Error(
+          `Sprite "${chosenSlug}" not found. Run seed-sprites first.`,
+        );
       }
 
       const nativeVoiceId =
@@ -63,6 +65,8 @@ export async function setupNextLesson(
           targetLanguage: payload.targetLanguage,
           nativeVoiceId,
           targetVoiceId,
+          energy: 3,
+          maxEnergy: 3,
         },
         include: { sprite: true },
       });
@@ -97,7 +101,7 @@ export async function setupNextLesson(
       tx.spriteNode.findUnique({ where: { nodeId } }),
       tx.spriteNode.findUnique({ where: { nodeId: bridgeNodeId } }),
     ]);
-    
+
     const taskPayload = JSON.stringify({
       ...payload,
       spriteSlug,

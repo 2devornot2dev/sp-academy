@@ -12,6 +12,8 @@ import { handleVocabBridgeGeneration } from "@/lib/system-tasks/handlers/handle-
 import { handleFreestyleReview } from "@/lib/system-tasks/handlers/handler-freestyle-review";
 import { handleSpriteExerciseGeneration } from "@/lib/system-tasks/handlers/handle-sprite-exercise";
 import { handleBookGeneration } from "@/lib/system-tasks/handlers/handle-book-generation";
+import { handleTrialGeneration } from "@/lib/system-tasks/handlers/handle-trial-generation";
+import { handleTutorExercise } from "@/lib/system-tasks/handlers/handle-tutor-exercise";
 import { SystemTaskType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
@@ -98,6 +100,14 @@ export async function POST(req: Request, { params }: Params) {
 
       case SystemTaskType.BOOK_GENERATION: {
         return await handleBookGeneration(task, body);
+      }
+
+      case SystemTaskType.TRIAL_GENERATION: {
+        return await handleTrialGeneration(task, body);
+      }
+
+      case SystemTaskType.TUTOR_EXERCISE_GENERATION: {
+        return await handleTutorExercise(task, body);
       }
 
       default:
