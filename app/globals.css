@@ -634,10 +634,125 @@ html {
   30% { transform: translateY(-6px); opacity: 1; }
 }
 
+/* Default (Spoon Ocean) */
 .animate-bg {
- @apply animate-[gradient_6s_ease_infinite] bg-linear-to-r from-sky-400 via-emerald-400 to-violet-400 bg-size-[300%_300%]
+  @apply animate-[gradient_6s_ease_infinite] bg-linear-to-r from-sky-400 via-emerald-400 to-violet-400 bg-size-[300%_300%];
 }
 
+/* Shared pseudo-element base for Stars / Bubbles / Galaxy */
+[data-banner="bubbles"] .animate-bg::before,
+[data-banner="stars"] .animate-bg::before,
+[data-banner="stars"] .animate-bg::after,
+[data-banner="galaxy"] .animate-bg::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, opacity;
+}
+
+/* 1. BUBBLES (Floating translucent circles, zero JS) */
+[data-banner="bubbles"] .animate-bg {
+  background-image: linear-gradient(120deg, #0ea5e9, #06b6d4, #10b981, #38bdf8);
+  background-size: 300% 300%;
+  animation: gradient 8s ease infinite;
+}
+[data-banner="bubbles"] .animate-bg::before {
+  background-image:
+    radial-gradient(circle 18px at 12% 75%, rgba(255, 255, 255, 0.22) 95%, transparent 100%),
+    radial-gradient(circle 10px at 26% 35%, rgba(255, 255, 255, 0.18) 95%, transparent 100%),
+    radial-gradient(circle 24px at 45% 80%, rgba(255, 255, 255, 0.15) 95%, transparent 100%),
+    radial-gradient(circle 12px at 64% 28%, rgba(255, 255, 255, 0.22) 95%, transparent 100%),
+    radial-gradient(circle 20px at 82% 70%, rgba(255, 255, 255, 0.16) 95%, transparent 100%),
+    radial-gradient(circle 8px at 91% 25%, rgba(255, 255, 255, 0.24) 95%, transparent 100%);
+  background-size: 320px 220px;
+  animation: float-bubbles 14s linear infinite;
+}
+
+/* 2. STARS (Two twinkling starfield layers) */
+[data-banner="stars"] .animate-bg {
+  background-image: linear-gradient(120deg, #0b1026, #1e1b4b, #0f172a, #1d2559);
+  background-size: 300% 300%;
+  animation: gradient 10s ease infinite;
+}
+[data-banner="stars"] .animate-bg::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 90px 70px, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2px 2px at 160px 25px, #bae6fd, transparent),
+    radial-gradient(1px 1px at 210px 95px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 270px 45px, #fde68a, transparent);
+  background-size: 300px 130px;
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+[data-banner="stars"] .animate-bg::after {
+  background-image:
+    radial-gradient(1px 1px at 45px 80px, #fff, transparent),
+    radial-gradient(2px 2px at 130px 110px, #e0e7ff, transparent),
+    radial-gradient(1.5px 1.5px at 240px 20px, #fff, transparent);
+  background-size: 280px 140px;
+  animation: twinkle 6s ease-in-out infinite alternate-reverse;
+}
+
+/* 3. GALAXY (Nebula swirl + crisp star specks) */
+[data-banner="galaxy"] .animate-bg {
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(236, 72, 153, 0.35), transparent 55%),
+    radial-gradient(ellipse at 80% 30%, rgba(56, 189, 248, 0.35), transparent 55%),
+    linear-gradient(125deg, #090d16, #2e1065, #1e1b4b, #4c1d95, #0f172a);
+  background-size: 100% 100%, 100% 100%, 300% 300%;
+  animation: gradient 9s ease infinite;
+}
+[data-banner="galaxy"] .animate-bg::before {
+  background-image:
+    radial-gradient(1.5px 1.5px at 35px 40px, #fff, transparent),
+    radial-gradient(2px 2px at 110px 85px, #f0abfc, transparent),
+    radial-gradient(1px 1px at 185px 25px, #7dd3fc, transparent),
+    radial-gradient(1.5px 1.5px at 245px 95px, #fff, transparent);
+  background-size: 280px 130px;
+  animation: twinkle 5s ease-in-out infinite alternate;
+}
+
+/* 4. JAMAICA FLAG (Smooth waving green / gold / black) */
+[data-banner="jamaica"] .animate-bg {
+  background-image: linear-gradient(
+    125deg,
+    #009b3a 0%,
+    #fed100 28%,
+    #111827 50%,
+    #fed100 72%,
+    #009b3a 100%
+  );
+  background-size: 300% 300%;
+  animation: gradient 7s ease infinite;
+}
+
+/* 5. SUNSET (Warm coral / amber / violet) */
+[data-banner="sunset"] .animate-bg {
+  background-image: linear-gradient(120deg, #f97316, #ec4899, #8b5cf6, #f59e0b);
+  background-size: 300% 300%;
+  animation: gradient 7s ease infinite;
+}
+
+/* GPU-only Keyframes */
+@keyframes float-bubbles {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, -220px, 0);
+  }
+}
+
+@keyframes twinkle {
+  0% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
 
 .animate-dark-bg {
  @apply animate-[gradient_6s_ease_infinite] bg-linear-to-r from-sky-400 via-emerald-400 to-violet-400 bg-size-[300%_300%]
