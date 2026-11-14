@@ -1,7 +1,7 @@
 // components/freestyle/exercise/tutor-exercise-arcade.tsx
 "use client";
 
-import { Fragment, useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import confetti from "canvas-confetti";
@@ -16,8 +16,6 @@ import {
   Trophy,
   AlertCircle,
   Loader2,
-  Dumbbell,
-  Sparkles,
   Check,
   Quote,
 } from "lucide-react";
@@ -38,12 +36,6 @@ interface TutorExerciseArcadeProps {
   targetLanguage: string;
   content: HydratedTutorExerciseContent;
 }
-
-const ROUNDS = [
-  { id: 0, step: 1, label: "Visual Match", icon: Sparkles },
-  { id: 1, step: 2, label: "Sentence Dash", icon: Dumbbell },
-  { id: 2, step: 3, label: "Voice Drill", icon: Mic },
-] as const;
 
 function normalizeSpeech(text: string): string {
   return text
@@ -269,7 +261,7 @@ export function TutorExerciseArcade({
           setSpeechFeedback({
             ok: false,
             message: bestTranscript
-              ? `Heard "${bestTranscript}". Listen closely and try saying "${burst?.targetPhrase}" again!`
+              ? `Heard "${bestTranscript}". Try saying "${burst?.targetPhrase}" again!`
               : "Didn't catch that clearly — tap Speak and try again.",
           });
         }
@@ -281,7 +273,7 @@ export function TutorExerciseArcade({
           ok: false,
           message:
             err?.error === "not-allowed"
-              ? "Microphone permission is blocked. Enable mic access in your browser to continue."
+              ? "Microphone permission is blocked. Enable mic access in your browser."
               : "Didn't catch any audio — speak closer to your mic and try again.",
         });
       };
@@ -314,7 +306,6 @@ export function TutorExerciseArcade({
     router.refresh();
   };
 
-  // Dynamic Tutor coaching line & avatar mood
   const isTutorHappy =
     workoutCompleted ||
     (roundIdx === 0 && matchedIds.size >= cards.length) ||
@@ -322,186 +313,139 @@ export function TutorExerciseArcade({
     (roundIdx === 2 && repsDone >= requiredReps);
 
   const tutorCoachMessage = workoutCompleted
-    ? `Bravo! You turned every slip from our call into muscle memory.`
+    ? `Bravo! You locked in every repair from our conversation.`
     : roundIdx === 0
       ? matchedIds.size >= cards.length
-        ? `Clean sweep! Ready to build full sentences next?`
-        : `Tap a phrase below, listen to how I pronounce it, then match it to its scene.`
+        ? `Clean sweep! Hit the button to jump into Sentence Dash.`
+        : `Tap a phrase below to hear it, then tap the matching picture scene.`
       : roundIdx === 1
         ? trapFeedback
           ? trapFeedback
           : isDashSentenceComplete
-            ? `Spot on! That's exactly how a native speaker says it.`
-            : `Watch out for the trap words from our conversation — pick the right chunk!`
+            ? `Spot on! That's the exact natural phrasing.`
+            : `Dodge the trap word from our conversation and pick the right piece!`
         : repsDone >= requiredReps
-          ? `3 out of 3! Lock it in and claim your workout victory.`
-          : `Listen to my audio if you need a refresher, then repeat it ${requiredReps} times out loud!`;
+          ? `3 out of 3! Click Complete Workout to finish.`
+          : `Listen once if you need a refresher, then speak the phrase ${requiredReps} times!`;
+
+  const roundProgressBadge =
+    roundIdx === 0
+      ? `${matchedIds.size} / ${cards.length} Matched`
+      : roundIdx === 1
+        ? `Sentence ${dashItemIdx + 1} / ${dashItems.length}`
+        : `${repsDone} / ${requiredReps} Spoken`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100 font-sans text-slate-900 selection:bg-indigo-100">
-      {/* ===================================================================
-          1. SPOON ACADEMY HEADER BANNER (Matches Conversation & Review UI)
-          =================================================================== */}
-      <header className="relative shrink-0 overflow-hidden animate-bg pt-5 pb-16 text-white shadow-lg">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 font-sans text-slate-900">
+      {/* SLIM TOP PROGRESS BAR */}
+      <div className="mx-auto flex w-full max-w-6xl shrink-0 items-center gap-4 px-4 pt-4 sm:px-5">
+        <Link
+          href="/conversation/review"
+          className="inline-flex shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
+          title="Back to Report Card"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
 
-        <div className="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/conversation/review"
-              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/40 px-4 py-1.5 text-xs font-black text-white shadow-sm backdrop-blur-md transition hover:bg-slate-950/60"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 text-cyan-300" />
-              <span>Back to Report Card</span>
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/20 bg-slate-950/40 px-3.5 py-1.5 text-xs font-extrabold text-sky-200 backdrop-blur-md">
-                {displayTutorName} • {level}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/20 px-3.5 py-1.5 text-xs font-black text-amber-200 backdrop-blur-md">
-                <Dumbbell className="h-3.5 w-3.5" />
-                <span>3-Min Tutor Workout</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="max-w-3xl">
-            <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl">
-              {title}
-            </h1>
-            <p className="mt-1 text-xs font-medium text-white/90 sm:text-sm">
-              Targeted 3-round repair drill built from your live conversation
-              with {displayTutorName}.
-            </p>
-          </div>
-        </div>
-      </header>
-
-      {/* ===================================================================
-          2. MAIN WORKSPACE OVERLAPPING HEADER
-          =================================================================== */}
-      <main className="relative z-20 mx-auto -mt-9 w-full max-w-6xl flex-1 px-6 pb-12 lg:px-8">
-        {/* 3D Stepper Bar */}
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white px-6 py-3.5 shadow-sm">
-          {ROUNDS.map((r, idx) => {
-            const isCurrent = !workoutCompleted && roundIdx === r.id;
-            const isDone = workoutCompleted || roundIdx > r.id;
-            const Icon = r.icon;
-            return (
-              <Fragment key={r.id}>
-                <div className="flex items-center gap-2.5 text-left">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-xs font-black transition-all ${
-                      isDone
-                        ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                        : isCurrent
-                          ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs"
-                          : "border-slate-300 bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    {isDone ? (
-                      <Check className="h-4 w-4 stroke-[3.5]" />
-                    ) : (
-                      r.step
-                    )}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1.5 text-xs font-black tracking-wider uppercase ${
-                      isCurrent || isDone ? "text-slate-900" : "text-slate-400"
-                    }`}
-                  >
-                    <Icon
-                      className={`h-3.5 w-3.5 ${
-                        isCurrent ? "text-blue-600" : "text-slate-400"
-                      }`}
-                    />
-                    <span className="hidden sm:inline">{r.label}</span>
-                  </span>
-                </div>
-
-                {idx < ROUNDS.length - 1 && (
-                  <div
-                    className={`h-1 flex-1 rounded-full ${
-                      workoutCompleted || roundIdx > r.id
-                        ? "bg-gradient-to-r from-emerald-400 to-sky-500"
-                        : "bg-slate-100"
-                    }`}
-                  />
-                )}
-              </Fragment>
-            );
-          })}
+        <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-slate-200/90 p-0.5 shadow-inner">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400 transition-all duration-500"
+            style={{
+              width: workoutCompleted
+                ? "100%"
+                : `${Math.round(((roundIdx + 1) / 3) * 100)}%`,
+            }}
+          />
         </div>
 
-        {/* AI Tutor Live Coach Banner */}
-        <div className="mb-5 flex items-center gap-4 rounded-3xl border-2 border-b-[5px] border-indigo-950/90 bg-gradient-to-r from-[#0F172A] via-[#171F3F] to-[#241645] p-4 text-white shadow-lg sm:px-6">
-          <div className="relative shrink-0">
-            <img
-              src={isTutorHappy ? tutor.avatars.happy : tutor.avatars.default}
-              alt={displayTutorName}
-              className="h-14 w-14 rounded-2xl border-2 border-sky-400 object-cover object-top shadow-md sm:h-16 sm:w-16"
-            />
-            <span className="absolute -right-1 -bottom-1 h-3.5 w-3.5 rounded-full border-2 border-slate-950 bg-emerald-400" />
-          </div>
+        <span className="shrink-0 text-xs font-black text-slate-500">
+          {workoutCompleted ? "3 / 3" : `${roundIdx + 1} / 3`}
+        </span>
+      </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-white sm:text-sm">
-                {displayTutorName}
-              </span>
-              <span className="rounded-md bg-sky-500/20 px-2 py-0.5 text-[10px] font-black tracking-wider text-sky-300 uppercase">
-                AI Tutor Coach
-              </span>
-            </div>
-            <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-slate-200 sm:text-sm">
-              <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 rotate-180 text-sky-400" />
-              <span>{tutorCoachMessage}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* MAIN STAGE CARD */}
-        <div className="overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-indigo-950/90 bg-gradient-to-br from-[#0F172A] via-[#171F3F] to-[#1E163B] p-6 text-white shadow-2xl sm:p-8">
-          {workoutCompleted ? (
-            /* ================= WORKOUT COMPLETE SCREEN ================= */
-            <motion.div
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mx-auto flex max-w-lg flex-col items-center justify-center space-y-5 py-10 text-center"
-            >
+      {/* ZERO-SCROLL STAGE: JUST AI TUTOR (LEFT) + EXERCISE (RIGHT) */}
+      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-5 lg:grid lg:grid-cols-12">
+        {/* LEFT COLUMN: AI TUTOR CARD (4 cols) */}
+        <aside className="flex shrink-0 flex-row items-center gap-4 rounded-[2rem] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 lg:col-span-4 lg:flex-col lg:items-stretch lg:justify-between lg:p-6">
+          <div className="flex items-center gap-3.5 lg:flex-col lg:items-center lg:text-center">
+            <div className="relative shrink-0">
               <img
-                src={tutor.avatars.happy}
+                src={isTutorHappy ? tutor.avatars.happy : tutor.avatars.default}
                 alt={displayTutorName}
-                className="h-24 w-24 rounded-3xl border-4 border-emerald-400 object-cover object-top shadow-xl"
+                className="h-14 w-14 rounded-2xl border-2 border-sky-200 object-cover object-top shadow-sm lg:h-28 lg:w-28 lg:rounded-3xl"
               />
+              <span className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-500" />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 lg:justify-center">
+                <h2 className="text-sm font-black text-slate-900 lg:text-lg">
+                  {displayTutorName}
+                </h2>
+                <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-blue-700 uppercase">
+                  {level}
+                </span>
+              </div>
+              <p className="hidden truncate text-xs font-bold text-slate-400 lg:mt-0.5 lg:block">
+                {title}
+              </p>
+            </div>
+          </div>
+
+          {/* Speech Bubble */}
+          <div className="min-w-0 flex-1 rounded-2xl bg-sky-50/80 p-3.5 ring-1 ring-sky-200/80 lg:my-4 lg:flex-none lg:p-4">
+            <div className="flex items-start gap-2">
+              <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
+              <p className="text-xs font-bold leading-relaxed text-slate-700 sm:text-sm">
+                {tutorCoachMessage}
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom Progress Pill (Desktop) */}
+          <div className="hidden items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70 lg:flex">
+            <span className="text-[11px] font-black tracking-wider text-slate-500 uppercase">
+              Progress
+            </span>
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-700">
+              {roundProgressBadge}
+            </span>
+          </div>
+        </aside>
+
+        {/* RIGHT COLUMN: EXERCISE STAGE (8 cols, strictly fits inside 100vh) */}
+        <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 sm:p-6 lg:col-span-8">
+          {workoutCompleted ? (
+            /* ================= WORKOUT COMPLETE ================= */
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="m-auto flex max-w-md flex-col items-center space-y-5 text-center"
+            >
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border-b-[5px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg">
+                <Trophy className="h-10 w-10" />
+              </div>
 
               <div className="space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/20 px-3.5 py-1 text-[11px] font-black tracking-wider text-emerald-300 uppercase">
-                  <Trophy className="h-3.5 w-3.5" />
-                  3-Min Workout Complete
-                </span>
-                <h3 className="text-2xl font-black text-white sm:text-3xl">
-                  Nice work with {displayTutorName}!
+                <h3 className="text-2xl font-black text-slate-900">
+                  3-Min Workout Complete!
                 </h3>
-                <p className="text-sm font-medium leading-relaxed text-slate-300">
-                  You matched your target expressions, dodged your common traps,
-                  and nailed the voice drill.
+                <p className="text-sm font-semibold text-slate-500">
+                  You locked in your expressions and fixed the traps from your
+                  call with {displayTutorName}.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <div className="flex w-full flex-col gap-2.5 sm:flex-row">
                 <Link
                   href={`/conversation/${sessionId}`}
-                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-white/15 bg-white/10 px-5 py-3.5 text-xs font-black text-white transition hover:bg-white/15 sm:text-sm"
+                  className="flex flex-1 items-center justify-center rounded-2xl border-2 border-b-4 border-slate-200 bg-white px-4 py-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
                 >
-                  <span>View Session Review</span>
+                  View Review
                 </Link>
-
                 <Link
                   href="/conversation/review"
-                  className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3.5 text-xs font-black text-white shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:brightness-110 sm:text-sm"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-5 py-3.5 text-xs font-black text-white shadow-md transition hover:brightness-105"
                 >
                   <span>Back to Report Card</span>
                   <ArrowRight className="h-4 w-4" />
@@ -509,19 +453,19 @@ export function TutorExerciseArcade({
               </div>
             </motion.div>
           ) : roundIdx === 0 ? (
-            /* ================= ROUND 1: 2x2 PRUNA 3D VISUAL MATCH ================= */
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-extrabold text-slate-200 sm:text-base">
+            /* ================= ROUND 1: VISUAL MATCH ================= */
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <div className="flex shrink-0 items-center justify-between gap-2">
+                <p className="text-xs font-black text-slate-800 sm:text-sm">
                   {content.visualMatch?.instruction ||
-                    "Select a phrase below, then tap its matching scene!"}
+                    "Select a phrase below, then tap its matching scene"}
                 </p>
-                <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black text-sky-300">
-                  {matchedIds.size} / {cards.length} Matched
+                <span className="shrink-0 rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black text-blue-700">
+                  {matchedIds.size} / {cards.length}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3">
                 {cards.map((card) => {
                   const isMatched = matchedIds.has(card.id);
                   const isWrong = wrongCardId === card.id;
@@ -531,33 +475,33 @@ export function TutorExerciseArcade({
                       key={card.id}
                       type="button"
                       onClick={() => handleCardTap(card.id, card.audioUrl)}
-                      className={`group relative aspect-[16/10] overflow-hidden rounded-2xl border-2 transition-all ${
+                      className={`group relative h-full w-full overflow-hidden rounded-2xl border-2 transition-all ${
                         isMatched
-                          ? "border-emerald-400 ring-2 ring-emerald-400/30"
+                          ? "border-emerald-500 ring-2 ring-emerald-400/30"
                           : isWrong
                             ? "animate-shake border-rose-500"
-                            : "border-white/15 hover:border-amber-300"
+                            : "border-slate-200 hover:border-amber-400"
                       }`}
                     >
                       {card.imageUrl ? (
                         <img
                           src={card.imageUrl}
                           alt={card.translation}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                          className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-800 p-4 text-center text-xs font-bold text-slate-300">
+                        <div className="flex h-full w-full items-center justify-center bg-slate-100 p-3 text-center text-xs font-bold text-slate-600">
                           {card.translation}
                         </div>
                       )}
 
                       {isMatched && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/75 p-3 backdrop-blur-[2px]">
-                          <CheckCircle2 className="mb-1.5 h-7 w-7 text-emerald-400" />
-                          <span className="text-base font-black text-white">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 p-2 backdrop-blur-[2px]">
+                          <CheckCircle2 className="mb-1 h-6 w-6 text-emerald-400" />
+                          <span className="text-xs font-black text-white sm:text-sm">
                             {card.word}
                           </span>
-                          <span className="mt-0.5 text-xs font-bold text-emerald-300">
+                          <span className="text-[11px] font-bold text-emerald-300">
                             {card.translation}
                           </span>
                         </div>
@@ -567,8 +511,17 @@ export function TutorExerciseArcade({
                 })}
               </div>
 
-              <div className="space-y-3 pt-1">
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {matchedIds.size >= cards.length ? (
+                <button
+                  type="button"
+                  onClick={() => setRoundIdx(1)}
+                  className="flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3.5 text-sm font-black text-white shadow-md transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                >
+                  <span>Next</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <div className="grid shrink-0 grid-cols-2 gap-2.5">
                   {shuffledWordPills.map((pill) => {
                     const isMatched = matchedIds.has(pill.id);
                     const isSelected = selectedWordId === pill.id;
@@ -582,61 +535,54 @@ export function TutorExerciseArcade({
                           setSelectedWordId(pill.id);
                           if (pill.audioUrl) playAudioUrl(pill.audioUrl);
                         }}
-                        className={`flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left text-xs font-black transition sm:text-sm ${
+                        className={`flex items-center justify-between rounded-2xl border-2 px-3.5 py-2.5 text-left text-xs font-black transition sm:text-sm ${
                           isMatched
-                            ? "border-emerald-500/30 bg-emerald-950/30 text-emerald-400/50 line-through"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-600/60 line-through"
                             : isSelected
-                              ? "border-amber-300 bg-amber-300/20 text-white shadow-md"
-                              : "border-white/15 bg-white/[0.06] text-slate-200 hover:border-white/35"
+                              ? "border-orange-700 border-b-[4px] bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-sm"
+                              : "border-slate-200 border-b-[4px] bg-white text-slate-800 hover:border-sky-300"
                         }`}
                       >
                         <span className="truncate">{pill.word}</span>
-                        <Volume2 className="ml-2 h-4 w-4 shrink-0 text-sky-300" />
+                        <Volume2
+                          className={`ml-2 h-4 w-4 shrink-0 ${
+                            isSelected ? "text-slate-950" : "text-blue-600"
+                          }`}
+                        />
                       </button>
                     );
                   })}
                 </div>
-
-                {matchedIds.size >= cards.length && (
-                  <button
-                    type="button"
-                    onClick={() => setRoundIdx(1)}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:brightness-110"
-                  >
-                    <span>Next: Sentence Dash</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           ) : roundIdx === 1 ? (
             /* ================= ROUND 2: BINARY SENTENCE DASH ================= */
-            <div className="space-y-6 py-2">
+            <div className="flex min-h-0 flex-1 flex-col justify-between gap-4">
               {currentDashItem && (
                 <>
-                  <div className="space-y-1.5 text-center">
-                    <span className="text-[11px] font-black tracking-widest text-amber-300 uppercase">
+                  <div className="shrink-0 space-y-1 text-center">
+                    <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">
                       Sentence {dashItemIdx + 1} of {dashItems.length}
                     </span>
-                    <h3 className="text-xl font-black text-white sm:text-2xl">
+                    <h3 className="text-lg font-black text-slate-900 sm:text-xl">
                       &ldquo;{currentDashItem.promptNative}&rdquo;
                     </h3>
                   </div>
 
-                  <div className="flex min-h-[88px] flex-wrap items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-white/20 bg-slate-950/60 p-5">
+                  <div className="flex min-h-[84px] flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4">
                     {builtTokens.map((tok, i) => (
                       <motion.span
                         key={i}
                         initial={{ scale: 0.85, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="rounded-xl border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-4 py-2 text-sm font-black text-white shadow-sm sm:text-base"
+                        className="rounded-xl border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3.5 py-1.5 text-sm font-black text-white shadow-xs"
                       >
                         {tok}
                       </motion.span>
                     ))}
 
                     {!isDashSentenceComplete && (
-                      <span className="animate-pulse rounded-xl border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-xs font-bold text-amber-200">
+                      <span className="animate-pulse rounded-xl bg-amber-100 px-3.5 py-1.5 text-xs font-black text-amber-800">
                         Pick chunk {forkIdx + 1} of{" "}
                         {currentDashItem.forks.length}...
                       </span>
@@ -644,17 +590,17 @@ export function TutorExerciseArcade({
                   </div>
 
                   {!isDashSentenceComplete && currentFork ? (
-                    <div className="space-y-4">
-                      <p className="text-center text-xs font-bold tracking-wider text-slate-400 uppercase">
-                        Choose the right block:
+                    <div className="my-auto space-y-3">
+                      <p className="text-center text-xs font-black tracking-wider text-slate-400 uppercase">
+                        Choose the right block
                       </p>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-4">
                         {forkOptions.map((opt, idx) => (
                           <button
                             key={idx}
                             type="button"
                             onClick={() => handlePickFork(opt)}
-                            className="rounded-2xl border-2 border-b-[5px] border-white/20 bg-white/[0.07] px-5 py-6 text-center text-xl font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-white/[0.12] active:translate-y-0.5 active:border-b-2"
+                            className="rounded-2xl border-2 border-b-[5px] border-slate-200 bg-white px-4 py-6 text-center text-lg font-black text-slate-900 shadow-xs transition hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/50 active:translate-y-0.5 active:border-b-2 sm:text-xl"
                           >
                             {opt.text}
                           </button>
@@ -662,16 +608,16 @@ export function TutorExerciseArcade({
                       </div>
 
                       {trapFeedback && (
-                        <div className="flex items-center gap-2.5 rounded-2xl border border-rose-400/40 bg-rose-950/60 px-4 py-3 text-xs font-bold text-rose-200 sm:text-sm">
-                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                        <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
                           <span>{trapFeedback}</span>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center gap-4 pt-2 text-center">
+                    <div className="my-auto flex flex-col items-center gap-4 text-center">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/20 px-4 py-1.5 text-xs font-black text-emerald-300">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-black text-emerald-700">
                           <CheckCircle2 className="h-4 w-4" />
                           <span>Sentence Nailed!</span>
                         </span>
@@ -681,7 +627,7 @@ export function TutorExerciseArcade({
                             onClick={() =>
                               playAudioUrl(currentDashItem.audioUrl)
                             }
-                            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-black text-sky-300 hover:bg-white/15"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-blue-600 hover:bg-slate-50"
                           >
                             <Volume2 className="h-3.5 w-3.5" />
                             <span>Replay</span>
@@ -692,12 +638,12 @@ export function TutorExerciseArcade({
                       <button
                         type="button"
                         onClick={advanceDashOrRound}
-                        className="flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:brightness-110"
+                        className="flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-sm font-black text-white shadow-md transition hover:brightness-105"
                       >
                         <span>
                           {dashItemIdx + 1 < dashItems.length
                             ? "Next Sentence"
-                            : "Final Round: 3x Voice Drill"}
+                            : "Next"}
                         </span>
                         <ArrowRight className="h-4 w-4" />
                       </button>
@@ -708,72 +654,65 @@ export function TutorExerciseArcade({
             </div>
           ) : (
             /* ================= ROUND 3: 3-REP VOICE DRILL ================= */
-            <div className="flex flex-col items-center justify-between space-y-6 py-4 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-between py-2 text-center">
               <div className="space-y-1">
-                <span className="text-[11px] font-black tracking-widest text-sky-300 uppercase">
-                  Final Round • Muscle Memory
+                <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">
+                  Muscle Memory
                 </span>
-                <h3 className="text-lg font-extrabold text-white sm:text-xl">
+                <h3 className="text-base font-black text-slate-900 sm:text-lg">
                   {burst?.instruction ||
-                    `Say "${burst?.targetPhrase}" ${requiredReps} times out loud!`}
+                    `Say "${burst?.targetPhrase}" ${requiredReps} times out loud`}
                 </h3>
               </div>
 
               <motion.div
-                animate={{
-                  scale: 1 + repsDone * 0.14,
-                }}
+                animate={{ scale: 1 + repsDone * 0.12 }}
                 transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                className={`relative flex h-32 w-32 flex-col items-center justify-center rounded-full border-4 shadow-2xl transition-colors ${
+                className={`flex h-28 w-28 flex-col items-center justify-center rounded-full border-4 shadow-md transition-colors ${
                   repsDone >= requiredReps
-                    ? "border-emerald-400 bg-gradient-to-tr from-emerald-400/30 to-sky-400/30 shadow-[0_0_50px_rgba(16,185,129,0.45)]"
-                    : "border-sky-400/60 bg-white/[0.06]"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-sky-400 bg-sky-50 text-blue-700"
                 }`}
               >
                 <Zap
-                  className={`h-9 w-9 ${
+                  className={`h-8 w-8 ${
                     repsDone >= requiredReps
-                      ? "fill-current text-amber-300"
-                      : "text-sky-300"
+                      ? "fill-amber-400 text-amber-500"
+                      : "text-blue-600"
                   }`}
                 />
-                <span className="mt-1 text-xs font-black text-white">
+                <span className="mt-1 text-xs font-black">
                   {repsDone} / {requiredReps} Reps
                 </span>
               </motion.div>
 
-              <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-4 shadow-md">
-                <div className="text-xl font-black text-white sm:text-2xl">
+              <div className="w-full max-w-md rounded-2xl bg-slate-50 px-5 py-3.5 ring-1 ring-slate-200/80">
+                <div className="text-lg font-black text-slate-900 sm:text-xl">
                   {burst?.targetPhrase}
                 </div>
-                <div className="mt-1 text-xs font-bold text-sky-300 sm:text-sm">
+                <div className="mt-0.5 text-xs font-bold text-blue-600">
                   &ldquo;{burst?.translation}&rdquo;
                 </div>
-                {burst?.phoneticHint && (
-                  <div className="mt-1 text-[11px] font-medium text-slate-400">
-                    {burst.phoneticHint}
-                  </div>
-                )}
               </div>
 
               {speechFeedback && (
                 <div
-                  className={`flex max-w-md items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold ${
+                  className={`flex max-w-md items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold ${
                     speechFeedback.ok
-                      ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-                      : "border-rose-400/40 bg-rose-500/15 text-rose-200"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-rose-200 bg-rose-50 text-rose-700"
                   }`}
                 >
                   {speechFeedback.ok ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                   ) : (
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
                   )}
                   <span>{speechFeedback.message}</span>
                 </div>
               )}
 
-              <div className="w-full max-w-md space-y-2.5">
+              <div className="w-full max-w-md shrink-0">
                 {repsDone < requiredReps ? (
                   speechSupported ? (
                     <div className="flex items-center gap-2.5">
@@ -781,10 +720,10 @@ export function TutorExerciseArcade({
                         <button
                           type="button"
                           onClick={() => playAudioUrl(burst.audioUrl)}
-                          className="rounded-2xl border-2 border-white/15 bg-white/[0.07] p-4 text-white transition hover:border-sky-300"
+                          className="rounded-2xl border-2 border-b-4 border-slate-200 bg-white p-3.5 text-blue-600 transition hover:bg-slate-50"
                           title="Listen"
                         >
-                          <Volume2 className="h-5 w-5 text-sky-300" />
+                          <Volume2 className="h-5 w-5" />
                         </button>
                       )}
 
@@ -792,10 +731,10 @@ export function TutorExerciseArcade({
                         type="button"
                         disabled={isListeningRep}
                         onClick={triggerSpeechRep}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 py-4 text-sm font-black shadow-lg transition ${
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 py-3.5 text-sm font-black shadow-md transition ${
                           isListeningRep
-                            ? "animate-pulse border-amber-500 bg-amber-300 text-slate-950"
-                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:brightness-110"
+                            ? "animate-pulse border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
+                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:brightness-105"
                         }`}
                       >
                         <Mic className="h-4 w-4" />
@@ -807,32 +746,25 @@ export function TutorExerciseArcade({
                       </button>
                     </div>
                   ) : (
-                    /* Fallback only if browser has zero SpeechRecognition support (e.g. Firefox) */
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-medium text-slate-400">
-                        Browser voice detection isn&apos;t supported here — listen
-                        and practice out loud, then mark each rep:
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setRepsDone((prev) => Math.min(requiredReps, prev + 1))
-                        }
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-4 text-sm font-black text-white"
-                      >
-                        <Check className="h-4 w-4" />
-                        <span>
-                          Mark Spoken Rep {repsDone + 1} of {requiredReps}
-                        </span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRepsDone((prev) => Math.min(requiredReps, prev + 1))
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-sm font-black text-white"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>
+                        Mark Spoken Rep {repsDone + 1} of {requiredReps}
+                      </span>
+                    </button>
                   )
                 ) : (
                   <button
                     type="button"
                     disabled={isCompleting}
                     onClick={handleFinishWorkout}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition hover:-translate-y-0.5 hover:brightness-110"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3.5 text-sm font-black text-white shadow-md transition hover:brightness-105"
                   >
                     {isCompleting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -847,7 +779,7 @@ export function TutorExerciseArcade({
               </div>
             </div>
           )}
-        </div>
+        </section>
       </main>
     </div>
   );
