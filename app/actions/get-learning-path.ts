@@ -63,7 +63,11 @@ async function hydrateTrack(
     }>;
   },
   userId: string,
-  freestyleSessions: Array<{ id: string; milestoneIndex: number | null }>,
+  freestyleSessions: Array<{
+    id: string;
+    milestoneIndex: number | null;
+    createdAt: Date;
+  }>,
   hitDailyCap: boolean,
 ) {
   if (!course) return null;
@@ -140,9 +144,32 @@ async function hydrateTrack(
         : null;
 
       const mIndex = b.milestoneIndex ?? 1;
-      const milestoneSessions = freestyleSessions.filter(
-        (s) => s.milestoneIndex === mIndex,
+      const thirdSpoonOrder = mIndex * 3;
+      const thirdLesson = course.lessons.find(
+        (l) => l.orderIndex === thirdSpoonOrder,
       );
+      const thirdBridge = bridgeByIndex.get(thirdSpoonOrder);
+      const reachedBossAt =
+        thirdBridge?.completedAt ??
+        thirdLesson?.completedAt ??
+        thirdLesson?.createdAt ??
+        null;
+
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const milestoneSessions = freestyleSessions.filter((s) => {
+        if (s.milestoneIndex === mIndex || s.milestoneIndex === mIndex + 1) {
+          return true;
+        }
+        if (reachedBossAt && s.createdAt >= reachedBossAt) {
+          return true;
+        }
+        if (!b.passed && s.createdAt >= twentyFourHoursAgo) {
+          return true;
+        }
+        return false;
+      });
+
       const freestyleUnlocked =
         Boolean(b.passed) || milestoneSessions.length >= 1 || hitDailyCap;
 
@@ -270,6 +297,7 @@ export async function getLearningPath(userId: string) {
       select: {
         id: true,
         milestoneIndex: true,
+        createdAt: true
       },
     }),
     getFreestyleRedisState(userId),
