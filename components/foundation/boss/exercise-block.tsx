@@ -109,7 +109,6 @@ export function ExerciseBlock({
   const isAudioMc =
     exercise.type === "MULTIPLE_CHOICE" && Boolean(exercise.audioKey);
 
-  // Badge label that feels more like a game mode than a raw enum
   const badgeLabel = isClozeQuestion
     ? "SNAP THE BLANK"
     : isAudioMc
@@ -124,17 +123,17 @@ export function ExerciseBlock({
     if (isClozeQuestion) {
       const parts = exercise.question.split("___");
       return (
-        <div className="mb-5 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/70 to-slate-50 px-5 py-5 text-center text-lg font-extrabold text-slate-800 shadow-inner">
+        <div className="mb-5 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-5 py-5 text-center text-lg font-black text-slate-900 shadow-2xs">
           <span>{parts[0]}</span>
           <span
-            className={`mx-1.5 inline-flex min-w-[90px] items-center justify-center rounded-xl border-2 px-3 py-1 text-base font-black transition-all ${
+            className={`mx-1.5 inline-flex min-w-[90px] items-center justify-center rounded-xl border-2 border-b-[3px] px-3 py-1 text-base font-black transition-all ${
               selectedBlank
                 ? message.status === "correct"
-                  ? "border-emerald-500 bg-emerald-500 text-white"
+                  ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
                   : message.status === "incorrect"
-                    ? "border-rose-500 bg-rose-500 text-white"
-                    : "border-indigo-500 bg-indigo-600 text-white"
-                : "border-dashed border-indigo-400 bg-white text-indigo-400"
+                    ? "border-rose-700 bg-gradient-to-b from-rose-500 to-rose-600 text-white"
+                    : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                : "border-dashed border-sky-400 bg-white text-blue-600"
             }`}
           >
             {selectedBlank || " ? "}
@@ -145,27 +144,27 @@ export function ExerciseBlock({
     }
 
     return (
-      <div className="mb-5 flex items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-lg font-extrabold text-slate-800">
-        <MessageSquare className="h-5 w-5 shrink-0 text-indigo-500" />
-        <span>“{exercise.question}”</span>
+      <div className="mb-5 flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-5 py-4 text-center text-lg font-black text-slate-900 shadow-2xs">
+        <MessageSquare className="h-5 w-5 shrink-0 text-blue-600" />
+        <span>&ldquo;{exercise.question}&rdquo;</span>
       </div>
     );
   };
 
   return (
     <div
-      className={`w-full max-w-[90%] rounded-3xl border-2 p-5 shadow-sm transition-all duration-300 sm:p-6 md:max-w-[85%] ${
+      className={`w-full max-w-[92%] rounded-3xl border-2 border-b-[6px] p-5 shadow-md transition-all duration-300 sm:p-6 md:max-w-[88%] ${
         message.status === "correct"
-          ? "border-emerald-200 bg-emerald-50 shadow-emerald-100"
+          ? "border-emerald-300 border-b-emerald-400 bg-emerald-50/90"
           : message.status === "incorrect"
-            ? "border-rose-200 bg-rose-50 shadow-rose-100"
-            : "border-slate-200 bg-white"
+            ? "border-rose-300 border-b-rose-400 bg-rose-50/90"
+            : "border-slate-200 border-b-slate-300 bg-white"
       }`}
     >
       <div className="mb-4 flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold uppercase tracking-widest text-slate-500">
+        <span className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-black tracking-wider text-indigo-700 uppercase">
           {isAudioMc ? (
-            <Headphones size={13} className="text-indigo-500" />
+            <Headphones size={13} className="text-indigo-600" />
           ) : (
             <Sparkles size={13} className="text-amber-500" />
           )}
@@ -174,28 +173,30 @@ export function ExerciseBlock({
 
         {message.status === "correct" && (
           <CheckCircle2
-            className="animate-in text-emerald-500 zoom-in"
-            size={28}
+            className="animate-in text-emerald-600 zoom-in"
+            size={26}
           />
         )}
 
         {message.status === "incorrect" && (
-          <XCircle className="animate-in text-rose-500 zoom-in" size={28} />
+          <XCircle className="animate-in text-rose-600 zoom-in" size={26} />
         )}
 
         {message.status === "pending" && (
           <div
-            className={`flex items-center gap-1.5 font-bold ${
-              timeLeft <= 5 ? "animate-pulse text-rose-500" : "text-amber-500"
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-black ${
+              timeLeft <= 5
+                ? "animate-pulse border-rose-200 bg-rose-50 text-rose-600"
+                : "border-amber-200 bg-amber-50 text-amber-700"
             }`}
           >
-            <Clock size={18} />
-            {timeLeft}s
+            <Clock size={14} />
+            <span>{timeLeft}s</span>
           </div>
         )}
       </div>
 
-      <p className="mb-4 text-[15px] font-bold text-slate-700">
+      <p className="mb-4 text-sm font-extrabold text-slate-800 sm:text-[15px]">
         {exercise.instruction}
       </p>
 
@@ -210,18 +211,20 @@ export function ExerciseBlock({
               exercise.targetText ?? undefined,
             )
           }
-          className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-extrabold text-indigo-600 transition-colors hover:bg-indigo-100 active:scale-95"
+          className="mb-5 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-3 text-xs font-black text-white shadow-md transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:text-sm"
         >
-          <Volume2 size={20} />
-          Listen to Boss Audio
+          <Volume2 size={18} />
+          <span>Listen to Boss Audio</span>
         </button>
       )}
 
       {message.status === "pending" && (
-        <div className="mb-6 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${
-              timeLeft <= 5 ? "bg-rose-500" : "bg-amber-400"
+              timeLeft <= 5
+                ? "bg-rose-500"
+                : "bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400"
             }`}
             style={{
               width: `${Math.max(0, (timeLeft / initialTime) * 100)}%`,
@@ -254,12 +257,12 @@ export function ExerciseBlock({
                   setSelectedBlank(option);
                   onSubmit(option);
                 }}
-                className={`w-full rounded-2xl border-2 border-b-4 px-5 py-4 font-bold transition-all active:translate-y-1 active:border-b-2 ${
-                  isClozeQuestion ? "text-center text-base" : "text-left"
+                className={`w-full rounded-2xl border-2 border-b-[4px] px-5 py-4 text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-base ${
+                  isClozeQuestion ? "text-center" : "text-left"
                 } ${
                   selectedBlank === option
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-400 hover:bg-indigo-50"
+                    ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
+                    : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:border-sky-300 hover:bg-sky-50/50"
                 }`}
               >
                 {option}
@@ -310,19 +313,19 @@ export function ExerciseBlock({
 
         {exercise.type === "CONVERSATION" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2.5">
-              <span className="text-xs font-bold text-amber-800">
+            <div className="flex items-center justify-between rounded-2xl border-2 border-b-4 border-amber-200 border-b-amber-300 bg-amber-50/60 px-4 py-3">
+              <span className="text-xs font-black text-amber-900">
                 {showHint
                   ? `Target phrase: "${exercise.targetText}"`
-                  : "Speak from memory! Need help?"}
+                  : "Speak from memory! Need a lifeline?"}
               </span>
               <button
                 type="button"
                 onClick={() => setShowHint((prev) => !prev)}
-                className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-1 text-xs font-extrabold text-amber-700 shadow-sm transition hover:bg-amber-100"
+                className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-3 py-1 text-xs font-black text-amber-700 shadow-2xs transition hover:bg-amber-100"
               >
-                {showHint ? <EyeOff size={14} /> : <Eye size={14} />}
-                {showHint ? "Hide Hint" : "Show Hint"}
+                {showHint ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showHint ? "Hide Hint" : "Peek Hint"}</span>
               </button>
             </div>
 

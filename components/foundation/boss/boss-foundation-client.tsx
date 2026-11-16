@@ -21,8 +21,6 @@ import { useS3Media } from "@/context/s3-context";
 import { WordAudioProvider } from "@/context/word-audio-context";
 import { MatrixProvider } from "@/context/matrix-context";
 
-
-
 const FALLBACK_AVATAR =
   "https://api.dicebear.com/9.x/bottts-neutral/svg?seed=boss";
 
@@ -130,13 +128,15 @@ export default function BossFoundationClient({
   };
 
   return (
-    <div className="min-h-screen w-full animate-bg p-4 sm:p-6 flex flex-col justify-center">
+    <div className="relative flex min-h-screen w-full flex-col justify-center overflow-hidden animate-bg p-4 sm:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
+
       {!hasStarted ? (
-        <div className="flex w-full flex-col items-center justify-center py-6">
-          {/* Wider Main Pre-Boss Card (max-w-2xl) */}
-          <div className="relative w-full max-w-2xl overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white text-center shadow-2xl shadow-indigo-900/15">
+        <div className="relative z-10 flex w-full flex-col items-center justify-center py-6">
+          {/* 3D Tactile Pre-Boss Arena Card */}
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white text-center shadow-2xl">
             {/* Widescreen Cover Banner */}
-            <div className="relative h-60 w-full bg-gradient-to-br from-indigo-600 via-indigo-500 to-purple-600 sm:h-72">
+            <div className="relative h-60 w-full bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 sm:h-72">
               {resolvedCoverUrl ? (
                 <img
                   src={resolvedCoverUrl}
@@ -146,22 +146,22 @@ export default function BossFoundationClient({
               ) : (
                 isLoading && (
                   <div className="flex h-full w-full items-center justify-center">
-                    <Loader2 className="animate-spin text-white/60" size={36} />
+                    <Loader2 className="animate-spin text-sky-300" size={36} />
                   </div>
                 )
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-slate-950/30" />
 
               {/* Top-left Milestone Badge */}
-              <div className="absolute left-5 top-5 flex items-center gap-1.5 rounded-full bg-black/45 px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white backdrop-blur-md">
+              <div className="absolute top-5 left-5 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-slate-950/60 px-3.5 py-1.5 text-xs font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
                 <Sparkles size={14} className="text-amber-300" />
-                Milestone {milestoneIndex} Boss
+                Milestone {milestoneIndex} Boss Arena
               </div>
 
-              {/* Top-right Attempts / Best Score pill (if returning) */}
+              {/* Top-right Attempts / Best Score pill */}
               {attempts > 0 && (
-                <div className="absolute right-5 top-5 flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-extrabold text-slate-700 shadow-sm backdrop-blur-md">
-                  <RotateCcw size={13} className="text-indigo-500" />
+                <div className="absolute top-5 right-5 flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/60 px-3.5 py-1.5 text-xs font-black text-white shadow-sm backdrop-blur-md">
+                  <RotateCcw size={13} className="text-sky-300" />
                   Attempt #{attempts + 1}
                   {bestScore !== null &&
                     ` • Last: ${bestScore}/${totalExercises}`}
@@ -170,85 +170,85 @@ export default function BossFoundationClient({
             </div>
 
             {/* Card Body */}
-            <div className="relative px-6 pb-8 pt-16 sm:px-10">
-              {/* Overlapping Circular Boss Avatar */}
-              <div className="absolute -top-14 left-1/2 flex h-28 w-28 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-[6px] border-white bg-slate-100 shadow-xl">
+            <div className="relative px-6 pt-16 pb-8 sm:px-10">
+              {/* Overlapping 3D Squircle Boss Avatar (Matches AI Tutor Portrait) */}
+              <div className="absolute -top-14 left-1/2 flex h-28 w-28 -translate-x-1/2 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl">
                 {isLoading && !resolvedDefaultAvatarUrl ? (
-                  <Loader2 className="animate-spin text-indigo-300" size={32} />
+                  <Loader2 className="animate-spin text-sky-300" size={32} />
                 ) : (
                   <img
                     src={bossAvatar}
                     alt={boss?.name || "Boss"}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-top"
                   />
                 )}
               </div>
 
-              <h1 className="mb-3 text-3xl font-black text-slate-800 sm:text-4xl">
+              <h1 className="mb-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
                 {boss?.name || "Milestone Boss"}
               </h1>
 
-              {/* Full Persona Bio */}
-              <div className="mb-6 rounded-2xl bg-slate-50 px-6 py-4 text-center shadow-inner">
-                <p className="text-[15px] font-medium leading-relaxed text-slate-600">
+              {/* Persona Bio Card */}
+              <div className="mb-6 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-6 py-4 text-center shadow-2xs">
+                <p className="text-sm font-bold leading-relaxed text-slate-700 sm:text-[15px]">
                   {boss?.persona ||
-                    "Prove your language skills in this final test."}
+                    "Prove your language skills in this final milestone checkpoint."}
                 </p>
               </div>
 
-              {/* 3-Column Stats Row: Challenges | Pass Goal | Lives */}
+              {/* 3-Column 3D Tactile Stats Row */}
               <div className="mb-7 grid w-full grid-cols-3 gap-3 sm:gap-4">
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-indigo-50 bg-indigo-50/40 py-3.5 transition-colors hover:bg-indigo-50/80">
-                  <div className="mb-0.5 rounded-full bg-indigo-100 p-2 text-indigo-600">
-                    <Target size={20} strokeWidth={2.5} />
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/60 py-3.5">
+                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">
+                    <Target size={18} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+                  <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
                     Challenges
                   </span>
-                  <span className="text-2xl font-black text-indigo-900">
+                  <span className="text-2xl font-black text-slate-900">
                     {totalExercises}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-emerald-50 bg-emerald-50/40 py-3.5 transition-colors hover:bg-emerald-50/80">
-                  <div className="mb-0.5 rounded-full bg-emerald-100 p-2 text-emerald-600">
-                    <Trophy size={20} strokeWidth={2.5} />
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-emerald-200 border-b-emerald-300 bg-emerald-50/60 py-3.5">
+                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs">
+                    <Trophy size={18} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                  <span className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
                     To Pass
                   </span>
-                  <span className="text-2xl font-black text-emerald-900">
+                  <span className="text-2xl font-black text-slate-900">
                     {passingScore}/{totalExercises}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-rose-50 bg-rose-50/40 py-3.5 transition-colors hover:bg-rose-50/80">
-                  <div className="mb-0.5 rounded-full bg-rose-100 p-2 text-rose-600">
-                    <ShieldAlert size={20} strokeWidth={2.5} />
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-rose-200 border-b-rose-300 bg-rose-50/60 py-3.5">
+                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-2xs">
+                    <ShieldAlert size={18} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">
+                  <span className="text-[10px] font-black tracking-widest text-rose-600 uppercase">
                     Lives
                   </span>
-                  <span className="text-2xl font-black text-rose-900">3</span>
+                  <span className="text-2xl font-black text-slate-900">3</span>
                 </div>
               </div>
 
               <button
                 onClick={handleStartEncounter}
                 disabled={isLoading}
-                className={`group relative flex w-full items-center justify-center gap-3 rounded-2xl py-4 text-lg font-extrabold text-white transition-all ${
+                className={`group relative flex w-full items-center justify-center gap-2.5 rounded-2xl border-b-4 py-4 text-base font-black text-white shadow-xl transition-all ${
                   isLoading
-                    ? "cursor-not-allowed bg-indigo-300"
-                    : "border-b-4 border-indigo-700 bg-indigo-500 shadow-lg shadow-indigo-200 hover:bg-indigo-400 hover:shadow-indigo-300 active:translate-y-1 active:border-b-0"
+                    ? "cursor-not-allowed border-slate-300 bg-slate-300"
+                    : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
                 }`}
               >
                 {isLoading ? (
-                  <Loader2 className="animate-spin" size={24} />
+                  <Loader2 className="animate-spin" size={22} />
                 ) : (
                   <Play
                     className="transition-transform group-hover:scale-110"
                     fill="currentColor"
-                    size={22}
+                    size={20}
                   />
                 )}
                 <span>{isLoading ? "Loading Media..." : "Start Encounter"}</span>

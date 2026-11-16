@@ -3,10 +3,12 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Heart,
@@ -17,14 +19,16 @@ import {
   Volume2,
   VolumeX,
   Sparkles,
+  Target,
+  RectangleHorizontal,
+  MessagesSquare,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
-import {
-  BossMessage,
-  useBossFoundation,
-} from "@/context/boss-context";
+import { BossMessage, useBossFoundation } from "@/context/boss-context";
 import { BossFoundationFreestyleChatBubble } from "./boss-freestyle-chat-bubble";
 import { useWordAudio } from "@/context/word-audio-context";
 import { ExerciseBlock } from "./exercise-block";
@@ -36,6 +40,48 @@ interface Props {
   coverImageUrl?: string;
   scenarioData?: unknown;
 }
+
+type BossStageMood = "default" | "happy" | "angry" | "sad" | "thinking";
+
+function getBossMoodMotion(mood: BossStageMood) {
+  switch (mood) {
+    case "happy":
+      return {
+        scale: [1, 1.14, 1.04],
+        y: [0, -10, 0],
+        rotate: [0, -3, 3, 0],
+      };
+    case "angry":
+      return {
+        scale: [1, 1.08, 1.02],
+        x: [0, -8, 8, -6, 6, -3, 3, 0],
+      };
+    case "sad":
+      return {
+        scale: [1, 0.95, 0.98],
+        y: [0, 6, 3],
+        rotate: [0, -4, -2],
+      };
+    case "thinking":
+      return {
+        scale: 1,
+        rotate: [0, -3, 2, 0],
+      };
+    default:
+      return { scale: 1, x: 0, y: 0, rotate: 0 };
+  }
+}
+
+const BOSS_MOOD_OVERLAY: Record<
+  BossStageMood,
+  { tint: string; badge: string | null }
+> = {
+  default: { tint: "bg-transparent", badge: null },
+  happy: { tint: "bg-emerald-400/20", badge: "✨" },
+  angry: { tint: "bg-rose-600/30", badge: "💢" },
+  sad: { tint: "bg-indigo-900/25", badge: "💧" },
+  thinking: { tint: "bg-indigo-500/15", badge: "💭" },
+};
 
 export default function BossFoundationFreestyle({
   onEnd,
@@ -72,6 +118,8 @@ export default function BossFoundationFreestyle({
 
   const { playWord, stopAudio: stopWordAudio } = useWordAudio();
 
+  const [viewMode, setViewMode] = useState<"single" | "multi">("single");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hasPlayedRef = useRef(false);
@@ -90,26 +138,60 @@ export default function BossFoundationFreestyle({
       ? Math.min((currentIndex / totalExercises) * 100, 100)
       : 0;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, transcript, isProcessing, isAiProcessing]);
+  // Derive active Boss message & active Exercise for 1-on-1 Stage mode
+  const latestBossChatMsg = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find(
+          (m) => !m.exercise && m.role !== "user" && (m as any).sender !== "user",
+        ) || null,
+    [messages],
+  );
 
-  // Pause intro video once the user clicks "Begin"
+  const activeExerciseMsg = useMemo(
+    () =>
+      [...messages].reverse().find((m) => m.exercise && m.status === "pending") ||
+      [...messages].reverse().find((m) => Boolean(m.exercise)) ||
+      null,
+    [messages],
+  );
+
+  const effectiveMood: BossStageMood = useMemo(() => {
+    if (showThinking) return "thinking";
+    if (latestBossChatMsg?.status === "correct") return "happy";
+    if (latestBossChatMsg?.status === "incorrect") return "angry";
+    const rawMood = latestBossChatMsg?.mood;
+    if (rawMood === "happy" || rawMood === "angry" || rawMood === "sad") {
+      return rawMood;
+    }
+    return "default";
+  }, [showThinking, latestBossChatMsg]);
+
+  const activeStageAvatarUrl = useMemo(() => {
+    if (effectiveMood === "happy") return getBossAvatarUrl("happy");
+    if (effectiveMood === "angry") return getBossAvatarUrl("angry");
+    if (effectiveMood === "sad") return getBossAvatarUrl("sad");
+    return bossAvatarUrl || getBossAvatarUrl("default");
+  }, [effectiveMood, bossAvatarUrl, getBossAvatarUrl]);
+
+  useEffect(() => {
+    if (viewMode === "multi") {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, transcript, isProcessing, isAiProcessing, viewMode]);
+
   useEffect(() => {
     if (hasStartedExercises && videoRef.current) {
       videoRef.current.pause();
     }
   }, [hasStartedExercises]);
 
-  // Click anywhere on the video: play (unmuted) / pause / replay
   const handleVideoClick = () => {
     const video = videoRef.current;
     if (!video) return;
 
     if (video.paused || video.ended) {
-      // Browsers only allow sound when playback starts inside a user click, so unmute
-      // on the element itself right here (not via state, which updates a render later).
-      // After the first play, respect whatever mute choice the user makes.
       if (!hasPlayedRef.current) {
         video.muted = false;
         setIsVideoMuted(false);
@@ -125,7 +207,7 @@ export default function BossFoundationFreestyle({
   };
 
   const toggleVideoMute = (event: ReactMouseEvent) => {
-    event.stopPropagation(); // don't also play/pause the video
+    event.stopPropagation();
     const video = videoRef.current;
     const next = !isVideoMuted;
     if (video) video.muted = next;
@@ -133,103 +215,160 @@ export default function BossFoundationFreestyle({
   };
 
   return (
-    <div className="relative mx-auto flex h-[calc(100vh-2rem)] max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 shadow-xl">
-      {/* Failed state */}
+    <div className="relative z-10 mx-auto flex h-[calc(100vh-2rem)] max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl">
+      {/* Failed state overlay */}
       {stageStatus === "FAILED" && (
-        <div className="absolute inset-0 z-50 flex animate-in flex-col items-center justify-center bg-white/95 p-8 text-center backdrop-blur-sm duration-500 zoom-in-95">
-          <div className="mb-6 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-rose-200 bg-rose-50 shadow-lg">
+        <div className="absolute inset-0 z-50 flex animate-in flex-col items-center justify-center bg-white/95 p-8 text-center backdrop-blur-sm duration-300 zoom-in-95">
+          <div className="mb-5 h-28 w-28 overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-rose-500 border-b-rose-800 bg-slate-900 shadow-xl">
             <img
               src={getBossAvatarUrl("angry")}
               alt={boss?.name || "Boss"}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover object-top"
             />
           </div>
 
-          <h2 className="mb-3 text-3xl font-extrabold text-slate-900">
+          <h2 className="mb-2 text-3xl font-black text-slate-900">
             Out of Hearts!
           </h2>
 
-          <p className="mb-8 max-w-sm font-medium text-slate-500">
-            {boss?.name} was not impressed. Take a deep breath and try the
-            encounter again.
+          <p className="mb-7 max-w-sm text-sm font-bold text-slate-500">
+            {boss?.name} was not impressed. Take a deep breath and challenge the
+            arena again.
           </p>
 
           <button
             type="button"
             onClick={onRetry}
-            className="flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl border-b-4 border-indigo-800 bg-indigo-600 py-4 text-lg font-extrabold text-white shadow-sm transition-all hover:bg-indigo-500 active:translate-y-1 active:border-b-0"
+            className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
           >
-            <RotateCcw size={20} />
-            Retry Encounter
+            <RotateCcw size={18} />
+            <span>Retry Encounter</span>
           </button>
 
           <button
             type="button"
             onClick={onEnd}
-            className="mt-4 font-bold text-slate-400 transition-colors hover:text-slate-600"
+            className="mt-3 rounded-xl px-4 py-2 text-xs font-black text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
-            Flee Battle
+            Exit to Learning Hub
           </button>
         </div>
       )}
 
-      {/* Stats header */}
-      <div className="z-10 flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-slate-200 bg-slate-100 shadow-sm">
+      {/* 1. Vibrant Dark Arena Header + Single/Multi View Switcher (Matches FreestyleChat) */}
+      <div className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-6 py-3.5 text-white">
+        <div className="pointer-events-none absolute -top-12 right-10 h-32 w-32 rounded-full bg-sky-500/20 blur-2xl" />
+
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
               <img
-                src={bossAvatarUrl}
+                src={activeStageAvatarUrl}
                 alt={boss?.name ? `${boss.name} avatar` : "Boss avatar"}
-                className="h-full w-full object-cover transition-all duration-300"
+                className="h-full w-full object-cover object-top transition-all duration-300"
               />
+              <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
             </div>
 
-            <h4 className="hidden text-sm font-extrabold uppercase tracking-wide text-slate-900 sm:block">
-              {boss?.name || "Milestone Boss"}
-            </h4>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-black tracking-tight text-white sm:text-lg">
+                  {boss?.name || "Milestone Boss"}
+                </h2>
+                <span className="rounded-lg border border-sky-400/40 bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-sky-300 uppercase">
+                  Boss Arena
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-300">
+                Challenge{" "}
+                <strong className="text-white">
+                  {Math.min(currentIndex + 1, Math.max(1, totalExercises))}
+                </strong>{" "}
+                of <strong className="text-white">{totalExercises}</strong>
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {[1, 2, 3].map((heartIndex) => (
-              <Heart
-                key={heartIndex}
-                size={22}
-                className={`transition-all duration-300 ${
-                  heartIndex <= chances
-                    ? "scale-100 fill-rose-500 text-rose-500 drop-shadow-sm"
-                    : "scale-90 fill-slate-200 text-slate-200"
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Single / Multi View Switcher (Matches FreestyleChat!) */}
+            <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-900/90 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("single")}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  viewMode === "single"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-400 hover:text-white"
                 }`}
-              />
-            ))}
-          </div>
+              >
+                <RectangleHorizontal className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">1-on-1 Stage</span>
+              </button>
 
-          <div className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5">
-            <Zap size={18} className="fill-amber-500 text-amber-500" />
-            <span className="text-sm font-extrabold text-amber-600">
-              {xp} XP
-            </span>
+              <button
+                type="button"
+                onClick={() => setViewMode("multi")}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  viewMode === "multi"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <MessagesSquare className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">
+                  Transcript ({messages.length})
+                </span>
+              </button>
+            </div>
+
+            {/* Hearts Pill */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-slate-900/90 px-3 py-1.5">
+              {[1, 2, 3].map((heartIndex) => (
+                <Heart
+                  key={heartIndex}
+                  size={18}
+                  className={`transition-all duration-300 ${
+                    heartIndex <= chances
+                      ? "scale-100 fill-rose-500 text-rose-500 drop-shadow-2xs"
+                      : "scale-90 fill-slate-700 text-slate-700"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* XP Pill */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-1.5">
+              <Zap size={15} className="fill-amber-300 text-amber-300" />
+              <span className="text-xs font-black text-amber-300">{xp} XP</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+      {/* 2. Arena Progress Strip */}
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-6 py-2.5">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black tracking-wider text-indigo-900 uppercase">
+          <Target className="h-3.5 w-3.5 text-indigo-600" />
+          Progress ({currentIndex}/{totalExercises})
+        </span>
+
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 p-0.5 shadow-inner">
           <div
-            className="h-full rounded-full bg-amber-400 transition-all duration-700 ease-out"
+            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400 transition-all duration-700 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>
 
-      {/* Chat and exercise area */}
-      <div className="relative flex-1 overflow-hidden bg-slate-50/50">
-        <ScrollArea className="h-full w-full">
-          <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-8">
-            {/* ===============================================================
-                BOSS INTRO VIDEO CUTSCENE (Shown before exercises begin!)
-                Click to play with sound. Plays once (no loop).
-                =============================================================== */}
-            {introVideoUrl && !hasStartedExercises && (
-              <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl shadow-xl animate-in fade-in zoom-in-95 duration-300">
+      {/* =====================================================================
+          3A. SINGLE 1-ON-1 STAGE VIEW (Living Boss Portrait + Active Exercise)
+          ===================================================================== */}
+      {viewMode === "single" ? (
+        <div className="relative flex-1 overflow-y-auto bg-slate-50/60 p-6">
+          <div className="mx-auto flex max-w-3xl flex-col items-center space-y-6">
+            {/* If Intro Video hasn't been started/skipped yet, spotlight the Cutscene */}
+            {introVideoUrl && !hasStartedExercises ? (
+              <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-slate-950 shadow-xl animate-in fade-in zoom-in-95 duration-300">
                 <div
                   role="button"
                   tabIndex={0}
@@ -260,26 +399,23 @@ export default function BossFoundationFreestyle({
                     className="h-full w-full object-cover"
                   />
 
-                  {/* Play button, only while paused / finished */}
                   {!isVideoPlaying && (
                     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg">
-                        <Play className="ml-1 h-7 w-7 fill-indigo-600 text-indigo-600" />
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xl">
+                        <Play className="ml-1 h-7 w-7 fill-current" />
                       </div>
                     </div>
                   )}
 
-                  {/* Top Left Cutscene Pill */}
-                  <div className="pointer-events-none absolute top-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-300 backdrop-blur-md">
-                    <Sparkles className="h-3.5 w-3.5" />
+                  <div className="pointer-events-none absolute top-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-slate-950/75 px-3 py-1 text-[11px] font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                     <span>{boss?.name || "Boss"} Intro</span>
                   </div>
 
-                  {/* Top Right Mute/Unmute Toggle */}
                   <button
                     type="button"
                     onClick={toggleVideoMute}
-                    className="absolute top-3.5 right-3.5 rounded-full bg-slate-950/75 p-2 text-white transition hover:bg-slate-900 backdrop-blur-md"
+                    className="absolute top-3.5 right-3.5 rounded-full border border-white/15 bg-slate-950/75 p-2 text-white backdrop-blur-md transition hover:bg-slate-900"
                     title={isVideoMuted ? "Unmute video" : "Mute video"}
                   >
                     {isVideoMuted ? (
@@ -290,33 +426,182 @@ export default function BossFoundationFreestyle({
                   </button>
                 </div>
               </div>
-            )}
+            ) : (
+              /* Living 1-on-1 Boss Portrait (Framer Motion Emote Engine) */
+              <div className="flex flex-col items-center text-center">
+                <div className="relative mb-4">
+                  {/* Ambient Mood Glow */}
+                  <div
+                    className={`pointer-events-none absolute -inset-4 rounded-[2.5rem] blur-xl transition-all duration-500 ${
+                      effectiveMood === "happy"
+                        ? "bg-emerald-400/50"
+                        : effectiveMood === "angry"
+                          ? "bg-rose-500/55"
+                          : effectiveMood === "sad"
+                            ? "bg-amber-400/40"
+                            : "bg-sky-400/30"
+                    }`}
+                  />
 
-            {messages.length === 0 && !isProcessing && !isRecording && (
-              <div className="flex min-h-[200px] flex-col items-center justify-center text-center opacity-60">
-                <p className="text-sm font-medium text-slate-500">
-                  Initializing challenge...
-                </p>
+                  {/* Expanding Shockwave Ring on Mood Change */}
+                  <AnimatePresence>
+                    <motion.div
+                      key={`ring-${effectiveMood}-${latestBossChatMsg?.id}`}
+                      initial={{ scale: 0.9, opacity: 0.85 }}
+                      animate={{ scale: 1.38, opacity: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.55, ease: "easeOut" }}
+                      className={`pointer-events-none absolute inset-0 rounded-[2rem] border-4 ${
+                        effectiveMood === "happy"
+                          ? "border-emerald-400"
+                          : effectiveMood === "angry"
+                            ? "border-rose-500"
+                            : effectiveMood === "sad"
+                              ? "border-amber-400"
+                              : "border-sky-400"
+                      }`}
+                    />
+                  </AnimatePresence>
+
+                  {/* Animated Portrait Box */}
+                  <motion.div
+                    key={`box-${effectiveMood}-${latestBossChatMsg?.id}`}
+                    animate={getBossMoodMotion(effectiveMood)}
+                    transition={
+                      effectiveMood === "thinking"
+                        ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+                        : { duration: 0.45, ease: "easeOut" }
+                    }
+                    className={`relative h-24 w-24 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl sm:h-28 sm:w-28 ${
+                      effectiveMood === "happy"
+                        ? "border-emerald-400 border-b-emerald-700"
+                        : effectiveMood === "angry"
+                          ? "border-rose-500 border-b-rose-800"
+                          : effectiveMood === "sad"
+                            ? "border-amber-400 border-b-orange-700"
+                            : "border-sky-400 border-b-blue-800"
+                    }`}
+                  >
+                    <img
+                      src={activeStageAvatarUrl}
+                      alt={boss?.name || "Boss"}
+                      className="h-full w-full object-cover object-top"
+                    />
+                    <div
+                      className={`pointer-events-none absolute inset-0 transition-colors duration-300 ${BOSS_MOOD_OVERLAY[effectiveMood].tint}`}
+                    />
+                  </motion.div>
+
+                  {/* Popping Top-Right Emoji Burst */}
+                  <AnimatePresence mode="wait">
+                    {BOSS_MOOD_OVERLAY[effectiveMood].badge && (
+                      <motion.div
+                        key={`emoji-${effectiveMood}-${latestBossChatMsg?.id}`}
+                        initial={{ scale: 0, rotate: -20, y: 8 }}
+                        animate={{ scale: 1, rotate: 0, y: 0 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 18,
+                        }}
+                        className="absolute -top-2.5 -right-2.5 flex h-8 w-8 items-center justify-center rounded-2xl border-2 border-white bg-white text-base shadow-lg"
+                      >
+                        {BOSS_MOOD_OVERLAY[effectiveMood].badge}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Animated Emote Status Pill */}
+                  <motion.span
+                    key={`pill-${effectiveMood}`}
+                    initial={{ scale: 0.85, y: 4 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 20 }}
+                    className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-3 py-0.5 text-[10px] font-black tracking-wider uppercase shadow-md ${
+                      effectiveMood === "happy"
+                        ? "border-emerald-800 bg-emerald-400 text-slate-950"
+                        : effectiveMood === "thinking"
+                          ? "border-indigo-900 bg-indigo-500 text-white"
+                          : effectiveMood === "angry"
+                            ? "border-rose-950 bg-rose-500 text-white"
+                            : "border-blue-900 bg-sky-400 text-slate-950"
+                    }`}
+                  >
+                    {effectiveMood === "happy"
+                      ? "🔥 Impressed"
+                      : effectiveMood === "thinking"
+                        ? "💭 Thinking..."
+                        : effectiveMood === "angry"
+                          ? "💢 Not Impressed"
+                          : `👑 ${boss?.name || "Boss"}`}
+                  </motion.span>
+                </div>
               </div>
             )}
 
-            {messages.map((message: BossMessage) => {
-              if (!message.exercise) {
-                return (
-                  <BossFoundationFreestyleChatBubble
-                    key={message.id}
-                    message={message}
-                    aiAvatarUrl={getBossAvatarUrl(message.mood || "default")}
-                    onReplay={handleReplay}
-                    ttsStatus="idle"
-                  />
-                );
-              }
+            {/* Boss's Latest Spoken Line Card */}
+            {latestBossChatMsg && (
+              <div
+                className={`w-full max-w-2xl rounded-3xl border-2 border-b-[6px] px-6 py-4 text-center shadow-md transition-all ${
+                  latestBossChatMsg.status === "correct"
+                    ? "border-emerald-300 border-b-emerald-400 bg-emerald-50/95 text-emerald-950"
+                    : latestBossChatMsg.status === "incorrect"
+                      ? "border-rose-300 border-b-rose-400 bg-rose-50/95 text-rose-950"
+                      : "border-slate-200 border-b-slate-300 bg-white text-slate-900"
+                }`}
+              >
+                {(latestBossChatMsg.status === "correct" ||
+                  latestBossChatMsg.status === "incorrect") && (
+                  <div className="mb-1.5 flex items-center justify-center gap-1.5">
+                    {latestBossChatMsg.status === "correct" ? (
+                      <>
+                        <CheckCircle2 size={15} className="text-emerald-600" />
+                        <span className="text-[11px] font-black tracking-wider text-emerald-700 uppercase">
+                          Correct! +50 XP
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={15} className="text-rose-600" />
+                        <span className="text-[11px] font-black tracking-wider text-rose-700 uppercase">
+                          Incorrect • -1 Heart
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
 
-              return (
+                <div className="flex items-center justify-center gap-2.5">
+                  <p className="text-base font-black leading-snug sm:text-xl">
+                    &ldquo;{latestBossChatMsg.text}&rdquo;
+                  </p>
+                  {latestBossChatMsg.text && (
+                    <button
+                      type="button"
+                      onClick={() => handleReplay(latestBossChatMsg.text!)}
+                      title="Replay Boss audio"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
+                    >
+                      <Volume2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {latestBossChatMsg.translation && (
+                  <p className="mt-1.5 text-xs font-bold text-slate-500 sm:text-sm">
+                    {latestBossChatMsg.translation}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Active Challenge Card (Centered on Stage) */}
+            {activeExerciseMsg && (
+              <div className="flex w-full justify-center">
                 <ExerciseBlock
-                  key={message.id}
-                  message={message}
+                  key={activeExerciseMsg.id}
+                  message={activeExerciseMsg}
                   onSubmit={submitExerciseAnswer}
                   onSubmitVoice={submitTurn}
                   onTimeOut={handleTimeOut}
@@ -331,52 +616,110 @@ export default function BossFoundationFreestyle({
                   playWord={playWord}
                   stopWordAudio={stopWordAudio}
                 />
-              );
-            })}
-
-            {showThinking && (
-              <div className="flex w-full justify-center py-4 animate-in fade-in duration-300">
-                <Marker role="status">
-                  <MarkerIcon>
-                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                  </MarkerIcon>
-                  <MarkerContent className="text-sm font-medium text-slate-500">
-                    Boss is thinking...
-                  </MarkerContent>
-                </Marker>
               </div>
             )}
-
-            <div ref={messagesEndRef} className="h-4" />
           </div>
-        </ScrollArea>
-      </div>
+        </div>
+      ) : (
+        /* =====================================================================
+           3B. MULTI-THREAD TRANSCRIPT VIEW (Full Scrollable Feed)
+           ===================================================================== */
+        <div className="relative flex-1 overflow-hidden bg-slate-50/50">
+          <ScrollArea className="h-full w-full">
+            <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-8">
+              {messages.map((message: BossMessage) => {
+                if (!message.exercise) {
+                  return (
+                    <BossFoundationFreestyleChatBubble
+                      key={message.id}
+                      message={message}
+                      aiAvatarUrl={getBossAvatarUrl(message.mood || "default")}
+                      onReplay={handleReplay}
+                      ttsStatus="idle"
+                    />
+                  );
+                }
 
-      {/* Bottom action bar */}
-      <div className="relative z-10 flex shrink-0 flex-col gap-4 border-t border-slate-200 bg-white p-4 sm:p-6 md:flex-row">
+                return (
+                  <ExerciseBlock
+                    key={message.id}
+                    message={message}
+                    onSubmit={submitExerciseAnswer}
+                    onSubmitVoice={submitTurn}
+                    onTimeOut={handleTimeOut}
+                    isRecording={isRecording}
+                    isAiProcessing={isAiProcessing}
+                    transcript={transcript}
+                    startRecording={startRecording}
+                    stopRecording={stopRecording}
+                    resetRecording={resetRecording}
+                    playExerciseAudio={playExerciseAudio}
+                    resolveAssetUrl={resolveAssetUrl}
+                    playWord={playWord}
+                    stopWordAudio={stopWordAudio}
+                  />
+                );
+              })}
+
+              {showThinking && (
+                <div className="flex w-full justify-center py-4 animate-in fade-in duration-300">
+                  <Marker role="status">
+                    <MarkerIcon>
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    </MarkerIcon>
+                    <MarkerContent className="text-xs font-black tracking-wider text-slate-500 uppercase">
+                      {boss?.name || "Boss"} is thinking...
+                    </MarkerContent>
+                  </Marker>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* 4. Bottom Control Bar (Matches FreestyleChat) */}
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-white px-6 py-4">
         {!hasStartedExercises ? (
           <button
             type="button"
             onClick={startExercises}
-            className={`flex w-full animate-in items-center justify-center rounded-2xl border-b-4 border-indigo-800 bg-indigo-600 py-4 text-lg font-extrabold text-white shadow-sm transition-all slide-in-from-bottom-2 hover:bg-indigo-500 active:translate-y-1 active:border-b-0 ${
-              videoFinished ? "ring-4 ring-indigo-300" : ""
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 sm:text-base ${
+              videoFinished ? "ring-4 ring-sky-300/60" : ""
             }`}
           >
-            {isProcessing ? "Skip Intro & Begin" : "I'm Ready, Let's Begin"}
+            <span>
+              {isProcessing ? "Skip Intro & Begin" : "I'm Ready, Let's Begin"}
+            </span>
+            <ArrowRight size={18} />
           </button>
         ) : stageStatus === "PLAYING" ? (
-          <div className="flex flex-1 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-4 text-center">
-            <span className="text-sm font-bold uppercase tracking-wider text-slate-500">
-              {hasPendingExercise
-                ? "Complete the exercise above to continue"
-                : isAiProcessing
-                  ? "Waiting for the boss to finish speaking..."
-                  : "Waiting for the next exercise..."}
-            </span>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span
+                className={`h-3 w-3 rounded-full ${
+                  isRecording
+                    ? "animate-ping bg-emerald-500"
+                    : isAiProcessing
+                      ? "animate-pulse bg-indigo-500"
+                      : "bg-sky-500"
+                }`}
+              />
+              <span className="text-sm font-extrabold text-slate-700">
+                {hasPendingExercise
+                  ? "Complete the active challenge above to continue..."
+                  : isAiProcessing
+                    ? `${boss?.name || "Boss"} is speaking...`
+                    : "Preparing next challenge..."}
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center rounded-2xl border-2 border-slate-200 bg-slate-50 px-6 py-4">
-            <p className="font-bold uppercase tracking-widest text-slate-400">
+          <div className="flex items-center gap-3">
+            <span className="h-3 w-3 rounded-full bg-emerald-500" />
+            <p className="text-sm font-black tracking-wider text-slate-700 uppercase">
               Encounter {stageStatus}
             </p>
           </div>
@@ -386,10 +729,10 @@ export default function BossFoundationFreestyle({
           <button
             type="button"
             onClick={onEnd}
-            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-emerald-500 px-8 py-4 text-lg font-extrabold text-white shadow-sm transition-all hover:bg-emerald-400 active:translate-y-1 active:border-b-0 md:w-auto"
+            className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 md:w-auto"
           >
-            Claim Victory
-            <ArrowRight size={20} />
+            <span>Claim Victory</span>
+            <ArrowRight size={18} />
           </button>
         )}
       </div>
