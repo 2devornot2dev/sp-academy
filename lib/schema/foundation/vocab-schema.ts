@@ -80,6 +80,7 @@ export const vocabMomentItemSchema = z.object({
   gloss: z.string(),
   audioS3Key: optionalS3Key, // "" when that word's TTS failed
   labelHint: z.string(),
+  imageS3Key: z.string().nullable().optional(),
 });
 
 export const pronunciationCheckSchema = z.object({

@@ -152,11 +152,11 @@ function VocabBridgeContent({
 
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 p-4 md:flex-row md:gap-8 md:p-8">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center gap-6 p-4 md:flex-row md:items-center md:gap-8 md:p-8">
         {/* =================================================================
             LEFT SIDEBAR: 3D TACTILE STEPPER CARD
             ================================================================= */}
-        <div className="flex h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200/80 md:w-72 md:p-7 lg:w-80">
+        <div className="flex h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-sm md:min-h-[640px] md:w-72 md:p-7 lg:w-80">
           <div>
             {/* Top Accent Amber Pill */}
             <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-3 py-1 text-[11px] font-black tracking-wide text-slate-950 uppercase shadow-2xs">
@@ -260,9 +260,9 @@ function VocabBridgeContent({
         </div>
 
         {/* =================================================================
-            RIGHT SIDE: MAIN CONTENT STAGE CARD
+            RIGHT SIDE: MAIN CONTENT STAGE CARD (Centered in Viewport)
             ================================================================= */}
-        <div className="relative flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200/80">
+        <div className="relative flex min-h-[640px] flex-1 flex-col justify-center overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white shadow-sm">
           {isFinishing && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/85 backdrop-blur-xs">
               <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
