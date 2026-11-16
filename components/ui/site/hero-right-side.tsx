@@ -11,7 +11,7 @@ const AUDIO_WAVE_HEIGHTS = [40, 70, 40, 100, 60, 30, 80, 50, 90, 40];
 
 export default function HeroRightSide() {
   return (
-    <div className="relative z-10 hidden w-full flex-1 items-center justify-center lg:flex lg:ml-10 mt-12 lg:mt-0 min-h-[650px]">
+    <div className="relative z-10 flex w-full flex-1 items-center justify-center mt-0 lg:ml-10 min-h-[280px] sm:min-h-[420px] lg:min-h-[650px]">
       
       {/* 1. IMPORTED CSS VECTORS BACKGROUND */}
       <div className={styles.vectorContainer}>
