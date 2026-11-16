@@ -18,7 +18,7 @@ export default async function Page({ params }: Params) {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC]">
+    <div className="min-h-screen animate-bg">
       <VocabBridgeWrapper bridge={bridge} />
     </div>
   );

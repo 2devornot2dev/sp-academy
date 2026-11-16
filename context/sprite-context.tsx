@@ -17,7 +17,7 @@ import {
   X,
   ArrowRight,
   RotateCcw,
-  MessageSquare,
+  Compass,
 } from "lucide-react";
 import { getPresignedUrls } from "@/app/actions/s3";
 import { getSpriteNode } from "@/lib/sprites/get-sprite-node";
@@ -97,14 +97,15 @@ interface SpriteContextValue {
   pendingPrompt: string | null;
   clearPendingPrompt: () => void;
 
-  // Ephemeral Popup Notifications
+  // Ephemeral Popup + Last Saved Notification
   current: SpritePayload | null;
+  lastNotification: SpritePayload | null;
   summonSprite: (payload: SpritePayload) => void;
   summonSpriteNode: (options: any) => Promise<void>;
   dismissSprite: () => void;
   isShowing: boolean;
 
-  // DB-Backed Persistent Notifications (For the Briefing Tab)
+  // DB-Backed Persistent Notifications
   dbNotifications: any[];
   dismissDbNotification: (id: string) => Promise<void>;
 
@@ -178,7 +179,7 @@ export function SpriteProvider({
           if (typeof window !== "undefined") {
             localStorage.setItem(`dismissed_${prev.id}`, "1");
           }
-        } catch (e) {}
+        } catch {}
       }
       return null;
     });
@@ -190,7 +191,7 @@ export function SpriteProvider({
       if (targetId && typeof window !== "undefined") {
         try {
           localStorage.setItem(`dismissed_fail_${targetId}`, "1");
-        } catch (e) {}
+        } catch {}
       }
       setLiveTask(null);
     },
@@ -413,14 +414,14 @@ export function SpriteProvider({
     dbSprite?.avatarUrl ||
     (isVivi ? "/sprite-f.png" : "/sprite-m.png");
 
+  // Docked in the EXACT same corner as the launcher button so they never stack!
   const positionClasses =
-    current?.position === "bottom-right"
-      ? "bottom-24 right-6"
-      : current?.position === "top-right"
-        ? "top-6 right-6"
-        : "bottom-6 left-6";
+    current?.position === "top-right"
+      ? "top-5 right-5 sm:top-6 sm:right-6"
+      : current?.position === "bottom-left"
+        ? "bottom-5 left-5 sm:bottom-6 sm:left-6"
+        : "bottom-5 right-5 sm:bottom-6 sm:right-6";
 
-  // Fixed: Calls the imported DB server action (no longer shadowed!)
   const dismissDbNotification = useCallback(async (id: string) => {
     setDbNotifications((prev) => prev.filter((n) => n.id !== id));
     await dismissDbNotificationAction(id).catch(console.error);
@@ -456,7 +457,6 @@ export function SpriteProvider({
         });
         return true;
       } else {
-        // If task can't be retried (e.g. already completed/stale), clear the stuck banner
         setLiveTask(null);
       }
       return false;
@@ -464,13 +464,12 @@ export function SpriteProvider({
     [liveTask?.taskId, summonSprite],
   );
 
-  // Refs so Pusher binds once per userId without re-subscribing on state changes
   const summonSpriteRef = useRef(summonSprite);
-  const openChatRef = useRef(openChat);
+  const retryLiveTaskRef = useRef(retryLiveTask);
   useEffect(() => {
     summonSpriteRef.current = summonSprite;
-    openChatRef.current = openChat;
-  }, [summonSprite, openChat]);
+    retryLiveTaskRef.current = retryLiveTask;
+  }, [summonSprite, retryLiveTask]);
 
   useEffect(() => {
     if (!userId) return;
@@ -479,7 +478,6 @@ export function SpriteProvider({
     getLiveTaskState(userId).then((cached) => {
       if (!mounted || !cached) return;
 
-      // Ignore background sprite notification task failures or previously dismissed failures
       if (
         cached.taskType === "SPRITE_NOTIFICATION_GENERATION" ||
         (cached.status === "FAILED" &&
@@ -509,13 +507,15 @@ export function SpriteProvider({
 
       summonSpriteRef.current({
         id: `fail_${data.taskId}`,
-        badge: `Error ⚠️`,
-        text: `My builder hit a snag. Check the Briefing Tab to retry it!`,
-        duration: 8000,
+        badge: `Build Interrupted ⚠️`,
+        text: `Something interrupted ${data.label || "your stage"} while building. Tap Retry to rebuild it!`,
+        duration: 10000,
         action: {
-          label: "View Details",
-          variant: "danger",
-          onClick: () => openChatRef.current({ tab: "briefing" }),
+          label: "Retry Build",
+          variant: "retry",
+          onClick: () => {
+            void retryLiveTaskRef.current(data.taskId);
+          },
         },
       });
     };
@@ -532,63 +532,20 @@ export function SpriteProvider({
       getActiveNotifications().then(setDbNotifications).catch(console.error);
     };
 
-    const handleSpriteNodeReady = (node: {
-      nodeId: string;
-      orderIndex: number;
-      stepType?: string | null;
-      header?: string | null;
-      nativeBody: string;
-      targetBody?: string | null;
-      nativeAudioUrl?: string | null;
-      targetAudioUrl?: string | null;
-      action?: string | null;
-    }) => {
-      // 1. ONLY auto-pop from Pusher if it's a Sprite Exercise notification!
-      // Curriculum nodes (SPOON / BRIDGE / BOSS) are now pre-baked in the background
-      // by the daisy-chain, and FoundationHubPage's `summonSpriteNode` already summons
-      // the exact node for the user's `currentFocus` when they actually reach that step!
-      const isExerciseNotification =
-        node.stepType === "EXERCISE_READY" ||
-        node.stepType === "EXERCISE_BUILDING";
-
-      if (!isExerciseNotification) {
-        return;
-      }
-
-      setLiveTask(null);
-
-      summonSpriteRef.current({
-        id: `${node.nodeId}_${Date.now()}`,
-        badge: node.header ?? undefined,
-        text: node.nativeBody,
-        targetText: node.targetBody ?? undefined,
-        audioUrl: node.nativeAudioUrl ?? node.targetAudioUrl,
-        targetAudioUrl: node.targetAudioUrl,
-        autoPlayAudio: true,
-        duration: 10000,
-        position: "bottom-right",
-        action: {
-          label: node.action || "Open Briefing",
-          variant: "primary",
-          onClick: () => openChatRef.current({ tab: "briefing" }),
-        },
-      });
-    };
-
     channel.bind("system-task-failed", handleFailed);
     channel.bind("system-task-building", handleBuilding);
     channel.bind("system-task-completed", handleCompleted);
-    channel.bind("sprite-node-ready", handleSpriteNodeReady);
 
     return () => {
       mounted = false;
       channel.unbind("system-task-failed", handleFailed);
       channel.unbind("system-task-building", handleBuilding);
       channel.unbind("system-task-completed", handleCompleted);
-      channel.unbind("sprite-node-ready", handleSpriteNodeReady);
       pusherClient.unsubscribe(channelName);
     };
   }, [userId]);
+
+  const lastNotification = notifications[0] ?? null;
 
   return (
     <SpriteContext.Provider
@@ -609,6 +566,7 @@ export function SpriteProvider({
         pendingPrompt,
         clearPendingPrompt,
         current,
+        lastNotification,
         summonSprite,
         summonSpriteNode,
         dismissSprite,
@@ -628,22 +586,18 @@ export function SpriteProvider({
     >
       {children}
 
+      {/* UNIFIED 3D LIGHT DISPATCH CARD (Docks in exact same corner as launcher) */}
       <AnimatePresence mode="wait">
         {current && !isChatOpen && (
           <motion.div
             key={current.id}
-            initial={{ opacity: 0, y: 24, scale: 0.92 }}
+            initial={{ opacity: 0, y: 20, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 14, scale: 0.95 }}
+            exit={{ opacity: 0, y: 12, scale: 0.94 }}
             transition={{ type: "spring", stiffness: 360, damping: 26 }}
-            className={`fixed ${positionClasses} z-50 flex w-[92vw] max-w-sm items-start gap-3.5 rounded-3xl border border-indigo-500/30 bg-slate-950/95 p-4 text-white shadow-2xl shadow-indigo-950/50 backdrop-blur-xl`}
+            className={`fixed ${positionClasses} z-50 flex w-[calc(100vw-2.5rem)] max-w-sm items-start gap-3.5 rounded-[1.75rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-4 text-slate-900 shadow-2xl`}
           >
             <div className="relative shrink-0">
-              <span
-                className={`absolute -inset-1 rounded-2xl bg-gradient-to-tr from-teal-400 via-indigo-500 to-fuchsia-500 blur-xs transition-opacity ${
-                  isPlaying ? "animate-pulse opacity-85" : "opacity-50"
-                }`}
-              />
               <motion.div
                 animate={
                   isPlaying
@@ -655,7 +609,7 @@ export function SpriteProvider({
                   duration: 1.2,
                   ease: "easeInOut",
                 }}
-                className="relative h-14 w-14 overflow-hidden rounded-2xl border border-white/20 bg-slate-900"
+                className="relative h-14 w-14 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 border-b-blue-600 bg-slate-100 shadow-sm"
               >
                 <img
                   src={avatarSrc}
@@ -663,24 +617,30 @@ export function SpriteProvider({
                   className="h-full w-full object-cover object-top"
                 />
               </motion.div>
+              <span className="absolute -right-1 -bottom-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="mb-1 flex items-center gap-1.5">
-                <span className="rounded-full bg-teal-400/20 px-2 py-0.5 text-[10px] font-black tracking-wider text-teal-300 uppercase">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-lg bg-sky-100 px-2 py-0.5 text-[10px] font-black tracking-wider text-blue-700 uppercase">
                   {spriteName}
                 </span>
                 {current.badge && (
-                  <span className="inline-flex items-center gap-1 truncate text-[10px] font-extrabold tracking-wide text-indigo-300 uppercase">
+                  <span className="inline-flex items-center gap-1 truncate text-[10px] font-black tracking-wide text-amber-600 uppercase">
                     <Sparkles className="h-2.5 w-2.5 shrink-0" />
                     {current.badge}
                   </span>
                 )}
               </div>
 
-              <p className="text-xs leading-relaxed font-semibold text-slate-100">
+              <p className="text-xs font-extrabold leading-relaxed text-slate-800">
                 &ldquo;{current.text}&rdquo;
               </p>
+              {current.targetText && (
+                <p className="mt-0.5 text-[11px] font-black text-indigo-600">
+                  &ldquo;{current.targetText}&rdquo;
+                </p>
+              )}
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {current.audioUrl && (
@@ -689,10 +649,10 @@ export function SpriteProvider({
                     onClick={() =>
                       isPlaying ? stopAudio() : playAudioUrl(current.audioUrl!)
                     }
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-extrabold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] px-3 py-1 text-[11px] font-black transition ${
                       isPlaying
-                        ? "bg-teal-500 text-slate-950"
-                        : "bg-white/10 text-white hover:bg-white/20"
+                        ? "border-amber-600 bg-amber-300 text-slate-950"
+                        : "border-sky-200 bg-sky-50 text-blue-600 hover:bg-sky-100"
                     }`}
                   >
                     {isPlaying ? (
@@ -716,11 +676,11 @@ export function SpriteProvider({
                       current.action?.onClick();
                       dismissSprite();
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[11px] font-extrabold transition active:scale-95 ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border-b-[3px] px-3.5 py-1.5 text-[11px] font-black text-white shadow-xs transition hover:brightness-105 active:translate-y-0.5 ${
                       current.action.variant === "danger" ||
                       current.action.variant === "retry"
-                        ? "bg-rose-500 text-white hover:bg-rose-400"
-                        : "bg-indigo-500 text-white hover:bg-indigo-400"
+                        ? "border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600"
+                        : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600"
                     }`}
                   >
                     {current.action.variant === "retry" && (
@@ -735,11 +695,11 @@ export function SpriteProvider({
 
                 <button
                   type="button"
-                  onClick={() => openChat({ tab: "briefing" })}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300 transition hover:bg-white/15 hover:text-white"
+                  onClick={() => openChat()}
+                  className="inline-flex items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-600 transition hover:bg-slate-100"
                 >
-                  <MessageSquare className="h-3 w-3 text-teal-400" />
-                  <span>Chat</span>
+                  <Compass className="h-3 w-3 text-blue-600" />
+                  <span>Hub</span>
                 </button>
               </div>
             </div>
@@ -747,9 +707,9 @@ export function SpriteProvider({
             <button
               type="button"
               onClick={dismissSprite}
-              className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="shrink-0 rounded-xl p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </motion.div>
         )}

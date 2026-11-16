@@ -123,10 +123,10 @@ export function ExerciseBlock({
     if (isClozeQuestion) {
       const parts = exercise.question.split("___");
       return (
-        <div className="mb-5 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-5 py-5 text-center text-lg font-black text-slate-900 shadow-2xs">
+        <div className="mb-3.5 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-4 py-3.5 text-center text-base font-black text-slate-900 shadow-2xs sm:text-lg">
           <span>{parts[0]}</span>
           <span
-            className={`mx-1.5 inline-flex min-w-[90px] items-center justify-center rounded-xl border-2 border-b-[3px] px-3 py-1 text-base font-black transition-all ${
+            className={`mx-1.5 inline-flex min-w-[90px] items-center justify-center rounded-xl border-2 border-b-[3px] px-3 py-0.5 text-sm font-black transition-all sm:text-base ${
               selectedBlank
                 ? message.status === "correct"
                   ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
@@ -144,8 +144,8 @@ export function ExerciseBlock({
     }
 
     return (
-      <div className="mb-5 flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-5 py-4 text-center text-lg font-black text-slate-900 shadow-2xs">
-        <MessageSquare className="h-5 w-5 shrink-0 text-blue-600" />
+      <div className="mb-3.5 flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-4 py-3 text-center text-base font-black text-slate-900 shadow-2xs sm:text-lg">
+        <MessageSquare className="h-4 w-4 shrink-0 text-blue-600" />
         <span>&ldquo;{exercise.question}&rdquo;</span>
       </div>
     );
@@ -153,7 +153,7 @@ export function ExerciseBlock({
 
   return (
     <div
-      className={`w-full max-w-[92%] rounded-3xl border-2 border-b-[6px] p-5 shadow-md transition-all duration-300 sm:p-6 md:max-w-[88%] ${
+      className={`w-full max-w-3xl rounded-3xl border-2 border-b-[6px] p-4 shadow-md transition-all duration-300 sm:p-5 ${
         message.status === "correct"
           ? "border-emerald-300 border-b-emerald-400 bg-emerald-50/90"
           : message.status === "incorrect"
@@ -161,7 +161,7 @@ export function ExerciseBlock({
             : "border-slate-200 border-b-slate-300 bg-white"
       }`}
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-black tracking-wider text-indigo-700 uppercase">
           {isAudioMc ? (
             <Headphones size={13} className="text-indigo-600" />
@@ -174,12 +174,12 @@ export function ExerciseBlock({
         {message.status === "correct" && (
           <CheckCircle2
             className="animate-in text-emerald-600 zoom-in"
-            size={26}
+            size={24}
           />
         )}
 
         {message.status === "incorrect" && (
-          <XCircle className="animate-in text-rose-600 zoom-in" size={26} />
+          <XCircle className="animate-in text-rose-600 zoom-in" size={24} />
         )}
 
         {message.status === "pending" && (
@@ -196,7 +196,7 @@ export function ExerciseBlock({
         )}
       </div>
 
-      <p className="mb-4 text-sm font-extrabold text-slate-800 sm:text-[15px]">
+      <p className="mb-3 text-sm font-extrabold text-slate-800">
         {exercise.instruction}
       </p>
 
@@ -211,15 +211,15 @@ export function ExerciseBlock({
               exercise.targetText ?? undefined,
             )
           }
-          className="mb-5 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-3 text-xs font-black text-white shadow-md transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:text-sm"
+          className="mb-3.5 flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-4 py-2.5 text-xs font-black text-white shadow-md transition hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:text-sm"
         >
-          <Volume2 size={18} />
+          <Volume2 size={16} />
           <span>Listen to Boss Audio</span>
         </button>
       )}
 
       {message.status === "pending" && (
-        <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${
               timeLeft <= 5
@@ -241,14 +241,9 @@ export function ExerciseBlock({
           />
         )}
 
+        {/* Always 2x2 grid for Multiple Choice */}
         {exercise.type === "MULTIPLE_CHOICE" && (
-          <div
-            className={
-              isClozeQuestion
-                ? "grid grid-cols-1 gap-3 sm:grid-cols-2"
-                : "flex flex-col gap-3"
-            }
-          >
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {exercise.options?.map((option: string, index: number) => (
               <button
                 key={`${option}-${index}`}
@@ -257,9 +252,7 @@ export function ExerciseBlock({
                   setSelectedBlank(option);
                   onSubmit(option);
                 }}
-                className={`w-full rounded-2xl border-2 border-b-[4px] px-5 py-4 text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-base ${
-                  isClozeQuestion ? "text-center" : "text-left"
-                } ${
+                className={`w-full rounded-2xl border-2 border-b-[4px] px-4 py-3 text-center text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-base ${
                   selectedBlank === option
                     ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
                     : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:border-sky-300 hover:bg-sky-50/50"
@@ -312,8 +305,8 @@ export function ExerciseBlock({
         )}
 
         {exercise.type === "CONVERSATION" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-2xl border-2 border-b-4 border-amber-200 border-b-amber-300 bg-amber-50/60 px-4 py-3">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-2xl border-2 border-b-4 border-amber-200 border-b-amber-300 bg-amber-50/60 px-4 py-2.5">
               <span className="text-xs font-black text-amber-900">
                 {showHint
                   ? `Target phrase: "${exercise.targetText}"`
