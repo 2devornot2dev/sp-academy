@@ -206,7 +206,7 @@ export function FreestyleReviewHub({
     { label: "Fluency", score: review.metrics.fluencyScore },
   ];
 
-const triggerCelebration = () => {
+  const triggerCelebration = () => {
     setStep("celebration");
     void markReviewCompleted(sessionId); // <-- Unlocks the 3-Min Workout!
     confetti({
@@ -566,7 +566,7 @@ const triggerCelebration = () => {
           {/* =================================================================
               FINALE: CELEBRATION + VOX / VIVI PERSONALIZED OUTRO
               ================================================================= */}
-        {step === "celebration" && (
+          {step === "celebration" && (
             <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border-2 border-b-[6px] border-emerald-200 bg-white p-8 text-center shadow-xl animate-in zoom-in-95 duration-300">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-4xl text-white shadow-lg">
                 🏆
@@ -586,13 +586,18 @@ const triggerCelebration = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <img
-                        src={avatarSrc}
-                        alt={review.spriteOutro.spriteName || spriteName}
+                        src={tutor.avatars.happy}
+                        alt={tutor.name}
                         className="h-10 w-10 rounded-xl border border-sky-300 object-cover object-top"
                       />
-                      <span className="text-xs font-black tracking-wider text-blue-700 uppercase">
-                        {review.spriteOutro.spriteName || spriteName} Dispatch
-                      </span>
+                      <div>
+                        <span className="block text-xs font-black tracking-wider text-blue-700 uppercase">
+                          {tutor.name}
+                        </span>
+                        <span className="block text-[10px] font-bold text-slate-400">
+                          AI Tutor Sign-Off
+                        </span>
+                      </div>
                     </div>
 
                     {(review.spriteOutro.nativeAudioUrl ||
@@ -680,4 +685,3 @@ const triggerCelebration = () => {
     </WordAudioProvider>
   );
 }
-
