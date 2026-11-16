@@ -211,21 +211,43 @@ Output ONLY a JSON object with 4 keys:
               freestyle: true,
             },
           },
+          foundationBridges: {
+            select: { bridgeIndex: true, passed: true },
+          },
+          foundationBossStages: {
+            orderBy: { milestoneIndex: "asc" },
+            select: { milestoneIndex: true, passed: true },
+          },
         },
       });
 
       if (activeCourse && activeCourse.lessons.length > 0) {
-        const firstIncompleteLesson = activeCourse.lessons.find(
-          (l) => !l.completedAt,
+        const bridgeByIndex = new Map(
+          activeCourse.foundationBridges.map((b) => [b.bridgeIndex, b]),
+        );
+        const bossByMilestone = new Map(
+          activeCourse.foundationBossStages.map((b) => [b.milestoneIndex, b]),
         );
 
-        if (firstIncompleteLesson) {
-          currentMilestoneIndex = Math.ceil(
-            firstIncompleteLesson.orderIndex / 3,
-          );
-        } else {
-          currentMilestoneIndex = Math.ceil(activeCourse.lessons.length / 3);
+        let activeOrder =
+          activeCourse.lessons[activeCourse.lessons.length - 1].orderIndex;
+
+        for (const l of activeCourse.lessons) {
+          const bridge = bridgeByIndex.get(l.orderIndex);
+          if (!l.completedAt || !bridge || !bridge.passed) {
+            activeOrder = l.orderIndex;
+            break;
+          }
+          if (l.orderIndex % 3 === 0) {
+            const boss = bossByMilestone.get(l.orderIndex / 3);
+            if (!boss || !boss.passed) {
+              activeOrder = l.orderIndex;
+              break;
+            }
+          }
         }
+
+        currentMilestoneIndex = Math.ceil(activeOrder / 3);
 
         const startOrder = (currentMilestoneIndex - 1) * 3 + 1;
         const endOrder = currentMilestoneIndex * 3;

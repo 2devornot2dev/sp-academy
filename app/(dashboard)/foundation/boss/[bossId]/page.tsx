@@ -21,24 +21,33 @@ export default async function BossIdPage({ params }: Params) {
   const courseId =
     (bossData as any).foundationCourseId || (bossData as any).course?.id;
   const milestoneIndex = (bossData as any).milestoneIndex ?? 1;
+  const bossCreatedAt = (bossData as any).createdAt
+    ? new Date((bossData as any).createdAt)
+    : null;
 
   // Server-side guard: Ensure Boss is unlocked via 3-min AI Conversation (or already passed / hit 5/day cap)
   if (!bossData.passed) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [milestoneSession, recentCount, redisState] = await Promise.all([
+    const [qualifyingSession, recentCount, redisState] = await Promise.all([
       prisma.freestyleSession.findFirst({
         where: {
           userId: user.id,
-          milestoneIndex,
-          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+          status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
+          OR: [
+            { milestoneIndex: { in: [milestoneIndex, milestoneIndex + 1] } },
+            { createdAt: { gte: twentyFourHoursAgo } },
+            ...(bossCreatedAt
+              ? [{ createdAt: { gte: bossCreatedAt } }]
+              : []),
+          ],
         },
         select: { id: true },
       }),
       prisma.freestyleSession.count({
         where: {
           userId: user.id,
-          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+          status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
           createdAt: { gte: twentyFourHoursAgo },
         },
       }),
@@ -47,7 +56,7 @@ export default async function BossIdPage({ params }: Params) {
 
     const hitDailyCap = Math.max(redisState.dailyUsed, recentCount) >= 5;
 
-    if (!milestoneSession && !hitDailyCap) {
+    if (!qualifyingSession && !hitDailyCap) {
       redirect("/conversation");
     }
   }
