@@ -26,6 +26,8 @@ import {
   type HydratedTutorExerciseContent,
 } from "@/app/actions/tutor-exercise-actions";
 import { useSpeak } from "@/hooks/use-speak";
+import { playSfx, preloadSfx } from "@/lib/sfx";
+
 interface TutorExerciseArcadeProps {
   userId: string;
   exerciseId: string;
@@ -68,6 +70,10 @@ export function TutorExerciseArcade({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { speak, stop: stopSpeak, isPlaying: isTutorSpeaking } = useSpeak();
   const round3AutoPlayedRef = useRef(false);
+
+  useEffect(() => {
+    preloadSfx();
+  }, []);
 
   const stopAllAudio = () => {
     stopSpeak();
@@ -129,16 +135,19 @@ export function TutorExerciseArcade({
     if (matchedIds.has(cardId) || !selectedWordId) return;
 
     if (cardId === selectedWordId) {
-      if (audioUrl) playAudioUrl(audioUrl);
       const nextMatched = new Set(matchedIds);
       nextMatched.add(cardId);
       setMatchedIds(nextMatched);
+
+      playSfx(nextMatched.size >= cards.length ? "round-clear" : "spark");
+      if (audioUrl) playAudioUrl(audioUrl);
 
       const nextUnmatched = shuffledWordPills.find(
         (c) => !nextMatched.has(c.id),
       );
       setSelectedWordId(nextUnmatched?.id ?? null);
     } else {
+      playSfx("wrong");
       setWrongCardId(cardId);
       setTimeout(() => setWrongCardId(null), 500);
     }
@@ -177,11 +186,16 @@ export function TutorExerciseArcade({
       setBuiltTokens(nextBuilt);
 
       if (forkIdx + 1 < currentDashItem.forks.length) {
+        playSfx("correct");
         setForkIdx(forkIdx + 1);
-      } else if (currentDashItem.audioUrl) {
-        playAudioUrl(currentDashItem.audioUrl);
+      } else {
+        playSfx("round-clear");
+        if (currentDashItem.audioUrl) {
+          playAudioUrl(currentDashItem.audioUrl);
+        }
       }
     } else {
+      playSfx("wrong");
       setTrapFeedback(
         currentFork.whyTrap ||
           `Watch out! "${opt.text}" is a common trap here.`,
@@ -193,6 +207,7 @@ export function TutorExerciseArcade({
     currentDashItem && builtTokens.length >= currentDashItem.forks.length;
 
   const advanceDashOrRound = () => {
+    playSfx("tap");
     if (dashItemIdx + 1 < dashItems.length) {
       setDashItemIdx(dashItemIdx + 1);
       setForkIdx(0);
@@ -245,11 +260,14 @@ export function TutorExerciseArcade({
     ) {
       return;
     }
+    playSfx("tap");
     mediaRecorderRef.current.stop();
   };
 
   const startRecordingRep = async () => {
     if (repsDone >= requiredReps || isRecordingRep || isGradingRep) return;
+    stopAllAudio();
+    playSfx("tap");
     setSpeechFeedback(null);
 
     try {
@@ -278,6 +296,7 @@ export function TutorExerciseArcade({
         });
 
         if (elapsedMs < 600 || rawBlob.size < 1000) {
+          playSfx("wrong");
           setSpeechFeedback({
             ok: false,
             message:
@@ -309,27 +328,39 @@ export function TutorExerciseArcade({
             );
 
             if (score >= 55) {
-              setRepsDone((prev) => Math.min(requiredReps, prev + 1));
+              setRepsDone((prev) => {
+                const next = Math.min(requiredReps, prev + 1);
+                playSfx(next >= requiredReps ? "round-clear" : "correct");
+                return next;
+              });
               setSpeechFeedback({
                 ok: true,
                 message: `Pronunciation Score: ${score}% — Nailed it!`,
               });
             } else {
+              playSfx("wrong");
               setSpeechFeedback({
                 ok: false,
                 message: `Scored ${score}%. Listen to the audio once and try saying "${burst?.targetPhrase}" clearly!`,
               });
             }
           } else {
-            // Fallback if Azure endpoint isn't reachable: count valid spoken recording
-            setRepsDone((prev) => Math.min(requiredReps, prev + 1));
+            setRepsDone((prev) => {
+              const next = Math.min(requiredReps, prev + 1);
+              playSfx(next >= requiredReps ? "round-clear" : "correct");
+              return next;
+            });
             setSpeechFeedback({
               ok: true,
               message: "Nice pronunciation! Rep locked in.",
             });
           }
         } catch {
-          setRepsDone((prev) => Math.min(requiredReps, prev + 1));
+          setRepsDone((prev) => {
+            const next = Math.min(requiredReps, prev + 1);
+            playSfx(next >= requiredReps ? "round-clear" : "correct");
+            return next;
+          });
           setSpeechFeedback({
             ok: true,
             message: "Nice pronunciation! Rep locked in.",
@@ -346,6 +377,7 @@ export function TutorExerciseArcade({
         stopAndGradeRep();
       }, 5000);
     } catch {
+      playSfx("wrong");
       setIsRecordingRep(false);
       setSpeechFeedback({
         ok: false,
@@ -360,6 +392,7 @@ export function TutorExerciseArcade({
     await completeTutorExercise({ userId, exerciseId });
     setIsCompleting(false);
     setWorkoutCompleted(true);
+    playSfx("victory");
     confetti({
       particleCount: 140,
       spread: 75,
@@ -580,7 +613,10 @@ export function TutorExerciseArcade({
               {matchedIds.size >= cards.length ? (
                 <button
                   type="button"
-                  onClick={() => setRoundIdx(1)}
+                  onClick={() => {
+                    playSfx("tap");
+                    setRoundIdx(1);
+                  }}
                   className="flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 py-3.5 text-sm font-black text-white shadow-md transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                 >
                   <span>Next</span>
@@ -598,6 +634,7 @@ export function TutorExerciseArcade({
                         type="button"
                         disabled={isMatched}
                         onClick={() => {
+                          playSfx("tap");
                           setSelectedWordId(pill.id);
                           if (pill.audioUrl) playAudioUrl(pill.audioUrl);
                         }}

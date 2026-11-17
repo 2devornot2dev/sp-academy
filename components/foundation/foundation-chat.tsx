@@ -27,6 +27,7 @@ import { useMatrix } from "@/context/matrix-context";
 import { useSprite } from "@/context/sprite-context";
 import { useSpeak } from "@/hooks/use-speak";
 import { toast } from "sonner";
+import { playSfx } from "@/lib/sfx";
 
 const normalizeText = (s: string) =>
   (s || "")
@@ -339,7 +340,8 @@ function LiveKitChatInner({
                 changed = true;
               }
             });
-            if (changed) {
+           if (changed) {
+              playSfx("spark");
               completedChunksRef.current = next;
               return next;
             }

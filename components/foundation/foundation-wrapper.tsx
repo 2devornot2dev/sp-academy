@@ -38,6 +38,7 @@ import { useRouter } from "next/navigation";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { completeLesson } from "@/app/actions/complete-lesson";
 import { SpriteCoachPop } from "./sprite-step-pop";
+import { playSfx, preloadSfx } from "@/lib/sfx";
 
 const STEPS_CONFIG = [
   { id: 0, title: "Language Setup", icon: Languages },
@@ -98,6 +99,7 @@ function FoundationContent() {
 
   // INTERCEPTOR: Sync the matrix cart to DB, then change step
   const handleNext = (nextStepIndex: number) => {
+    playSfx(nextStepIndex === 8 ? "victory" : "round-clear");
     syncCart(userId, targetLang);
     setStep(nextStepIndex);
   };
@@ -247,7 +249,7 @@ function FoundationContent() {
           </div>
         </div>
 
-       {/* RIGHT SIDE: MAIN CONTENT "CARD" */}
+        {/* RIGHT SIDE: MAIN CONTENT "CARD" */}
         <div className="flex-1 bg-white rounded-4xl shadow-xs overflow-hidden min-h-[600px] flex flex-col">
           {renderStep()}
         </div>

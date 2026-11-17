@@ -23,6 +23,7 @@ import { VocabMomentStep } from "./vocab-moment-step";
 import { CooldownStep } from "./cooldown-step";
 import { BridgePronunciationStep } from "./bridge-pronunciation-step";
 import { BridgeOutroStep } from "./bridge-outro-step";
+import { playSfx, preloadSfx } from "@/lib/sfx";
 
 const BRIDGE_STEPS = [
   { id: 1, title: "Scene Context", subtitle: "Listen & observe", icon: Video },
@@ -75,7 +76,9 @@ function VocabBridgeContent({
     (bridge.handoffFragment as any)?.wordAudio ||
     {};
 
+  // Inside VocabBridgeContent (5 steps):
   const handleNext = (nextStepIndex: number) => {
+    playSfx(nextStepIndex === 5 ? "victory" : "round-clear");
     syncCart(userId, targetLang);
     setStep(nextStepIndex);
   };
@@ -148,7 +151,9 @@ function VocabBridgeContent({
   };
 
   const spoonNum = bridge.bridgeIndex || bridge.lesson?.orderIndex || 1;
-  const progressPct = Math.round(((step - 1) / (BRIDGE_STEPS.length - 1)) * 100);
+  const progressPct = Math.round(
+    ((step - 1) / (BRIDGE_STEPS.length - 1)) * 100,
+  );
 
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>

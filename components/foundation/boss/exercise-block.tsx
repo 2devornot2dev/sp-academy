@@ -18,6 +18,7 @@ import type { BossMessage } from "@/context/boss-context";
 import { PictureSelector } from "./picture-selector";
 import { PronunciationExercise } from "./pronuncation-exercise";
 import { SentenceBuilder } from "./sentence-builder";
+import { playSfx } from "@/lib/sfx";
 
 interface ExerciseBlockProps {
   message: BossMessage;
@@ -85,6 +86,7 @@ export function ExerciseBlock({
   useEffect(() => {
     if (isTimerPaused || timeLeft <= 0) {
       if (timeLeft <= 0 && !isTimerPaused) {
+        playSfx("heart-lost");
         onTimeOut();
       }
       return;
@@ -249,6 +251,7 @@ export function ExerciseBlock({
                 key={`${option}-${index}`}
                 type="button"
                 onClick={() => {
+                  playSfx("tap");
                   setSelectedBlank(option);
                   onSubmit(option);
                 }}
@@ -314,7 +317,10 @@ export function ExerciseBlock({
               </span>
               <button
                 type="button"
-                onClick={() => setShowHint((prev) => !prev)}
+                onClick={() => {
+                  playSfx("tap");
+                  setShowHint((prev) => !prev);
+                }}
                 className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-3 py-1 text-xs font-black text-amber-700 shadow-2xs transition hover:bg-amber-100"
               >
                 {showHint ? <EyeOff size={13} /> : <Eye size={13} />}

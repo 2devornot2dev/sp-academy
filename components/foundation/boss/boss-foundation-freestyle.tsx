@@ -8,6 +8,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import confetti from "canvas-confetti";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -32,6 +33,7 @@ import { BossMessage, useBossFoundation } from "@/context/boss-context";
 import { BossFoundationFreestyleChatBubble } from "./boss-freestyle-chat-bubble";
 import { useWordAudio } from "@/context/word-audio-context";
 import { ExerciseBlock } from "./exercise-block";
+import { playSfx, preloadSfx } from "@/lib/sfx";
 
 interface Props {
   onEnd: () => void;
@@ -123,9 +125,16 @@ export default function BossFoundationFreestyle({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hasPlayedRef = useRef(false);
+  const lastGradedMsgIdRef = useRef<string | number | null>(null);
+  const prevStageStatusRef = useRef<string>(stageStatus);
+
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoFinished, setVideoFinished] = useState(false);
+
+  useEffect(() => {
+    preloadSfx();
+  }, []);
 
   const showThinking = isAiProcessing && !isRecording;
 
@@ -157,6 +166,38 @@ export default function BossFoundationFreestyle({
     [messages],
   );
 
+  // Trigger SFX when a new graded Boss reaction arrives
+  useEffect(() => {
+    if (!latestBossChatMsg?.id) return;
+    if (lastGradedMsgIdRef.current === latestBossChatMsg.id) return;
+
+    if (latestBossChatMsg.status === "correct") {
+      lastGradedMsgIdRef.current = latestBossChatMsg.id;
+      playSfx("correct");
+    } else if (latestBossChatMsg.status === "incorrect") {
+      lastGradedMsgIdRef.current = latestBossChatMsg.id;
+      playSfx("heart-lost");
+    }
+  }, [latestBossChatMsg?.id, latestBossChatMsg?.status]);
+
+  // Trigger Victory / Defeat SFX on stage status change
+  useEffect(() => {
+    if (prevStageStatusRef.current === stageStatus) return;
+    prevStageStatusRef.current = stageStatus;
+
+    if (stageStatus === "PASSED") {
+      playSfx("victory");
+      confetti({
+        particleCount: 150,
+        spread: 75,
+        origin: { y: 0.6 },
+        colors: ["#6366F1", "#10B981", "#F59E0B", "#EC4899"],
+      });
+    } else if (stageStatus === "FAILED") {
+      playSfx("wrong");
+    }
+  }, [stageStatus]);
+
   const effectiveMood: BossStageMood = useMemo(() => {
     if (showThinking) return "thinking";
     if (latestBossChatMsg?.status === "correct") return "happy";
@@ -169,10 +210,15 @@ export default function BossFoundationFreestyle({
   }, [showThinking, latestBossChatMsg]);
 
   const activeStageAvatarUrl = useMemo(() => {
-    if (effectiveMood === "happy") return getBossAvatarUrl("happy");
-    if (effectiveMood === "angry") return getBossAvatarUrl("angry");
-    if (effectiveMood === "sad") return getBossAvatarUrl("sad");
-    return bossAvatarUrl || getBossAvatarUrl("default");
+    const moodUrl =
+      effectiveMood === "happy"
+        ? getBossAvatarUrl("happy")
+        : effectiveMood === "angry"
+          ? getBossAvatarUrl("angry")
+          : effectiveMood === "sad"
+            ? getBossAvatarUrl("sad")
+            : getBossAvatarUrl("default");
+    return moodUrl || bossAvatarUrl || getBossAvatarUrl("default");
   }, [effectiveMood, bossAvatarUrl, getBossAvatarUrl]);
 
   useEffect(() => {
@@ -221,7 +267,7 @@ export default function BossFoundationFreestyle({
         <div className="absolute inset-0 z-50 flex animate-in flex-col items-center justify-center bg-white/95 p-8 text-center backdrop-blur-sm duration-300 zoom-in-95">
           <div className="mb-5 h-28 w-28 overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-rose-500 border-b-rose-800 bg-slate-900 shadow-xl">
             <img
-              src={getBossAvatarUrl("angry")}
+              src={getBossAvatarUrl("angry") || bossAvatarUrl}
               alt={boss?.name || "Boss"}
               className="h-full w-full object-cover object-top"
             />
@@ -238,7 +284,10 @@ export default function BossFoundationFreestyle({
 
           <button
             type="button"
-            onClick={onRetry}
+            onClick={() => {
+              playSfx("tap");
+              onRetry();
+            }}
             className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
           >
             <RotateCcw size={18} />
@@ -247,7 +296,10 @@ export default function BossFoundationFreestyle({
 
           <button
             type="button"
-            onClick={onEnd}
+            onClick={() => {
+              playSfx("tap");
+              onEnd();
+            }}
             className="mt-3 rounded-xl px-4 py-2 text-xs font-black text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             Exit to Learning Hub
@@ -255,7 +307,7 @@ export default function BossFoundationFreestyle({
         </div>
       )}
 
-      {/* 1. Vibrant Dark Arena Header + Single/Multi View Switcher (Matches FreestyleChat) */}
+      {/* 1. Vibrant Dark Arena Header + Single/Multi View Switcher */}
       <div className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-6 py-3.5 text-white">
         <div className="pointer-events-none absolute -top-12 right-10 h-32 w-32 rounded-full bg-sky-500/20 blur-2xl" />
 
@@ -290,11 +342,14 @@ export default function BossFoundationFreestyle({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Single / Multi View Switcher (Matches FreestyleChat!) */}
+            {/* Single / Multi View Switcher */}
             <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-900/90 p-1">
               <button
                 type="button"
-                onClick={() => setViewMode("single")}
+                onClick={() => {
+                  playSfx("tap");
+                  setViewMode("single");
+                }}
                 className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
                   viewMode === "single"
                     ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
@@ -307,7 +362,10 @@ export default function BossFoundationFreestyle({
 
               <button
                 type="button"
-                onClick={() => setViewMode("multi")}
+                onClick={() => {
+                  playSfx("tap");
+                  setViewMode("multi");
+                }}
                 className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
                   viewMode === "multi"
                     ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
@@ -364,8 +422,8 @@ export default function BossFoundationFreestyle({
           3A. SINGLE 1-ON-1 STAGE VIEW (Living Boss Portrait + Active Exercise)
           ===================================================================== */}
       {viewMode === "single" ? (
-        <div className="relative flex-1 overflow-y-auto bg-slate-50/60 p-6">
-          <div className="mx-auto flex max-w-3xl flex-col items-center space-y-6">
+        <div className="relative flex-1 overflow-y-auto bg-slate-50/60 px-5 py-4">
+          <div className="mx-auto flex max-w-3xl flex-col items-center space-y-3.5">
             {/* If Intro Video hasn't been started/skipped yet, spotlight the Cutscene */}
             {introVideoUrl && !hasStartedExercises ? (
               <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-slate-950 shadow-xl animate-in fade-in zoom-in-95 duration-300">
@@ -428,11 +486,11 @@ export default function BossFoundationFreestyle({
               </div>
             ) : (
               /* Living 1-on-1 Boss Portrait (Framer Motion Emote Engine) */
-              <div className="flex flex-col items-center text-center">
-                <div className="relative mb-4">
+              <div className="flex flex-col items-center pt-1 text-center">
+                <div className="relative mb-2.5">
                   {/* Ambient Mood Glow */}
                   <div
-                    className={`pointer-events-none absolute -inset-4 rounded-[2.5rem] blur-xl transition-all duration-500 ${
+                    className={`pointer-events-none absolute -inset-3 rounded-[2.2rem] blur-xl transition-all duration-500 ${
                       effectiveMood === "happy"
                         ? "bg-emerald-400/50"
                         : effectiveMood === "angry"
@@ -448,10 +506,10 @@ export default function BossFoundationFreestyle({
                     <motion.div
                       key={`ring-${effectiveMood}-${latestBossChatMsg?.id}`}
                       initial={{ scale: 0.9, opacity: 0.85 }}
-                      animate={{ scale: 1.38, opacity: 0 }}
+                      animate={{ scale: 1.35, opacity: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.55, ease: "easeOut" }}
-                      className={`pointer-events-none absolute inset-0 rounded-[2rem] border-4 ${
+                      className={`pointer-events-none absolute inset-0 rounded-[1.75rem] border-4 ${
                         effectiveMood === "happy"
                           ? "border-emerald-400"
                           : effectiveMood === "angry"
@@ -472,7 +530,7 @@ export default function BossFoundationFreestyle({
                         ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
                         : { duration: 0.45, ease: "easeOut" }
                     }
-                    className={`relative h-24 w-24 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl sm:h-28 sm:w-28 ${
+                    className={`relative h-20 w-20 overflow-hidden rounded-[1.75rem] border-2 border-b-[5px] bg-slate-900 shadow-xl sm:h-24 sm:w-24 ${
                       effectiveMood === "happy"
                         ? "border-emerald-400 border-b-emerald-700"
                         : effectiveMood === "angry"
@@ -505,7 +563,7 @@ export default function BossFoundationFreestyle({
                           stiffness: 420,
                           damping: 18,
                         }}
-                        className="absolute -top-2.5 -right-2.5 flex h-8 w-8 items-center justify-center rounded-2xl border-2 border-white bg-white text-base shadow-lg"
+                        className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-xl border-2 border-white bg-white text-sm shadow-lg"
                       >
                         {BOSS_MOOD_OVERLAY[effectiveMood].badge}
                       </motion.div>
@@ -543,7 +601,7 @@ export default function BossFoundationFreestyle({
             {/* Boss's Latest Spoken Line Card */}
             {latestBossChatMsg && (
               <div
-                className={`w-full max-w-2xl rounded-3xl border-2 border-b-[6px] px-6 py-4 text-center shadow-md transition-all ${
+                className={`w-full max-w-2xl rounded-3xl border-2 border-b-[5px] px-5 py-3 text-center shadow-sm transition-all ${
                   latestBossChatMsg.status === "correct"
                     ? "border-emerald-300 border-b-emerald-400 bg-emerald-50/95 text-emerald-950"
                     : latestBossChatMsg.status === "incorrect"
@@ -553,18 +611,18 @@ export default function BossFoundationFreestyle({
               >
                 {(latestBossChatMsg.status === "correct" ||
                   latestBossChatMsg.status === "incorrect") && (
-                  <div className="mb-1.5 flex items-center justify-center gap-1.5">
+                  <div className="mb-1 flex items-center justify-center gap-1.5">
                     {latestBossChatMsg.status === "correct" ? (
                       <>
-                        <CheckCircle2 size={15} className="text-emerald-600" />
-                        <span className="text-[11px] font-black tracking-wider text-emerald-700 uppercase">
+                        <CheckCircle2 size={14} className="text-emerald-600" />
+                        <span className="text-[10px] font-black tracking-wider text-emerald-700 uppercase">
                           Correct! +50 XP
                         </span>
                       </>
                     ) : (
                       <>
-                        <XCircle size={15} className="text-rose-600" />
-                        <span className="text-[11px] font-black tracking-wider text-rose-700 uppercase">
+                        <XCircle size={14} className="text-rose-600" />
+                        <span className="text-[10px] font-black tracking-wider text-rose-700 uppercase">
                           Incorrect • -1 Heart
                         </span>
                       </>
@@ -573,7 +631,7 @@ export default function BossFoundationFreestyle({
                 )}
 
                 <div className="flex items-center justify-center gap-2.5">
-                  <p className="text-base font-black leading-snug sm:text-xl">
+                  <p className="text-sm font-black leading-snug sm:text-lg">
                     &ldquo;{latestBossChatMsg.text}&rdquo;
                   </p>
                   {latestBossChatMsg.text && (
@@ -581,15 +639,15 @@ export default function BossFoundationFreestyle({
                       type="button"
                       onClick={() => handleReplay(latestBossChatMsg.text!)}
                       title="Replay Boss audio"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
                     >
-                      <Volume2 size={16} />
+                      <Volume2 size={15} />
                     </button>
                   )}
                 </div>
 
                 {latestBossChatMsg.translation && (
-                  <p className="mt-1.5 text-xs font-bold text-slate-500 sm:text-sm">
+                  <p className="mt-1 text-xs font-bold text-slate-500">
                     {latestBossChatMsg.translation}
                   </p>
                 )}
@@ -633,7 +691,10 @@ export default function BossFoundationFreestyle({
                     <BossFoundationFreestyleChatBubble
                       key={message.id}
                       message={message}
-                      aiAvatarUrl={getBossAvatarUrl(message.mood || "default")}
+                      aiAvatarUrl={
+                        getBossAvatarUrl(message.mood || "default") ||
+                        bossAvatarUrl
+                      }
                       onReplay={handleReplay}
                       ttsStatus="idle"
                     />
@@ -680,12 +741,15 @@ export default function BossFoundationFreestyle({
         </div>
       )}
 
-      {/* 4. Bottom Control Bar (Matches FreestyleChat) */}
+      {/* 4. Bottom Control Bar */}
       <div className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-white px-6 py-4">
         {!hasStartedExercises ? (
           <button
             type="button"
-            onClick={startExercises}
+            onClick={() => {
+              playSfx("round-clear");
+              startExercises();
+            }}
             className={`flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 sm:text-base ${
               videoFinished ? "ring-4 ring-sky-300/60" : ""
             }`}
@@ -728,7 +792,10 @@ export default function BossFoundationFreestyle({
         {stageStatus === "PASSED" && (
           <button
             type="button"
-            onClick={onEnd}
+            onClick={() => {
+              playSfx("tap");
+              onEnd();
+            }}
             className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 md:w-auto"
           >
             <span>Claim Victory</span>
