@@ -30,12 +30,11 @@ import { Question } from "./question";
 import { SelectionCard } from "./selection-card";
 import { AccountStep } from "./steps/account-step";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
-import { setUserGeneration } from "@/lib/upstash";
 import { Gender } from "@prisma/client";
 import { SpriteStep } from "./steps/stripe-step";
 import { invokeTrialBuilder } from "@/app/actions/invoke-trial-builder";
+import { setUserGeneration } from "@/app/actions/set-user-generation";
 
-// 🛡️ Guarantees plain English names always convert to valid BCP-47 locale codes
 
 function getLanguageCode(item: any): string {
   if (item?.code && /^[a-z]{2,3}-[A-Z]{2,4}$/.test(item.code)) return item.code;
