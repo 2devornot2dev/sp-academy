@@ -29,7 +29,7 @@ const STAGES = [
     getTitle: (name: string, lang: string) =>
       `Analyzing ${name}'s ${lang} profile...`,
     getSub: (level: string, goal: string) =>
-      `Calibrating ${level} baseline around ${goal} and phonetic targets.`,
+      `Calibrating ${level} baseline around ${goal} and speaking targets.`,
   },
   {
     id: "designing",
@@ -37,36 +37,36 @@ const STAGES = [
     startSec: 18,
     endSec: 38,
     getTitle: (_: string, lang: string) =>
-      `Designing your autonomous ${lang} curriculum...`,
+      `Designing your ${lang} curriculum...`,
     getSub: () =>
       `Mapping progression curves, speaking drills, and scenario checkpoints.`,
   },
   {
     id: "spoons",
-    label: "SPOONS",
+    label: "Spoons",
     startSec: 38,
     endSec: 65,
-    getTitle: () => `Forging your first 3 SPOONS...`,
+    getTitle: () => `Building your first Spoons...`,
     getSub: () =>
       `Generating bite-sized core audio lessons, scene visuals, and dialogue.`,
   },
   {
     id: "vocabs",
-    label: "VOCABS",
+    label: "Vocab Bridges",
     startSec: 65,
     endSec: 90,
-    getTitle: () => `Synthesizing mini VOCABS & voices...`,
+    getTitle: () => `Synthesizing Vocab & voices...`,
     getSub: () =>
-      `Extracting key scene words and generating native neural voice actors.`,
+      `Extracting key scene words and generating native voice actors.`,
   },
   {
     id: "bosses",
-    label: "BOSS'S",
+    label: "Boss Arena",
     startSec: 90,
     endSec: 108,
-    getTitle: () => `Awakening your Stage BOSS'S...`,
+    getTitle: () => `Setting up your Boss Stage...`,
     getSub: () =>
-      `Configuring Boss avatar moods, 3-heart survival rules, and timed gauntlets.`,
+      `Configuring Boss avatar moods, 3-heart rules, and timed challenges.`,
   },
   {
     id: "ready",
@@ -92,10 +92,13 @@ export function GenerationCycleCard({ data }: { data: UserGenerationData }) {
     (data.nativeLanguage && LOCALE_NAMES[data.nativeLanguage]) ||
     data.nativeLanguage ||
     "";
-  const level = data.level || "custom";
+  const level = data.level || "beginner";
   const goal = data.goal || "fluency";
 
-  // Sync with Redis createdAt so browser refreshes don't reset the 115s timer
+  const isVivi = data.spriteSlug === "vivi";
+  const companionName = isVivi ? "Vivi" : "Vox";
+  const companionAvatar = isVivi ? "/sprite-f.png" : "/sprite-m.png";
+
   useEffect(() => {
     const startTime = data.createdAt || Date.now();
 
@@ -110,7 +113,7 @@ export function GenerationCycleCard({ data }: { data: UserGenerationData }) {
   }, [data.createdAt]);
 
   const foundIndex = STAGES.findIndex(
-    (s) => elapsed >= s.startSec && elapsed < s.endSec
+    (s) => elapsed >= s.startSec && elapsed < s.endSec,
   );
   const activeIndex = foundIndex === -1 ? STAGES.length - 1 : foundIndex;
   const activeStage = STAGES[activeIndex];
@@ -118,79 +121,90 @@ export function GenerationCycleCard({ data }: { data: UserGenerationData }) {
   const progress = Math.min(97, Math.max(4, Math.round((elapsed / 115) * 100)));
 
   return (
-    <div className="fixed inset-0 z-50 flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-slate-950 px-6 text-white">
-      {/* Background Glows */}
-      <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[130px]" />
-      <div className="pointer-events-none absolute -bottom-40 left-1/4 h-[400px] w-[500px] rounded-full bg-fuchsia-500/15 blur-[120px]" />
+    <div className="fixed inset-0 z-50 flex min-h-screen w-full flex-col items-center justify-center overflow-hidden animate-bg px-4 py-8 font-sans text-slate-900 sm:px-6">
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       <div className="relative z-10 w-full max-w-2xl">
-        {/* Top Brand + User Context Pills */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-3.5 py-1.5 text-xs font-extrabold tracking-wide text-indigo-200 uppercase">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-              SPOON ACADEMY FORGE
-            </span>
-          </div>
+        {/* Top Context Pills */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/45 px-4 py-1.5 text-xs font-black tracking-wide text-white uppercase shadow-sm backdrop-blur-md">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            <span>Spoon Academy Setup</span>
+          </span>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black text-white">
             {nativeLang && (
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+              <span className="rounded-full border border-white/20 bg-slate-950/45 px-3 py-1 backdrop-blur-md">
                 {nativeLang} → {targetLang}
               </span>
             )}
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 capitalize">
+            <span className="rounded-full border border-white/20 bg-slate-950/45 px-3 py-1 capitalize backdrop-blur-md">
               {level}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 capitalize">
+            <span className="rounded-full border border-white/20 bg-slate-950/45 px-3 py-1 capitalize backdrop-blur-md">
               {goal}
             </span>
           </div>
         </div>
 
-        {/* Main Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
-          {/* Step Counter + Percentage */}
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-2 text-xs font-extrabold tracking-widest text-indigo-400 uppercase">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Step {activeIndex + 1} of {STAGES.length} • {activeStage.label}
+        {/* Main 3D White Spoon Card */}
+        <div className="relative overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-2xl sm:p-9">
+          {/* Top Status + Percentage */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black tracking-wider text-blue-700 uppercase">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+              <span>
+                Step {activeIndex + 1} of {STAGES.length} • {activeStage.label}
+              </span>
             </span>
 
-            <span className="font-mono text-sm font-black text-indigo-300">
+            <span className="rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3 py-1 text-xs font-black text-white shadow-2xs">
               {progress}%
             </span>
           </div>
 
-          {/* Animated Stage Headline & Subtext */}
-          <div className="my-7 min-h-[96px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeStage.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.3 }}
-              >
-                <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-                  {activeStage.getTitle(firstName, targetLang)}
-                </h1>
-                <p className="mt-2 text-sm leading-relaxed text-slate-300 sm:text-base">
-                  {activeStage.getSub(level, goal)}
-                </p>
-              </motion.div>
-            </AnimatePresence>
+          {/* Vox / Vivi Avatar + Dynamic Stage Headline */}
+          <div className="my-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative shrink-0 self-start sm:self-center">
+              <div className="h-16 w-16 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 border-b-blue-600 bg-slate-100 shadow-md sm:h-20 sm:w-20">
+                <img
+                  src={companionAvatar}
+                  alt={companionName}
+                  className="h-full w-full object-cover object-top"
+                />
+              </div>
+              <span className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-500" />
+            </div>
+
+            <div className="min-h-[76px] min-w-0 flex-1">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeStage.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <h1 className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+                    {activeStage.getTitle(firstName, targetLang)}
+                  </h1>
+                  <p className="mt-1.5 text-xs font-semibold leading-relaxed text-slate-500 sm:text-sm">
+                    {activeStage.getSub(level, goal)}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="mb-8 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+          {/* 3D Progress Bar */}
+          <div className="mb-7 h-3.5 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 shadow-inner ring-1 ring-slate-200/70">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 transition-all duration-1000 ease-linear"
+              className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-emerald-400 transition-all duration-1000 ease-linear"
               style={{ width: `${progress}%` }}
             />
           </div>
 
-          {/* The 6 Stage Pills: Analyzing -> Designing -> SPOONS -> VOCABS -> BOSS'S -> Almost Ready */}
+          {/* 6 3D Tactile Stage Pills */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {STAGES.map((stage, idx) => {
               const isDone = idx < activeIndex;
@@ -199,24 +213,28 @@ export function GenerationCycleCard({ data }: { data: UserGenerationData }) {
               return (
                 <div
                   key={stage.id}
-                  className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-xs font-extrabold tracking-wide transition-all duration-300 ${
+                  className={`flex items-center gap-2.5 rounded-2xl border-2 px-3.5 py-2.5 text-xs font-black tracking-wide transition-all duration-300 ${
                     isDone
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      ? "border-emerald-200 border-b-4 border-b-emerald-300 bg-emerald-50/70 text-emerald-800"
                       : isCurrent
-                        ? "border-indigo-400/60 bg-indigo-500/20 text-white shadow-lg shadow-indigo-500/10"
-                        : "border-white/5 bg-white/[0.02] text-slate-500"
+                        ? "border-sky-400 border-b-4 border-b-blue-600 bg-sky-50 text-slate-900 shadow-sm"
+                        : "border-slate-200/70 bg-slate-50/70 text-slate-400"
                   }`}
                 >
                   <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ${
                       isDone
-                        ? "bg-emerald-500 text-slate-950"
+                        ? "border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
                         : isCurrent
-                          ? "bg-indigo-400 text-slate-950"
-                          : "bg-white/10 text-slate-500"
+                          ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                          : "bg-slate-200/80 text-slate-500"
                     }`}
                   >
-                    {isDone ? <Check className="h-3 w-3 stroke-[3]" /> : idx + 1}
+                    {isDone ? (
+                      <Check className="h-3.5 w-3.5 stroke-[3.5]" />
+                    ) : (
+                      idx + 1
+                    )}
                   </span>
                   <span className="truncate">{stage.label}</span>
                 </div>
@@ -226,8 +244,9 @@ export function GenerationCycleCard({ data }: { data: UserGenerationData }) {
         </div>
 
         {/* Footer Reassurance */}
-        <p className="mt-6 text-center text-xs font-medium text-slate-400">
-          Building your custom neural curriculum takes ~2 minutes. Your hub will open automatically.
+        <p className="mt-5 text-center text-xs font-extrabold text-white/95 drop-shadow-[0_1px_4px_rgba(15,23,42,0.3)]">
+          {companionName} is putting your {targetLang} hub together. It will
+          open automatically when ready!
         </p>
       </div>
     </div>

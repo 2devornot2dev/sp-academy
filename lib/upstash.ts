@@ -26,7 +26,11 @@ export async function setUserGeneration(
   const token = crypto.randomBytes(6).toString("hex");
   const key = `user_gen:${token}`;
 
-  await redis.set(key, data, { ex: 600 });
+  await redis.set(
+    key,
+    { ...data, createdAt: data.createdAt ?? Date.now() },
+    { ex: 600 },
+  );
 
   return token;
 }

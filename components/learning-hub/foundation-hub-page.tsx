@@ -308,26 +308,21 @@ export default function FoundationHubPage({
                       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() =>
-                            openChat({
-                              tab: "session",
-                              prompt: `Let's do a quick 1-on-1 conversational warm-up while my next stage is building!`,
-                            })
-                          }
+                          onClick={() => router.push("/conversation")}
                           className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
                         >
                           <MessageSquare className="h-3.5 w-3.5" />
-                          <span>1-on-1 AI Chat</span>
+                          <span>Live 3-Min AI Chat</span>
                           <ArrowRight className="h-3.5 w-3.5" />
                         </button>
 
                         <button
                           type="button"
-                          onClick={() => openChat({ tab: "session" })}
+                          onClick={() => router.push("/conversation/review")}
                           className="inline-flex items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/25 px-4 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-500/40"
                         >
                           <Dumbbell className="h-3.5 w-3.5 text-amber-300" />
-                          <span>Sprite Exercise</span>
+                          <span>3-Min Workouts</span>
                         </button>
                       </div>
                     </div>
