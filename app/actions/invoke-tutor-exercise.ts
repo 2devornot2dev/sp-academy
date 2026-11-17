@@ -4,6 +4,8 @@
 import { prisma } from "@/lib/prisma";
 import { lambda, createCommand } from "@/lib/aws/lambda";
 import { Prisma, SystemTaskType } from "@prisma/client";
+import { getTutorVoiceId } from "@/lib/freestyle/tutors";
+import { resolveFishVoiceId } from "@/lib/sprites/voices";
 
 const TUTOR_EXERCISE_LAMBDA =
   process.env.TUTOR_EXERCISE_LAMBDA_NAME ?? "spoon-tutor-builder";
@@ -14,17 +16,15 @@ const BASE_WEBHOOK = `${
   "https://spoonacademy.com"
 }/api/webhooks/system-tasks`;
 
-// Default Fish Audio voice IDs per language + tutor gender
-const TUTOR_FISH_VOICES: Record<string, { FEMALE: string; MALE: string }> = {
-  "fr-FR": {
-    FEMALE: "d99596e8405d4651bcd3ebe45df58f97",
-    MALE: "d99596e8405d4651bcd3ebe45df58f97",
-  },
-  "es-ES": {
-    FEMALE: "d99596e8405d4651bcd3ebe45df58f97",
-    MALE: "d99596e8405d4651bcd3ebe45df58f97",
-  },
-};
+function normalizeLangCode(raw?: string | null, fallback = "fr-FR"): string {
+  if (!raw) return fallback;
+  const v = raw.trim();
+  const lower = v.toLowerCase();
+  if (lower === "fr" || lower === "french") return "fr-FR";
+  if (lower === "es" || lower === "spanish") return "es-ES";
+  if (lower === "en" || lower === "english") return "en-US";
+  return v;
+}
 
 export type InvokeTutorExerciseResult =
   | {
@@ -63,7 +63,8 @@ export async function invokeTutorExercise({
     if (!session.review.hasUserReviewed) {
       return {
         ok: false,
-        error: "Complete your Interactive AI Review first to unlock this 3-Min Workout!",
+        error:
+          "Complete your Interactive AI Review first to unlock this 3-Min Workout!",
       };
     }
 
@@ -103,23 +104,25 @@ export async function invokeTutorExercise({
       ? (review.vocabUpgrades as any[])
       : [];
     const grammarAnalysis = review.grammarAnalysis ?? {};
-    const overallFeedback = (review.overallFeedback as Record<string, any>) ?? {};
+    const overallFeedback =
+      (review.overallFeedback as Record<string, any>) ?? {};
     const tutorName = overallFeedback.tutorName || "Sophie";
 
-    const targetLang =
-      session.targetLanguage === "fr"
-        ? "fr-FR"
-        : session.targetLanguage === "es"
-          ? "es-ES"
-          : session.targetLanguage || "fr-FR";
-    const nativeLang =
-      session.nativeLanguage === "en"
-        ? "en-US"
-        : session.nativeLanguage || "en-US";
+    const targetLang = normalizeLangCode(session.targetLanguage, "fr-FR");
+    const nativeLang = normalizeLangCode(session.nativeLanguage, "en-US");
 
-    const targetFishVoiceId =
-      TUTOR_FISH_VOICES[targetLang]?.[session.voiceGender] ??
-      "d99596e8405d4651bcd3ebe45df58f97";
+    const tutorGender: "male" | "female" =
+      overallFeedback.voiceGender === "male" ||
+      session.voiceGender === "MALE" ||
+      tutorName.toLowerCase() === "antoine"
+        ? "male"
+        : "female";
+
+    const voiceCode = getTutorVoiceId(tutorGender, targetLang);
+    const targetFishVoiceId = resolveFishVoiceId(
+      voiceCode,
+      `${targetLang}-${tutorGender === "male" ? "boy-01" : "girl-01"}`,
+    );
 
     const title = session.topic
       ? `3-Min Workout: ${session.topic}`
@@ -146,7 +149,7 @@ export async function invokeTutorExercise({
 
       const task = await tx.systemTask.create({
         data: {
-          type: SystemTaskType.TUTOR_EXERCISE_GENERATION, // <-- Add to SystemTaskType enum in schema.prisma
+          type: SystemTaskType.TUTOR_EXERCISE_GENERATION,
           status: "IN_PROGRESS",
           metadata: {
             userId: session.userId,
@@ -169,6 +172,7 @@ export async function invokeTutorExercise({
       reviewId: review.id,
       userId: session.userId,
       tutorName,
+      level: session.level || "EASY",
       topic: session.topic || "Conversation",
       nativeLanguage: nativeLang,
       targetLanguage: targetLang,
