@@ -25,7 +25,7 @@ import {
   completeTutorExercise,
   type HydratedTutorExerciseContent,
 } from "@/app/actions/tutor-exercise-actions";
-
+import { useSpeak } from "@/hooks/use-speak";
 interface TutorExerciseArcadeProps {
   userId: string;
   exerciseId: string;
@@ -66,13 +66,20 @@ export function TutorExerciseArcade({
   const [roundIdx, setRoundIdx] = useState<0 | 1 | 2>(0);
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { speak, stop: stopSpeak, isPlaying: isTutorSpeaking } = useSpeak();
+  const round3AutoPlayedRef = useRef(false);
+
+  const stopAllAudio = () => {
+    stopSpeak();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  };
 
   const playAudioUrl = (url?: string | null) => {
     if (!url) return;
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      stopAllAudio();
       const audio = new Audio(url);
       audioRef.current = audio;
       void audio.play();
@@ -80,6 +87,30 @@ export function TutorExerciseArcade({
       // Ignore autoplay errors
     }
   };
+
+  const speakLine = (text?: string | null, lang = resolvedLang) => {
+    if (!text) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    void speak(text, lang, 0.95, voiceGender);
+  };
+
+  // Auto-model the Round 3 phrase once when entering Voice Drill
+  useEffect(() => {
+    if (roundIdx === 2 && !round3AutoPlayedRef.current) {
+      round3AutoPlayedRef.current = true;
+      const t = setTimeout(() => {
+        if (content.speechBurst?.audioUrl) {
+          playAudioUrl(content.speechBurst.audioUrl);
+        } else if (content.speechBurst?.targetPhrase) {
+          speakLine(content.speechBurst.targetPhrase, resolvedLang);
+        }
+      }, 250);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundIdx]);
 
   // ================= ROUND 1 STATE: VISUAL MATCH =================
   const cards = content.visualMatch?.cards || [];
@@ -208,7 +239,10 @@ export function TutorExerciseArcade({
   }, []);
 
   const stopAndGradeRep = () => {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+    if (
+      !mediaRecorderRef.current ||
+      mediaRecorderRef.current.state === "inactive"
+    ) {
       return;
     }
     mediaRecorderRef.current.stop();
@@ -246,7 +280,8 @@ export function TutorExerciseArcade({
         if (elapsedMs < 600 || rawBlob.size < 1000) {
           setSpeechFeedback({
             ok: false,
-            message: "Recording was too short — tap Speak, say the full phrase, then tap Done!",
+            message:
+              "Recording was too short — tap Speak, say the full phrase, then tap Done!",
           });
           return;
         }
@@ -314,7 +349,8 @@ export function TutorExerciseArcade({
       setIsRecordingRep(false);
       setSpeechFeedback({
         ok: false,
-        message: "Microphone access is blocked. Please allow mic permissions in your browser.",
+        message:
+          "Microphone access is blocked. Please allow mic permissions in your browser.",
       });
     }
   };
@@ -330,6 +366,13 @@ export function TutorExerciseArcade({
       origin: { y: 0.6 },
       colors: ["#6366F1", "#10B981", "#F59E0B", "#EC4899"],
     });
+    const cheer = resolvedLang.startsWith("es")
+      ? "¡Bravo! ¡Excelente trabajo!"
+      : resolvedLang.startsWith("en")
+        ? "Awesome job! You crushed it!"
+        : "Bravo ! Très bien joué !";
+
+    speakLine(cheer, resolvedLang);
     router.refresh();
   };
 
@@ -382,10 +425,30 @@ export function TutorExerciseArcade({
                   • {title}
                 </span>
               </div>
-              <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-bold text-slate-600 sm:text-sm">
-                <Quote className="h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
-                <span className="truncate">{tutorCoachMessage}</span>
-              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="flex min-w-0 items-center gap-1.5 truncate text-xs font-bold text-slate-600 sm:text-sm">
+                  <Quote className="h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
+                  <span className="truncate">{tutorCoachMessage}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    isTutorSpeaking
+                      ? stopSpeak()
+                      : speakLine(tutorCoachMessage, "en-US")
+                  }
+                  title="Hear coaching tip"
+                  className={`inline-flex shrink-0 items-center justify-center rounded-lg border p-1 transition ${
+                    isTutorSpeaking
+                      ? "border-amber-300 bg-amber-100 text-amber-800"
+                      : "border-sky-200 bg-sky-50 text-blue-600 hover:bg-sky-100"
+                  }`}
+                >
+                  <Volume2
+                    className={`h-3 w-3 ${isTutorSpeaking ? "animate-pulse" : ""}`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -570,6 +633,18 @@ export function TutorExerciseArcade({
                     <h3 className="text-lg font-black text-slate-900 sm:text-xl">
                       &ldquo;{currentDashItem.promptNative}&rdquo;
                     </h3>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        currentDashItem.audioUrl
+                          ? playAudioUrl(currentDashItem.audioUrl)
+                          : speakLine(currentDashItem.fullTarget, resolvedLang)
+                      }
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-black text-blue-600 transition hover:bg-sky-100"
+                    >
+                      <Volume2 className="h-3 w-3" />
+                      <span>Hear Target Sentence</span>
+                    </button>
                   </div>
 
                   <div className="flex min-h-[84px] flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4">
