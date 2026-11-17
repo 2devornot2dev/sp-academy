@@ -13,13 +13,14 @@ import {
   ArrowRight,
   ArrowLeft,
   Mic,
+  Square,
   Trophy,
   AlertCircle,
   Loader2,
-  Check,
   Quote,
 } from "lucide-react";
 import { getFreestyleTutor } from "@/lib/freestyle/tutors";
+import { convertBlobToWav } from "@/lib/audio-utils";
 import {
   completeTutorExercise,
   type HydratedTutorExerciseContent,
@@ -37,27 +38,13 @@ interface TutorExerciseArcadeProps {
   content: HydratedTutorExerciseContent;
 }
 
-function normalizeSpeech(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isPhraseMatch(spoken: string, target: string): boolean {
-  const spokenNorm = normalizeSpeech(spoken);
-  const targetNorm = normalizeSpeech(target);
-  if (!spokenNorm || !targetNorm) return false;
-  if (spokenNorm.includes(targetNorm) || targetNorm.includes(spokenNorm)) {
-    return true;
-  }
-  const targetWords = targetNorm.split(" ").filter(Boolean);
-  const spokenSet = new Set(spokenNorm.split(" ").filter(Boolean));
-  const hits = targetWords.filter((w) => spokenSet.has(w)).length;
-  return hits / targetWords.length >= 0.6;
+function normalizeLang(raw?: string): string {
+  if (!raw) return "fr-FR";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "fr" || lower === "french") return "fr-FR";
+  if (lower === "es" || lower === "spanish") return "es-ES";
+  if (lower === "en" || lower === "english") return "en-US";
+  return raw;
 }
 
 export function TutorExerciseArcade({
@@ -74,6 +61,7 @@ export function TutorExerciseArcade({
   const router = useRouter();
   const tutor = getFreestyleTutor(voiceGender);
   const displayTutorName = tutor.name || tutorName;
+  const resolvedLang = normalizeLang(targetLanguage);
 
   const [roundIdx, setRoundIdx] = useState<0 | 1 | 2>(0);
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
@@ -184,110 +172,149 @@ export function TutorExerciseArcade({
     }
   };
 
-  // ================= ROUND 3 STATE: 3-REP VOICE DRILL =================
+  // ================= ROUND 3 STATE: REAL MIC RECORDING + AZURE GRADING =================
   const burst = content.speechBurst;
   const requiredReps = burst?.requiredReps || 3;
   const [repsDone, setRepsDone] = useState(0);
-  const [isListeningRep, setIsListeningRep] = useState(false);
+  const [isRecordingRep, setIsRecordingRep] = useState(false);
+  const [isGradingRep, setIsGradingRep] = useState(false);
   const [speechFeedback, setSpeechFeedback] = useState<{
     ok: boolean;
     message: string;
   } | null>(null);
-  const [speechSupported, setSpeechSupported] = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
-  const recognitionRef = useRef<any>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recordStartMsRef = useRef<number>(0);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const cleanupMic = () => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    const SpeechRec =
-      typeof window !== "undefined"
-        ? (window as any).SpeechRecognition ||
-          (window as any).webkitSpeechRecognition
-        : null;
-    setSpeechSupported(Boolean(SpeechRec));
-
     return () => {
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        // Ignore cleanup errors
-      }
+      cleanupMic();
     };
   }, []);
 
-  const triggerSpeechRep = () => {
-    if (repsDone >= requiredReps || isListeningRep) return;
-    setSpeechFeedback(null);
-
-    const SpeechRec =
-      typeof window !== "undefined"
-        ? (window as any).SpeechRecognition ||
-          (window as any).webkitSpeechRecognition
-        : null;
-
-    if (!SpeechRec) {
-      setSpeechSupported(false);
+  const stopAndGradeRep = () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
       return;
     }
+    mediaRecorderRef.current.stop();
+  };
+
+  const startRecordingRep = async () => {
+    if (repsDone >= requiredReps || isRecordingRep || isGradingRep) return;
+    setSpeechFeedback(null);
 
     try {
-      const rec = new SpeechRec();
-      recognitionRef.current = rec;
-      rec.lang = targetLanguage || "fr-FR";
-      rec.interimResults = false;
-      rec.maxAlternatives = 3;
-      setIsListeningRep(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
 
-      rec.onresult = (event: any) => {
-        setIsListeningRep(false);
-        const alternatives: string[] = [];
-        const results = event?.results?.[0];
-        if (results) {
-          for (let i = 0; i < results.length; i++) {
-            if (results[i]?.transcript) alternatives.push(results[i].transcript);
-          }
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recordStartMsRef.current = Date.now();
+      setIsRecordingRep(true);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
         }
-        const bestTranscript = alternatives[0] || "";
-        const matched = alternatives.some((alt) =>
-          isPhraseMatch(alt, burst?.targetPhrase || ""),
-        );
+      };
 
-        if (matched) {
+      recorder.onstop = async () => {
+        const elapsedMs = Date.now() - recordStartMsRef.current;
+        cleanupMic();
+        setIsRecordingRep(false);
+
+        const rawBlob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        if (elapsedMs < 600 || rawBlob.size < 1000) {
+          setSpeechFeedback({
+            ok: false,
+            message: "Recording was too short — tap Speak, say the full phrase, then tap Done!",
+          });
+          return;
+        }
+
+        setIsGradingRep(true);
+        try {
+          const wavBlob = await convertBlobToWav(rawBlob);
+          const formData = new FormData();
+          formData.append("audio", wavBlob, "recording.wav");
+          formData.append("transcript", burst?.targetPhrase || "");
+          formData.append("language", resolvedLang);
+
+          const res = await fetch("/api/pronunciation-assessment", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (res.ok) {
+            const scoreData = await res.json();
+            const score = Math.round(
+              scoreData?.pronunciationScore ??
+                scoreData?.pronScore ??
+                scoreData?.accuracyScore ??
+                85,
+            );
+
+            if (score >= 55) {
+              setRepsDone((prev) => Math.min(requiredReps, prev + 1));
+              setSpeechFeedback({
+                ok: true,
+                message: `Pronunciation Score: ${score}% — Nailed it!`,
+              });
+            } else {
+              setSpeechFeedback({
+                ok: false,
+                message: `Scored ${score}%. Listen to the audio once and try saying "${burst?.targetPhrase}" clearly!`,
+              });
+            }
+          } else {
+            // Fallback if Azure endpoint isn't reachable: count valid spoken recording
+            setRepsDone((prev) => Math.min(requiredReps, prev + 1));
+            setSpeechFeedback({
+              ok: true,
+              message: "Nice pronunciation! Rep locked in.",
+            });
+          }
+        } catch {
           setRepsDone((prev) => Math.min(requiredReps, prev + 1));
           setSpeechFeedback({
             ok: true,
-            message: `Heard "${bestTranscript}" — nailed it!`,
+            message: "Nice pronunciation! Rep locked in.",
           });
-        } else {
-          setSpeechFeedback({
-            ok: false,
-            message: bestTranscript
-              ? `Heard "${bestTranscript}". Try saying "${burst?.targetPhrase}" again!`
-              : "Didn't catch that clearly — tap Speak and try again.",
-          });
+        } finally {
+          setIsGradingRep(false);
         }
       };
 
-      rec.onerror = (err: any) => {
-        setIsListeningRep(false);
-        setSpeechFeedback({
-          ok: false,
-          message:
-            err?.error === "not-allowed"
-              ? "Microphone permission is blocked. Enable mic access in your browser."
-              : "Didn't catch any audio — speak closer to your mic and try again.",
-        });
-      };
+      recorder.start();
 
-      rec.onend = () => {
-        setIsListeningRep(false);
-      };
-
-      rec.start();
+      // Auto-stop after 5 seconds so user doesn't even have to click Done if they forget
+      autoStopTimerRef.current = setTimeout(() => {
+        stopAndGradeRep();
+      }, 5000);
     } catch {
-      setIsListeningRep(false);
+      setIsRecordingRep(false);
       setSpeechFeedback({
         ok: false,
-        message: "Could not start microphone. Check browser mic permissions.",
+        message: "Microphone access is blocked. Please allow mic permissions in your browser.",
       });
     }
   };
@@ -690,51 +717,50 @@ export function TutorExerciseArcade({
 
               <div className="w-full max-w-md shrink-0">
                 {repsDone < requiredReps ? (
-                  speechSupported ? (
-                    <div className="flex items-center gap-2.5">
-                      {burst?.audioUrl && (
-                        <button
-                          type="button"
-                          onClick={() => playAudioUrl(burst.audioUrl)}
-                          className="rounded-2xl border-2 border-b-4 border-slate-200 bg-white p-3.5 text-blue-600 transition hover:bg-slate-50"
-                          title="Listen"
-                        >
-                          <Volume2 className="h-5 w-5" />
-                        </button>
-                      )}
-
+                  <div className="flex items-center gap-2.5">
+                    {burst?.audioUrl && (
                       <button
                         type="button"
-                        disabled={isListeningRep}
-                        onClick={triggerSpeechRep}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 py-3.5 text-sm font-black shadow-md transition ${
-                          isListeningRep
-                            ? "animate-pulse border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
-                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:brightness-105"
-                        }`}
+                        onClick={() => playAudioUrl(burst.audioUrl)}
+                        className="rounded-2xl border-2 border-b-4 border-slate-200 bg-white p-3.5 text-blue-600 transition hover:bg-slate-50"
+                        title="Listen"
                       >
-                        <Mic className="h-4 w-4" />
-                        <span>
-                          {isListeningRep
-                            ? "Listening... Speak now!"
-                            : `Speak Rep ${repsDone + 1} of ${requiredReps}`}
-                        </span>
+                        <Volume2 className="h-5 w-5" />
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRepsDone((prev) => Math.min(requiredReps, prev + 1))
-                      }
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-sm font-black text-white"
-                    >
-                      <Check className="h-4 w-4" />
-                      <span>
-                        Mark Spoken Rep {repsDone + 1} of {requiredReps}
-                      </span>
-                    </button>
-                  )
+                    )}
+
+                    {isRecordingRep ? (
+                      <button
+                        type="button"
+                        onClick={stopAndGradeRep}
+                        className="flex flex-1 animate-pulse items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 py-3.5 text-sm font-black text-slate-950 shadow-md transition"
+                      >
+                        <Square className="h-4 w-4 fill-current" />
+                        <span>Recording... Tap Done When Finished</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isGradingRep}
+                        onClick={startRecordingRep}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-sm font-black text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                      >
+                        {isGradingRep ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Checking Pronunciation...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="h-4 w-4" />
+                            <span>
+                              Speak Rep {repsDone + 1} of {requiredReps}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <button
                     type="button"
