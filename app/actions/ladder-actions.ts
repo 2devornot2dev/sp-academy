@@ -21,9 +21,9 @@ const BASE_WEBHOOK = `${
   "https://spoonacademy.com"
 }/api/webhooks/system-tasks`;
 
-export const LADDER_UNLOCK_SPOON = 15;
+const LADDER_UNLOCK_SPOON = 15;
 
-export const STARTER_LADDER_SLUGS = [
+const STARTER_LADDER_SLUGS = [
   "colors-1",
   "numbers-time-1",
   "everyday-objects-1",
