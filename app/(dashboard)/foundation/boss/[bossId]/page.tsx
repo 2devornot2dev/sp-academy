@@ -21,26 +21,27 @@ export default async function BossIdPage({ params }: Params) {
   const courseId =
     (bossData as any).foundationCourseId || (bossData as any).course?.id;
   const milestoneIndex = (bossData as any).milestoneIndex ?? 1;
-  const bossCreatedAt = (bossData as any).createdAt
-    ? new Date((bossData as any).createdAt)
-    : null;
 
-  // Server-side guard: Ensure Boss is unlocked via 3-min AI Conversation (or already passed / hit 5/day cap)
+  // Server-side guard: strictly require a completed FreestyleSession for THIS milestoneIndex
   if (!bossData.passed) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [qualifyingSession, recentCount, redisState] = await Promise.all([
+    const course = courseId
+      ? await prisma.foundationCourse.findUnique({
+          where: { id: courseId },
+          select: { createdAt: true },
+        })
+      : null;
+
+    const [milestoneSession, recentCount, redisState] = await Promise.all([
       prisma.freestyleSession.findFirst({
         where: {
           userId: user.id,
+          milestoneIndex,
           status: { in: ["REVIEW_PENDING", "REVIEWED", "COMPLETED"] },
-          OR: [
-            { milestoneIndex: { in: [milestoneIndex, milestoneIndex + 1] } },
-            { createdAt: { gte: twentyFourHoursAgo } },
-            ...(bossCreatedAt
-              ? [{ createdAt: { gte: bossCreatedAt } }]
-              : []),
-          ],
+          ...(course?.createdAt
+            ? { createdAt: { gte: course.createdAt } }
+            : {}),
         },
         select: { id: true },
       }),
@@ -56,13 +57,11 @@ export default async function BossIdPage({ params }: Params) {
 
     const hitDailyCap = Math.max(redisState.dailyUsed, recentCount) >= 5;
 
-    if (!qualifyingSession && !hitDailyCap) {
+    if (!milestoneSession && !hitDailyCap) {
       redirect("/conversation");
     }
   }
 
-  // Fire-and-forget: As soon as the user enters Boss M, start the next milestone's daisy-chain
-  // (Spoon 3M+1 -> Spoon 3M+2 -> Spoon 3M+3 -> Boss M+1) in the background!
   if (courseId) {
     void startNextMilestoneDaisyChain({
       courseId,

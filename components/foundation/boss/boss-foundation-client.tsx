@@ -88,7 +88,7 @@ export default function BossFoundationClient({
 
   const avatarKeys = useMemo(() => getBossAvatarKeys(boss), [boss]);
 
-  const allKeys = useMemo(() => {
+const allKeys = useMemo(() => {
     const keys: (string | undefined)[] = [
       avatarKeys.default,
       boss?.coverUrl ?? undefined,
@@ -96,6 +96,7 @@ export default function BossFoundationClient({
       avatarKeys.sad,
       avatarKeys.angry,
       introVideoKey,
+      (boss as any)?.introAudioKey ?? undefined,
     ];
     playlist.forEach((item) => {
       keys.push(item.audioKey ?? undefined);

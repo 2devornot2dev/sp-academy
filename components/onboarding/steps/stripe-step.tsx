@@ -1,3 +1,4 @@
+// components/onboarding/steps/stripe-step.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -11,35 +12,69 @@ import {
 import { SelectionCard } from "../selection-card";
 
 interface SpriteStepProps {
+  nativeLanguage: string;
   targetLanguage: string;
   selectedSprite: SpriteSlug;
   setSelectedSprite: (slug: SpriteSlug) => void;
+  selectedNativeVoiceId: string;
+  setSelectedNativeVoiceId: (id: string) => void;
   selectedVoiceId: string;
   setSelectedVoiceId: (id: string) => void;
 }
 
 export function SpriteStep({
+  nativeLanguage,
   targetLanguage,
   selectedSprite,
   setSelectedSprite,
+  selectedNativeVoiceId,
+  setSelectedNativeVoiceId,
   selectedVoiceId,
   setSelectedVoiceId,
 }: SpriteStepProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const allLocaleVoices =
+  const nativeLocaleVoices =
+    SPRITE_VOICES[nativeLanguage] ?? SPRITE_VOICES["en-US"];
+  const nativeVoices = nativeLocaleVoices.filter(
+    (v) => v.sprite === selectedSprite,
+  );
+
+  const targetLocaleVoices =
     SPRITE_VOICES[targetLanguage] ?? SPRITE_VOICES["fr-FR"];
-  const voices = allLocaleVoices.filter((v) => v.sprite === selectedSprite);
+  const targetVoices = targetLocaleVoices.filter(
+    (v) => v.sprite === selectedSprite,
+  );
 
-  // Auto-select first voice when user toggles between Vox and Vivi
+  // Auto-select first matching native & target voice when toggling Vox / Vivi
   useEffect(() => {
-    if (!voices.some((v) => v.id === selectedVoiceId) && voices[0]) {
-      setSelectedVoiceId(voices[0].id);
+    if (
+      !nativeVoices.some((v) => v.id === selectedNativeVoiceId) &&
+      nativeVoices[0]
+    ) {
+      setSelectedNativeVoiceId(nativeVoices[0].id);
     }
-  }, [selectedSprite, targetLanguage, voices, selectedVoiceId, setSelectedVoiceId]);
+  }, [
+    selectedSprite,
+    nativeLanguage,
+    nativeVoices,
+    selectedNativeVoiceId,
+    setSelectedNativeVoiceId,
+  ]);
 
-  // Stop audio on unmount
+  useEffect(() => {
+    if (!targetVoices.some((v) => v.id === selectedVoiceId) && targetVoices[0]) {
+      setSelectedVoiceId(targetVoices[0].id);
+    }
+  }, [
+    selectedSprite,
+    targetLanguage,
+    targetVoices,
+    selectedVoiceId,
+    setSelectedVoiceId,
+  ]);
+
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -49,9 +84,13 @@ export function SpriteStep({
     };
   }, []);
 
-  const handlePlaySample = (voice: VoiceOption, e: React.MouseEvent) => {
+  const handlePlaySample = (
+    voice: VoiceOption,
+    onSelect: (id: string) => void,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
-    setSelectedVoiceId(voice.id);
+    onSelect(voice.id);
 
     if (playingId === voice.id) {
       audioRef.current?.pause();
@@ -74,8 +113,10 @@ export function SpriteStep({
     setPlayingId(voice.id);
   };
 
+  const coachName = selectedSprite === "vox" ? "Vox" : "Vivi";
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* 1. Choose Companion: Vox vs Vivi */}
       <div className="grid gap-4 sm:grid-cols-2">
         {SPRITES.map((s) => {
@@ -101,7 +142,7 @@ export function SpriteStep({
                 {selected && <Check className="h-4 w-4 stroke-3" />}
               </div>
 
-              <div className="h-28 w-28 overflow-hidden rounded-2xl bg-gradient-to-b from-violet-100/60 to-white shadow-sm">
+              <div className="h-24 w-24 overflow-hidden rounded-2xl bg-gradient-to-b from-violet-100/60 to-white shadow-sm">
                 <img
                   src={s.avatarUrl}
                   alt={s.name}
@@ -109,10 +150,10 @@ export function SpriteStep({
                 />
               </div>
 
-              <h3 className="mt-4 text-xl font-extrabold text-gray-900">
+              <h3 className="mt-3 text-xl font-extrabold text-gray-900">
                 {s.name}
               </h3>
-              <p className="mt-1 text-sm font-medium text-gray-500">
+              <p className="mt-1 text-xs font-medium text-gray-500">
                 {s.tagline}
               </p>
             </button>
@@ -120,20 +161,77 @@ export function SpriteStep({
         })}
       </div>
 
-      {/* 2. Choose Voice for Selected Companion */}
+      {/* 2. Choose Native Coaching Voice */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-2.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-gray-500 uppercase">
             <Volume2 className="h-4 w-4 text-violet-600" />
-            Choose {selectedSprite === "vox" ? "Vox's" : "Vivi's"} Voice
+            {coachName}&apos;s Native Coaching Voice
           </span>
           <span className="text-xs font-medium text-gray-400">
-            Click play to preview
+            For intros &amp; tips
           </span>
         </div>
 
         <div className="grid gap-3">
-          {voices.map((v) => {
+          {nativeVoices.map((v) => {
+            const isPlaying = playingId === v.id;
+            return (
+              <SelectionCard
+                key={v.id}
+                selected={selectedNativeVoiceId === v.id}
+                onClick={() => setSelectedNativeVoiceId(v.id)}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) =>
+                    handlePlaySample(v, setSelectedNativeVoiceId, e)
+                  }
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition ${
+                    isPlaying
+                      ? "bg-violet-600 text-white shadow-md shadow-violet-500/30"
+                      : "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                  }`}
+                >
+                  {isPlaying ? (
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  ) : (
+                    <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-gray-900">{v.label}</p>
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-gray-500">
+                      {v.id}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs font-medium text-gray-500 italic">
+                    &ldquo;{v.sampleText}&rdquo;
+                  </p>
+                </div>
+              </SelectionCard>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Choose Target Language Voice */}
+      <div>
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-gray-500 uppercase">
+            <Volume2 className="h-4 w-4 text-sky-600" />
+            {coachName}&apos;s Target Language Voice
+          </span>
+          <span className="text-xs font-medium text-gray-400">
+            For lessons &amp; audio drills
+          </span>
+        </div>
+
+        <div className="grid gap-3">
+          {targetVoices.map((v) => {
             const isPlaying = playingId === v.id;
             return (
               <SelectionCard
@@ -141,32 +239,31 @@ export function SpriteStep({
                 selected={selectedVoiceId === v.id}
                 onClick={() => setSelectedVoiceId(v.id)}
               >
-                {/* Play/Stop Sample Button */}
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={(e) => handlePlaySample(v, e)}
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${
+                  onClick={(e) => handlePlaySample(v, setSelectedVoiceId, e)}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition ${
                     isPlaying
-                      ? "bg-violet-600 text-white shadow-md shadow-violet-500/30"
-                      : "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                      ? "bg-sky-600 text-white shadow-md shadow-sky-500/30"
+                      : "bg-sky-100 text-sky-700 hover:bg-sky-200"
                   }`}
                 >
                   {isPlaying ? (
-                    <Square className="h-4 w-4 fill-current" />
+                    <Square className="h-3.5 w-3.5 fill-current" />
                   ) : (
-                    <Play className="h-4 w-4 fill-current ml-0.5" />
+                    <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
                   )}
                 </div>
 
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-gray-900">{v.label}</p>
                     <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-gray-500">
                       {v.id}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-sm font-medium text-gray-500 italic">
+                  <p className="mt-0.5 truncate text-xs font-medium text-gray-500 italic">
                     &ldquo;{v.sampleText}&rdquo;
                   </p>
                 </div>

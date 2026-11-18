@@ -62,13 +62,16 @@ export interface BossPersona {
   name: string;
   persona: string;
   introMessage: string;
+  introTranslation?: string | null;
+  gender?: "M" | "F" | "male" | "female" | null;
+  introAudioKey?: string | null;
+  introVideoKey?: string | null;
   appearance?: string | null;
   sceneDescription?: string | null;
   avatarKey?: string | null;
   coverUrl?: string | null;
   avatar?: BossAvatar | null;
 }
-
 export interface BossMessage {
   id: number | string;
   role: "assistant" | "user" | "exercise" | "system";
@@ -225,7 +228,29 @@ function checkDeterministicAnswer(
 
   return false;
 }
+const MALE_ARCHETYPE_HINTS = [
+  "sneakerhead",
+  "boss_arch_3_dj",
+  "boxer",
+  "magician",
+  "muralist",
+];
 
+function resolveBossGender(boss?: BossPersona | null): "male" | "female" {
+  const explicit = String(boss?.gender || "").trim().toLowerCase();
+  if (explicit === "m" || explicit === "male") return "male";
+  if (explicit === "f" || explicit === "female") return "female";
+
+  const audioKey = (boss?.introAudioKey || "").toLowerCase();
+  if (audioKey.includes("/m_")) return "male";
+  if (audioKey.includes("/f_")) return "female";
+
+  const assetHint = `${boss?.coverUrl || ""} ${boss?.avatar?.default || ""}`.toLowerCase();
+  if (MALE_ARCHETYPE_HINTS.some((hint) => assetHint.includes(hint))) {
+    return "male";
+  }
+  return "female";
+}
 // ============================================================================
 // INNER PROVIDER (Runs inside <LiveKitRoom>)
 // ============================================================================
@@ -282,6 +307,7 @@ function BossLiveKitInnerProvider({
   const reactionAppendedRef = useRef(false);
   const reactionResolverRef = useRef<(() => void) | null>(null);
   const transcriptRef = useRef("");
+  
 
   const updateTranscript = useCallback((val: string) => {
     transcriptRef.current = val;
@@ -321,6 +347,8 @@ function BossLiveKitInnerProvider({
 
   const scenarioData = (session?.scenarioData as any) || {};
   const boss: BossPersona | null = scenarioData.boss || session?.boss || null;
+
+  const bossVoiceGender = useMemo(() => resolveBossGender(boss), [boss]);
 
   const playlist: PlaylistItem[] =
     scenarioData.exerciseBank ||
@@ -775,6 +803,28 @@ function BossLiveKitInnerProvider({
     };
   }, [introMessage, stopAudio]);
 
+const bossVoiceGender = resolveBossGender(boss);
+        const targetVoiceId = `${targetLanguage}-${
+          bossVoiceGender === "male" ? "man-01" : "girl-01"
+        }`;
+
+        const res = await fetch("/api/livekit/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lessonId: `boss-${session?.id || Date.now()}`,
+            nativeLanguage,
+            targetLanguage,
+            voiceGender: bossVoiceGender,
+            targetVoiceId,
+            freestyleData: {
+              topic: `Milestone Boss: ${boss?.name || "Challenge"}`,
+              persona: boss?.persona || "Strict milestone examiner",
+              openingLine: boss?.sceneDescription || "",
+              aiOpeningTarget: "", // <-- Stay silent on connect; stage handles video vs audio!
+            },
+          }),
+        });
   const startExercises = useCallback(() => {
     if (startExercisesRef.current || stageStatusRef.current !== "PLAYING") {
       return;
@@ -1084,8 +1134,16 @@ function BossLiveKitInnerProvider({
     void processResult(false, "[TIMEOUT]", currentItem);
   }, [playlist, processResult]);
 
-  const handleReplay = useCallback(
+const handleReplay = useCallback(
     async (text: string) => {
+      if (text === introMessage && boss?.introAudioKey) {
+        try {
+          await playNativeAudioUntilSettled(resolveAssetUrl(boss.introAudioKey));
+          return;
+        } catch {
+          // Fall through to LiveKit if S3 audio fails
+        }
+      }
       const cleanText = forSpeech(text);
       if (!cleanText) return;
       try {
@@ -1096,10 +1154,19 @@ function BossLiveKitInnerProvider({
           { reliable: true },
         );
       } catch {
-        await speak(cleanText, bcp47Language, 1.0, session?.voiceGender);
+        await speak(cleanText, bcp47Language, 1.0, bossVoiceGender);
       }
     },
-    [bcp47Language, sendBossCmd, session?.voiceGender, speak],
+    [
+      bcp47Language,
+      boss?.introAudioKey,
+      bossVoiceGender,
+      introMessage,
+      playNativeAudioUntilSettled,
+      resolveAssetUrl,
+      sendBossCmd,
+      speak,
+    ],
   );
 
   return (

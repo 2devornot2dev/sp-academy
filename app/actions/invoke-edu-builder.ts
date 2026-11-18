@@ -494,6 +494,18 @@ export async function invokeEduBuilder(
   };
 
   if (normalizedPayload.isOnboarding && normalizedPayload.targetLanguage) {
+
+    if (normalizedPayload.isOnboarding) {
+    await prisma.accountSettings
+      .upsert({
+        where: { userId: normalizedPayload.userId },
+        create: { userId: normalizedPayload.userId },
+        update: {},
+      })
+      .catch((e) =>
+        console.warn("AccountSettings default upsert skipped:", e),
+      );
+  }
     await prisma.languageProfile
       .upsert({
         where: {

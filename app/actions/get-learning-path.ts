@@ -41,7 +41,7 @@ async function safePresign(key?: string | null): Promise<string | null> {
   if (key.startsWith("http://") || key.startsWith("https://")) return key;
   try {
     return await getPresignedImageUrl(key);
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -52,6 +52,7 @@ async function safePresign(key?: string | null): Promise<string | null> {
 async function hydrateTrack(
   course: {
     id: string;
+    createdAt: Date;
     lessons: Array<{
       id: string;
       title: string | null;
@@ -143,32 +144,13 @@ async function hydrateTrack(
           }
         : null;
 
+      // STRICT MILESTONE LOCK: Only sessions for THIS exact milestoneIndex created in THIS course
       const mIndex = b.milestoneIndex ?? 1;
-      const thirdSpoonOrder = mIndex * 3;
-      const thirdLesson = course.lessons.find(
-        (l) => l.orderIndex === thirdSpoonOrder,
+      const milestoneSessions = freestyleSessions.filter(
+        (s) =>
+          s.milestoneIndex === mIndex &&
+          s.createdAt >= course.createdAt,
       );
-      const thirdBridge = bridgeByIndex.get(thirdSpoonOrder);
-      const reachedBossAt =
-        thirdBridge?.completedAt ??
-        thirdLesson?.completedAt ??
-        thirdLesson?.createdAt ??
-        null;
-
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-      const milestoneSessions = freestyleSessions.filter((s) => {
-        if (s.milestoneIndex === mIndex || s.milestoneIndex === mIndex + 1) {
-          return true;
-        }
-        if (reachedBossAt && s.createdAt >= reachedBossAt) {
-          return true;
-        }
-        if (!b.passed && s.createdAt >= twentyFourHoursAgo) {
-          return true;
-        }
-        return false;
-      });
 
       const freestyleUnlocked =
         Boolean(b.passed) || milestoneSessions.length >= 1 || hitDailyCap;
@@ -260,9 +242,10 @@ export async function getLearningPath(userId: string) {
   // Fetch ALL courses for this user (Standard Track & Hard Mode Track)
   const courses = await prisma.foundationCourse.findMany({
     where: { userId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     select: {
       id: true,
+      createdAt: true,
       targetLanguage: true,
       nativeLanguage: true,
       isHardMode: true,
@@ -297,7 +280,7 @@ export async function getLearningPath(userId: string) {
       select: {
         id: true,
         milestoneIndex: true,
-        createdAt: true
+        createdAt: true,
       },
     }),
     getFreestyleRedisState(userId),
@@ -413,8 +396,8 @@ export async function getLearningPath(userId: string) {
           translation: topPhrase.translation,
           partOfSpeech: topPhrase.partOfSpeech,
           spokenAttempts: topPhrase.spokenAttempts,
-          avgSpokenScore: topWord.avgSpokenScore
-            ? Math.round(topWord.avgSpokenScore)
+          avgSpokenScore: topPhrase.avgSpokenScore
+            ? Math.round(topPhrase.avgSpokenScore)
             : null,
           seenCount: topPhrase.seenCount,
           status: topPhrase.status,
@@ -460,4 +443,4 @@ export type LearningPathData = NonNullable<
 
 export type LearningPath = LearningPathData;
 
-export type LearningTrack = LearningPathData["standardTrack"]; // new
+export type LearningTrack = LearningPathData["standardTrack"];

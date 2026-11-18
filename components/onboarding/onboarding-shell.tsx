@@ -36,6 +36,7 @@ import { invokeTrialBuilder } from "@/app/actions/invoke-trial-builder";
 import { setUserGeneration } from "@/app/actions/set-user-generation";
 
 
+
 function getLanguageCode(item: any): string {
   if (item?.code && /^[a-z]{2,3}-[A-Z]{2,4}$/.test(item.code)) return item.code;
   if (item?.value && /^[a-z]{2,3}-[A-Z]{2,4}$/.test(item.value))
@@ -59,6 +60,7 @@ export default function OnboardingShell({
   const { data: session, isPending } = authClient.useSession();
   const isOAuth = searchParams.get("oauth") === "1";
   const hasAccount = isOAuth && !!session?.user;
+  const [nativeVoiceId, setNativeVoiceId] = useState<string>("");
 
   // Wipe any existing session when arriving on onboarding unless returning from Google click
   useEffect(() => {
@@ -191,13 +193,12 @@ export default function OnboardingShell({
     }
   };
 
-  const handleCompleteOnboarding = async () => {
+const handleCompleteOnboarding = async () => {
     let userId = createdUserId || session?.user?.id;
 
-    // Fallback: fetch fresh session directly from authClient if hook hasn't updated yet
     if (!userId) {
       const fresh = await authClient.getSession();
-      userId = fresh?.data?.user?.id ?? undefined; // was: ?? null
+      userId = fresh?.data?.user?.id ?? undefined;
     }
 
     if (!userId) {
@@ -210,13 +211,14 @@ export default function OnboardingShell({
     setError(null);
 
     try {
-      const voiceSuffix =
-        voiceId.split("-").slice(2).join("-") ||
-        (sprite === "vivi" ? "girl-01" : "boy-01");
+      const fallbackSuffix = sprite === "vivi" ? "girl-01" : "boy-01";
+      const nativeSuffix =
+        nativeVoiceId.split("-").slice(2).join("-") || fallbackSuffix;
+      const targetSuffix =
+        voiceId.split("-").slice(2).join("-") || fallbackSuffix;
 
-      // Always prefix with the actual selected languages so switching languages never mismatches voiceId
-      const resolvedNativeVoiceId = `${nativeLanguage}-${voiceSuffix}`;
-      const resolvedTargetVoiceId = `${targetLanguage}-${voiceSuffix}`;
+      const resolvedNativeVoiceId = `${nativeLanguage}-${nativeSuffix}`;
+      const resolvedTargetVoiceId = `${targetLanguage}-${targetSuffix}`;
 
       const commonPayload = {
         userId,
@@ -535,13 +537,18 @@ export default function OnboardingShell({
                   title="Choose your guide & voice"
                   description="Vox or Vivi will brief you before every Spoon and coach you through the curriculum."
                 >
-                  <SpriteStep
+
+                 <SpriteStep
+                    nativeLanguage={nativeLanguage}
                     targetLanguage={targetLanguage}
                     selectedSprite={sprite}
                     setSelectedSprite={setSprite}
+                    selectedNativeVoiceId={nativeVoiceId}
+                    setSelectedNativeVoiceId={setNativeVoiceId}
                     selectedVoiceId={voiceId}
                     setSelectedVoiceId={setVoiceId}
                   />
+
                 </Question>
               )}
             </AnimatePresence>

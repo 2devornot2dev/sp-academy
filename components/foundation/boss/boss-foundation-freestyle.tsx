@@ -221,6 +221,32 @@ export default function BossFoundationFreestyle({
     return moodUrl || bossAvatarUrl || getBossAvatarUrl("default");
   }, [effectiveMood, bossAvatarUrl, getBossAvatarUrl]);
 
+  // Auto-play the intro video if present; otherwise auto-play the Boss's intro audio line
+  useEffect(() => {
+    if (hasStartedExercises || hasPlayedRef.current) return;
+
+    if (introVideoUrl) {
+      const video = videoRef.current;
+      if (!video) return;
+      video.muted = false;
+      setIsVideoMuted(false);
+      hasPlayedRef.current = true;
+      video.play().catch(() => {
+        // If browser requires another tap for unmuted video, leave the Play button visible
+        hasPlayedRef.current = false;
+      });
+      return;
+    }
+
+    if (boss?.introMessage) {
+      hasPlayedRef.current = true;
+      void playExerciseAudio(
+        (boss as any)?.introAudioKey ?? null,
+        boss.introMessage,
+      );
+    }
+  }, [hasStartedExercises, introVideoUrl, boss, playExerciseAudio]);
+
   useEffect(() => {
     if (viewMode === "multi") {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
