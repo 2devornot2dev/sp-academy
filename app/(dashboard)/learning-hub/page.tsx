@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth-guard";
 import { getUserGeneration } from "@/lib/upstash";
 import { PronunciationProvider } from "@/context/pronunciation-context";
 import { MatrixProvider } from "@/context/matrix-context";
+import { getLadderOverview } from "@/app/actions/ladder-actions";
 
 export default async function Page({
   searchParams,
@@ -22,16 +23,20 @@ export default async function Page({
     getUserGeneration(setupToken),
   ]);
 
-  return (
-  
-      <PronunciationProvider>
-        <MatrixProvider>
+  const activeTargetLang =
+    path?.standardTrack?.targetLanguage || userLang?.lang?.targetLanguage || "fr-FR";
+  const ladderOverview = await getLadderOverview(user.id, activeTargetLang);
+
+   return (
+    <PronunciationProvider>
+      <MatrixProvider>
         <FoundationHubPage
           path={path}
           lang={userLang as any}
           generationData={generationData}
+          ladder={ladderOverview}
         />
-        </MatrixProvider>
-      </PronunciationProvider>
+      </MatrixProvider>
+    </PronunciationProvider>
   );
 }

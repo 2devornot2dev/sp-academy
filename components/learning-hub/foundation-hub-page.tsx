@@ -1,3 +1,4 @@
+// components/learning-hub/foundation-hub-page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -20,22 +21,26 @@ import { GenerationCycleCard } from "./generation-cycle-card";
 import { LearningPathMiniCards } from "./learning-mini-path-cards";
 import { PastActivitySlimList } from "./past-activity-slim-list";
 import { WordMatrixCard } from "./word-matrix-card";
-
 import { SpriteChat } from "@/components/sprite/sprite-chat";
+import { VocabLadderHubCard } from "@/components/learning-hub/ladder/vocab-ladder-hub-card";
+import type { LadderOverviewData } from "@/app/actions/ladder-actions";
 
 type Props = {
   path: LearningPathData | null;
   lang: { nativeLanguage: string; targetLanguage: string | null | any };
   generationData?: UserGenerationData | null;
+  ladder?: LadderOverviewData | null;
 };
 
 export default function FoundationHubPage({
   path,
   lang,
   generationData,
+  ladder = null,
 }: Props) {
   const router = useRouter();
   const {
+    summonSprite,
     summonSpriteNode,
     profile,
     liveTask,
@@ -48,7 +53,6 @@ export default function FoundationHubPage({
   const standardTrack = path?.standardTrack;
   const hardTrack = path?.hardTrack;
 
-  // Track State hoisted so the whole page (Hero Card + Map + History) syncs!
   const [activeTrack, setActiveTrack] = useState<"STANDARD" | "HARD">(() => {
     return hardTrack &&
       hardTrack.currentFocus?.data.orderIndex &&
@@ -61,7 +65,7 @@ export default function FoundationHubPage({
     standardTrack?.lessons.filter((l) => Boolean(l.completedAt)).length || 0;
   const hardModeUnlocked = completedStandardSpoonsCount >= 30;
   const isHardView = activeTrack === "HARD" && hardModeUnlocked;
-  
+
   const currentTrackData = isHardView && hardTrack ? hardTrack : standardTrack;
 
   const lessons = currentTrackData?.lessons ?? [];
@@ -75,7 +79,6 @@ export default function FoundationHubPage({
 
   // --- ENGINE STATE ---
   const currentFocus = currentTrackData?.currentFocus ?? null;
-  const nextLocked = currentTrackData?.nextLocked ?? null;
 
   const vocabDue =
     currentFocus?.type === "BRIDGE" ? currentFocus.data : undefined;
@@ -156,8 +159,7 @@ export default function FoundationHubPage({
       stepLabel = `Start Spoon ${spoonNum}`;
     } else if (currentFocus?.type === "BRIDGE" && vocabDue && !waitingOnVocab) {
       const spoonNum = (vocabDue as any)?.orderIndex ?? completedLessonsCount;
-      const bridgeId =
-        (vocabDue as any)?.bridge?.id ?? (vocabDue as any)?.id;
+      const bridgeId = (vocabDue as any)?.bridge?.id ?? (vocabDue as any)?.id;
       orderIndex = getBridgeSpriteOrderIndex(spoonNum);
       actionHref = getVocabHref(bridgeId);
       stepLabel = `Unlock Bridge ${spoonNum}`;
@@ -246,6 +248,36 @@ export default function FoundationHubPage({
     setLiveTask,
   ]);
 
+  // --- SPOON 15 VOCAB LADDER UNLOCK NOTIFICATION ---
+  useEffect(() => {
+    if (
+      !ladder?.isUnlocked ||
+      ladder.completedCount > 0 ||
+      !ladder.activeRung
+    ) {
+      return;
+    }
+    const seenKey = `ladder_unlocked_seen_${user?.id}_${ladder.targetLanguage}`;
+    if (typeof window !== "undefined" && localStorage.getItem(seenKey)) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem(seenKey, "1");
+    }
+    summonSprite({
+      id: `ladder_unlock_${Date.now()}`,
+      badge: "Vocab Ladder Unlocked! 🪜",
+      text: `15 Spoons down! I just unlocked the Vocab Ladder so you can stack Colors, Opposites, and Past/Future Verbs.`,
+      duration: 10000,
+      action: {
+        label: `Climb Rung ${ladder.activeRung.rungOrder}`,
+        variant: "primary",
+        onClick: () =>
+          router.push(`/learning-hub/ladder/${ladder.activeRung!.slug}`),
+      },
+    });
+  }, [ladder, user?.id, router, summonSprite]);
+
   const activeOrderIndex =
     currentFocus?.data.orderIndex ?? completedLessonsCount + 1;
 
@@ -253,7 +285,12 @@ export default function FoundationHubPage({
     <div className="min-h-screen bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100">
       <DashboardHeader
         name={user?.firstName || generationData?.firstName}
-        lang={lang}
+        lang={{
+          nativeLanguage:
+            currentTrackData?.nativeLanguage || lang?.nativeLanguage,
+          targetLanguage:
+            currentTrackData?.targetLanguage || lang?.targetLanguage,
+        }}
         completedCount={completedLessonsCount}
         streak={1}
       />
@@ -298,14 +335,14 @@ export default function FoundationHubPage({
                               While Your Next Stage Is Baking...
                             </span>
                           </div>
-                          <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-200">
-                            Jump into a 1-on-1 AI warm-up with {spriteName} or
-                            play a 3-round Sprite Workout!
+                          <p className="mt-0.5 text-xs font-bold text-slate-200 sm:text-sm">
+                            Jump into a 3-min AI voice call or practice your
+                            unlocked workouts!
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                         <button
                           type="button"
                           onClick={() => router.push("/conversation")}
@@ -343,6 +380,8 @@ export default function FoundationHubPage({
 
           {/* RIGHT PANEL */}
           <div className="flex flex-col gap-6 lg:col-span-4">
+            <VocabLadderHubCard ladder={ladder} />
+
             <WordMatrixCard
               totalWordsLearned={totalWordsLearned}
               matrixStats={path?.matrixStats}

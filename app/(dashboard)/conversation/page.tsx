@@ -3,7 +3,7 @@ import { getUserLanguage } from "@/app/actions/get-user-language";
 import FreestyleWrapper from "@/components/freestyle/freestyle-wrapper";
 import { requireUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
-import { getFreestyleRedisState } from "@/lib/upstash";
+import { getFreestyleRedisState, getStartOfToday } from "@/lib/upstash";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +11,9 @@ const COOLDOWN_MS = 5 * 60 * 1000;
 
 export default async function ConversationPage() {
   const user = await requireUser();
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const startOfToday = getStartOfToday();
 
-  const [{ lang }, redisState, recentSessions, totalReviewsCount] =
+  const [{ lang }, redisState, todaySessions, totalReviewsCount] =
     await Promise.all([
       getUserLanguage(user.id),
       getFreestyleRedisState(user.id),
@@ -21,7 +21,7 @@ export default async function ConversationPage() {
         where: {
           userId: user.id,
           status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-          createdAt: { gte: twentyFourHoursAgo },
+          createdAt: { gte: startOfToday }, // today only, not rolling 24h
         },
         orderBy: { createdAt: "desc" },
         select: {
@@ -51,8 +51,8 @@ export default async function ConversationPage() {
       sessionId: redisState.cooldownSessionId,
       remainingSeconds: redisState.cooldownSecondsLeft,
     };
-  } else if (recentSessions[0]) {
-    const latest = recentSessions[0];
+  } else if (todaySessions[0]) {
+    const latest = todaySessions[0];
     const endedMs = new Date(latest.updatedAt ?? latest.createdAt).getTime();
     const elapsedMs = Date.now() - endedMs;
     if (elapsedMs < COOLDOWN_MS) {
@@ -68,7 +68,7 @@ export default async function ConversationPage() {
 
   const dailySessionsUsed = Math.max(
     redisState.dailyUsed,
-    recentSessions.length,
+    todaySessions.length,
   );
 
   return (

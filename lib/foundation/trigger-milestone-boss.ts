@@ -61,38 +61,67 @@ export async function triggerMilestoneBossAndNextSpoon({
     !existingBossStage ||
     existingBossStage.status === "FAILED"
   ) {
-    const [targetLessons, targetBridges, wordMatrix] = await Promise.all([
-      prisma.foundationLesson.findMany({
-        where: {
-          foundationCourseId: courseId,
-          orderIndex: { gte: startIndex, lte: endIndex },
-        },
-        orderBy: { orderIndex: "asc" },
-        select: {
-          id: true,
-          title: true,
-          orderIndex: true,
-          lessonHandoff: true,
-          grammarContent: true,
-          freestyle: true,
-        },
-      }),
-      prisma.foundationBridge.findMany({
-        where: {
-          foundationCourseId: courseId,
-          bridgeIndex: { gte: startIndex, lte: endIndex },
-        },
-        orderBy: { bridgeIndex: "asc" },
-        select: {
-          id: true,
-          foundationLessonId: true,
-          bridgeIndex: true,
-          vocabMoment: true,
-          handoffFragment: true,
-        },
-      }),
-      getWordMatrix(userId, targetLanguage),
-    ]);
+const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
+      await Promise.all([
+        prisma.foundationLesson.findMany({
+          where: {
+            foundationCourseId: courseId,
+            orderIndex: { gte: startIndex, lte: endIndex },
+          },
+          orderBy: { orderIndex: "asc" },
+          select: {
+            id: true,
+            title: true,
+            orderIndex: true,
+            lessonHandoff: true,
+            grammarContent: true,
+            freestyle: true,
+          },
+        }),
+        prisma.foundationBridge.findMany({
+          where: {
+            foundationCourseId: courseId,
+            bridgeIndex: { gte: startIndex, lte: endIndex },
+          },
+          orderBy: { bridgeIndex: "asc" },
+          select: {
+            id: true,
+            foundationLessonId: true,
+            bridgeIndex: true,
+            vocabMoment: true,
+            handoffFragment: true,
+          },
+        }),
+        getWordMatrix(userId, targetLanguage),
+        course.isHardMode
+          ? prisma.userLadderProgress.findMany({
+              where: {
+                userId,
+                passed: true,
+                targetLanguage,
+              },
+              include: {
+                ladderPack: { select: { translations: true } },
+              },
+            })
+          : Promise.resolve([]),
+      ]);
+
+    const ladderWords = completedLadderRows.flatMap((row) => {
+      const trans = (row.ladderPack.translations as Record<string, any>)?.[
+        targetLanguage
+      ];
+      return (trans?.items || []).map((it: any) => ({
+        word: it.word,
+        tappedCorrect: 1,
+        tappedWrong: 0,
+        spokenAttempts: 1,
+        avgSpokenScore: 70,
+      }));
+    });
+
+    const combinedWordMatrix =
+      ladderWords.length > 0 ? [...wordMatrix, ...ladderWords] : wordMatrix;
 
     if (targetLessons.length === 3 && targetBridges.length === 3) {
       const bossStage = await prisma.foundationBossStage.upsert({
@@ -142,7 +171,7 @@ export async function triggerMilestoneBossAndNextSpoon({
         milestoneIndex,
         lessons: targetLessons,
         bridges: targetBridges,
-        wordMatrix,
+        wordMatrix: combinedWordMatrix,
         webhookUrl,
       });
 

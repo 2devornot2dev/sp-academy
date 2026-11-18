@@ -16,7 +16,7 @@ model FoundationCourse {
   cacheKey       String // e.g., "en-US:es-ES:beginner:travel"
 
   // Planner-generated day-by-day outline
-  outline Json?
+  outline    Json?
   isHardMode Boolean @default(false)
 
   lessons  FoundationLesson[]

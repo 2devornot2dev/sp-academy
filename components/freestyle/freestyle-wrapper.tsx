@@ -131,81 +131,89 @@ export default function FreestyleWrapper({
     }
 
     setIncompleteReason(null);
-    const isFemale = config.voiceGender === "female";
-    const tutorName = config.tutorName || (isFemale ? "Sophie" : "Antoine");
-    const aiAvatarUrl = getTutorAvatarByMood(config.voiceGender, "default");
-    const level = config.level || "EASY";
 
-    const createRes = await fetch(`/api/users/${userId}/freestyle/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const isFemale = config.voiceGender === "female";
+      const tutorName = config.tutorName || (isFemale ? "Sophie" : "Antoine");
+      const aiAvatarUrl = getTutorAvatarByMood(config.voiceGender, "default");
+      const level = config.level || "EASY";
+
+      const createRes = await fetch(`/api/users/${userId}/freestyle/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...config,
+          level,
+          aiAvatarUrl,
+        }),
+      });
+
+      const sessionData = await createRes.json();
+      if (!createRes.ok || !sessionData.sessionId) {
+        throw new Error(
+          sessionData.error || "Failed to create freestyle session",
+        );
+      }
+
+      const fd = sessionData.freestyleData || {};
+      const requiredChunks = fd.requiredChunks || [];
+      const topicLabel =
+        fd.topic || config.topic || "Live Conversation Practice";
+      const personaPrompt = `${fd.persona || tutorName}. LEVEL CALIBRATION: ${
+        LEVEL_INSTRUCTIONS[level]
+      }`;
+
+      const tokenRes = await fetch("/api/livekit/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nativeLanguage: config.nativeLanguage,
+          targetLanguage: config.targetLanguage,
+          voiceGender: config.voiceGender,
+          level,
+          freestyleData: {
+            mode: config.mode || "FOCUSED",
+            level,
+            topic: topicLabel,
+            persona: personaPrompt,
+            requiredChunks,
+            openingLine: fd.openingLine,
+            aiOpeningTarget: fd.aiOpeningTarget,
+            starterHintTarget: fd.starterHintTarget,
+          },
+        }),
+      });
+
+      const lkData = await tokenRes.json();
+      if (!tokenRes.ok || !lkData.token) {
+        throw new Error(lkData.error || "Failed to initialize LiveKit room");
+      }
+
+      setLivekitData({
+        token: lkData.token,
+        wsUrl: lkData.wsUrl,
+      });
+
+      setActiveSession({
+        id: sessionData.sessionId,
+        userId,
+        userAvatarUrl: sessionData.userAvatarUrl,
         ...config,
         level,
+        tutorName,
+        topic: topicLabel,
         aiAvatarUrl,
-      }),
-    });
-
-    const sessionData = await createRes.json();
-    if (!createRes.ok || !sessionData.sessionId) {
-      throw new Error(
-        sessionData.error || "Failed to create freestyle session",
+        requiredChunks,
+        chunkTranslations: fd.chunkTranslations || [],
+        openingLine: fd.openingLine,
+        starterHintTarget: fd.starterHintTarget,
+        starterHintNative: fd.starterHintNative,
+      } as any);
+    } catch (err: any) {
+      setIncompleteReason(
+        err?.message || "Something went wrong while preparing the arena.",
       );
     }
-
-    const fd = sessionData.freestyleData || {};
-    const requiredChunks = fd.requiredChunks || [];
-    const topicLabel = fd.topic || config.topic || "Live Conversation Practice";
-    const personaPrompt = `${fd.persona || tutorName}. LEVEL CALIBRATION: ${
-      LEVEL_INSTRUCTIONS[level]
-    }`;
-
-    const tokenRes = await fetch("/api/livekit/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nativeLanguage: config.nativeLanguage,
-        targetLanguage: config.targetLanguage,
-        voiceGender: config.voiceGender,
-        level,
-        freestyleData: {
-          mode: config.mode || "FOCUSED",
-          level,
-          topic: topicLabel,
-          persona: personaPrompt,
-          requiredChunks,
-          openingLine: fd.openingLine,
-          aiOpeningTarget: fd.aiOpeningTarget,
-          starterHintTarget: fd.starterHintTarget,
-        },
-      }),
-    });
-
-    const lkData = await tokenRes.json();
-    if (!tokenRes.ok || !lkData.token) {
-      throw new Error(lkData.error || "Failed to initialize LiveKit room");
-    }
-
-    setLivekitData({
-      token: lkData.token,
-      wsUrl: lkData.wsUrl,
-    });
-
-    setActiveSession({
-      id: sessionData.sessionId,
-      userId,
-      userAvatarUrl: sessionData.userAvatarUrl,
-      ...config,
-      level,
-      tutorName,
-      topic: topicLabel,
-      aiAvatarUrl,
-      requiredChunks,
-      chunkTranslations: fd.chunkTranslations || [],
-      openingLine: fd.openingLine,
-      starterHintTarget: fd.starterHintTarget,
-      starterHintNative: fd.starterHintNative,
-    } as any);
   };
 
   const handleEndSession = (result?: {
@@ -299,6 +307,8 @@ export default function FreestyleWrapper({
               defaultNative={defaultNative}
               defaultTarget={defaultTarget}
               reviewsCount={reviewsCount}
+              dailyUsed={dailyUsed}
+              dailyMax={dailySessionsMax}
             />
           </motion.div>
         )}

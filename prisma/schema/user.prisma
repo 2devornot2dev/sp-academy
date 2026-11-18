@@ -74,9 +74,9 @@ model SpriteProfile {
   sprite Sprite @relation(fields: [spriteId], references: [id])
 
   // 🟢 NEW: Saved Chat Sessions
-  sessions            SpriteSession[]
-  spriteExercises     SpriteExercise[]
-  notifications       SpriteNotification[]
+  sessions        SpriteSession[]
+  spriteExercises SpriteExercise[]
+  notifications   SpriteNotification[]
 
   dismissedCards String[]
 }
@@ -231,6 +231,51 @@ model UserBookProgress {
   @@unique([userId, spoonBookId, targetLanguage])
 }
 
+model VocabLadderPack {
+  id          String @id @default(cuid())
+  slug        String @unique // e.g. "colors-1", "opposites-1", "verbs-past-1"
+  rungOrder   Int // 1..10
+  tier        Int    @default(1) // 1 = Bricks (1-3), 2 = Modifiers (4-7), 3 = Verbs (8-10)
+  category    String // "BASICS" | "OBJECTS" | "MODIFIERS" | "VERBS"
+  icon        String // "🎨" | "⚡" | "🏃"
+  accentColor String @default("sky") // "sky" | "amber" | "purple"
+
+  // 8 shared Sunburst PNG keys (two 1¢ 2x2 grids, shared across fr-FR, es-ES, en-US!)
+  imageS3Keys String[]
+
+  // Keyed by locale: { "fr-FR": { title, subtitle, pairs, stacks, flips }, ... }
+  translations Json
+
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress UserLadderProgress[]
+
+  @@index([rungOrder])
+}
+
+model UserLadderProgress {
+  id             String @id @default(cuid())
+  userId         String
+  ladderPackId   String
+  targetLanguage String // "fr-FR" | "es-ES" | "en-US"
+
+  passed      Boolean   @default(false)
+  score       Int?
+  attempts    Int       @default(0)
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ladderPack VocabLadderPack @relation(fields: [ladderPackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ladderPackId, targetLanguage])
+  @@index([userId, targetLanguage])
+}
+
 model User {
   id    String @id @default(cuid())
   email String @unique
@@ -299,6 +344,7 @@ model User {
   foundationCourses      FoundationCourse[]
   foundationBossStages   FoundationBossStage[]
   bookProgress           UserBookProgress[]
+  userLadderProgresses   UserLadderProgress[]
 }
 
 model BillingInformation {

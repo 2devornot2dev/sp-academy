@@ -178,7 +178,9 @@ export default function FreestyleSetup({
   onStart,
   defaultNative = "en-US",
   defaultTarget = "fr-FR",
-  reviewsCount = 0
+  reviewsCount = 0,
+  dailyUsed = 0,
+  dailyMax = 5,
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState("FOCUSED");
@@ -211,22 +213,32 @@ export default function FreestyleSetup({
 
   const step1Valid = !(mode === "SPECIFIC" && !topic.trim());
 
+  const isDailyCapReached = dailyUsed >= dailyMax;
+  const remainingToday = Math.max(0, dailyMax - dailyUsed);
+
   const previewAvatarUrl = getTutorAvatarByMood(voiceGender, "default");
 
   const handleStart = async () => {
+    if (isDailyCapReached) return;
+
     const silentAudio = new Audio("data:audio/mp3;base64,//MkxAA...");
     silentAudio.play().catch(() => {});
 
     setIsStarting(true);
-    await onStart({
-      mode,
-      level,
-      persona,
-      topic: mode === "SPECIFIC" ? topic : undefined,
-      nativeLanguage: nativeLang,
-      targetLanguage: targetLang,
-      voiceGender,
-    });
+    try {
+      await onStart({
+        mode,
+        level,
+        persona,
+        topic: mode === "SPECIFIC" ? topic : undefined,
+        nativeLanguage: nativeLang,
+        targetLanguage: targetLang,
+        voiceGender,
+      });
+    } finally {
+      // Always reset the spinner, even if onStart returns early or errors out
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -367,10 +379,14 @@ export default function FreestyleSetup({
                   <button
                     type="button"
                     onClick={handleStart}
-                    disabled={isStarting || !step1Valid}
+                    disabled={isStarting || !step1Valid || isDailyCapReached}
                     className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-7 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-50"
                   >
-                    {isStarting ? (
+                    {isDailyCapReached ? (
+                      <span>
+                        Daily Limit Reached ({dailyUsed}/{dailyMax})
+                      </span>
+                    ) : isStarting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span>Preparing Arena...</span>
@@ -378,7 +394,9 @@ export default function FreestyleSetup({
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-current" />
-                        <span>Start 3-Minute Session</span>
+                        <span>
+                          Start 3-Min Session ({remainingToday}/{dailyMax} left)
+                        </span>
                       </>
                     )}
                   </button>
@@ -631,7 +649,11 @@ export default function FreestyleSetup({
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
                     <Check className="h-3.5 w-3.5 stroke-[3]" />
-                    <span>Ready — Click Start Above</span>
+                    <span>
+                      {isDailyCapReached
+                        ? "Daily limit reached — come back tomorrow"
+                        : "Ready — Click Start Above"}
+                    </span>
                   </span>
                 )}
               </div>
@@ -783,6 +805,12 @@ export default function FreestyleSetup({
                   <span className="font-black text-slate-800">
                     {voiceGender === "female" ? "Sophie" : "Antoine"} (
                     {selectedPersonaObj.icon} {selectedPersonaObj.label})
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-400">Today</span>
+                  <span className="font-black text-slate-800">
+                    {dailyUsed}/{dailyMax} sessions used
                   </span>
                 </div>
               </div>
