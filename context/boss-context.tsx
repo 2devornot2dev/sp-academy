@@ -72,6 +72,7 @@ export interface BossPersona {
   coverUrl?: string | null;
   avatar?: BossAvatar | null;
 }
+
 export interface BossMessage {
   id: number | string;
   role: "assistant" | "user" | "exercise" | "system";
@@ -228,6 +229,7 @@ function checkDeterministicAnswer(
 
   return false;
 }
+
 const MALE_ARCHETYPE_HINTS = [
   "sneakerhead",
   "boss_arch_3_dj",
@@ -251,6 +253,7 @@ function resolveBossGender(boss?: BossPersona | null): "male" | "female" {
   }
   return "female";
 }
+
 // ============================================================================
 // INNER PROVIDER (Runs inside <LiveKitRoom>)
 // ============================================================================
@@ -307,7 +310,6 @@ function BossLiveKitInnerProvider({
   const reactionAppendedRef = useRef(false);
   const reactionResolverRef = useRef<(() => void) | null>(null);
   const transcriptRef = useRef("");
-  
 
   const updateTranscript = useCallback((val: string) => {
     transcriptRef.current = val;
@@ -638,15 +640,15 @@ function BossLiveKitInnerProvider({
           { reliable: true },
         );
       } catch {
-        await speak(speechText, bcp47Language, 1.0, session?.voiceGender);
+        await speak(speechText, bcp47Language, 1.0, bossVoiceGender);
       }
     },
     [
       bcp47Language,
+      bossVoiceGender,
       playNativeAudioUntilSettled,
       resolveAssetUrl,
       sendBossCmd,
-      session?.voiceGender,
       speak,
     ],
   );
@@ -791,6 +793,7 @@ function BossLiveKitInnerProvider({
       id: `intro-${Date.now()}`,
       role: "assistant",
       text: introMessage,
+      translation: boss?.introTranslation || undefined,
       mood: "default",
     };
     setMessages([welcomeMessage]);
@@ -801,30 +804,8 @@ function BossLiveKitInnerProvider({
       resultPipelineRef.current = true;
       stopAudio();
     };
-  }, [introMessage, stopAudio]);
+  }, [boss?.introTranslation, introMessage, stopAudio]);
 
-const bossVoiceGender = resolveBossGender(boss);
-        const targetVoiceId = `${targetLanguage}-${
-          bossVoiceGender === "male" ? "man-01" : "girl-01"
-        }`;
-
-        const res = await fetch("/api/livekit/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lessonId: `boss-${session?.id || Date.now()}`,
-            nativeLanguage,
-            targetLanguage,
-            voiceGender: bossVoiceGender,
-            targetVoiceId,
-            freestyleData: {
-              topic: `Milestone Boss: ${boss?.name || "Challenge"}`,
-              persona: boss?.persona || "Strict milestone examiner",
-              openingLine: boss?.sceneDescription || "",
-              aiOpeningTarget: "", // <-- Stay silent on connect; stage handles video vs audio!
-            },
-          }),
-        });
   const startExercises = useCallback(() => {
     if (startExercisesRef.current || stageStatusRef.current !== "PLAYING") {
       return;
@@ -1039,7 +1020,6 @@ const bossVoiceGender = resolveBossGender(boss);
       (!transcriptRef.current.trim() || !latestPronunciationRef.current) &&
       attempts < 35
     ) {
-      // If we received the transcript and waited at least 1.5s, proceed even if pronunciation object is null
       if (
         transcriptRef.current.trim() &&
         attempts >= 15 &&
@@ -1098,7 +1078,6 @@ const bossVoiceGender = resolveBossGender(boss);
       cleanTarget.length > 0 &&
       (cleanUser.includes(cleanTarget) || cleanTarget.includes(cleanUser));
 
-    // Require non-empty user speech if there is no target text (e.g. open CONVERSATION)
     const finalIsCorrect = cleanTarget
       ? azurePassed || textPassed
       : cleanUser.length > 1;
@@ -1134,11 +1113,13 @@ const bossVoiceGender = resolveBossGender(boss);
     void processResult(false, "[TIMEOUT]", currentItem);
   }, [playlist, processResult]);
 
-const handleReplay = useCallback(
+  const handleReplay = useCallback(
     async (text: string) => {
       if (text === introMessage && boss?.introAudioKey) {
         try {
-          await playNativeAudioUntilSettled(resolveAssetUrl(boss.introAudioKey));
+          await playNativeAudioUntilSettled(
+            resolveAssetUrl(boss.introAudioKey),
+          );
           return;
         } catch {
           // Fall through to LiveKit if S3 audio fails
@@ -1242,9 +1223,16 @@ export function BossFoundationProvider({
     let cancelled = false;
     async function initBossRoom() {
       try {
+        const bossVoiceGender = resolveBossGender(boss);
+        const targetVoiceId = `${targetLanguage}-${
+          bossVoiceGender === "male" ? "man-01" : "girl-01"
+        }`;
+
         console.log("[BOSS-PRON] Minting LiveKit token with languages:", {
           targetLanguage,
           nativeLanguage,
+          voiceGender: bossVoiceGender,
+          targetVoiceId,
           sessionId: session?.id,
         });
 
@@ -1255,11 +1243,13 @@ export function BossFoundationProvider({
             lessonId: `boss-${session?.id || Date.now()}`,
             nativeLanguage,
             targetLanguage,
+            voiceGender: bossVoiceGender,
+            targetVoiceId,
             freestyleData: {
               topic: `Milestone Boss: ${boss?.name || "Challenge"}`,
               persona: boss?.persona || "Strict milestone examiner",
               openingLine: boss?.sceneDescription || "",
-              aiOpeningTarget: boss?.introMessage || "",
+              aiOpeningTarget: "",
             },
           }),
         });

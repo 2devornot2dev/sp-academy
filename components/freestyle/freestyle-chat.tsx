@@ -923,7 +923,7 @@ const handleEndSession = async () => {
                         stiffness: 420,
                         damping: 18,
                       }}
-                      className="absolute -top-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-white bg-white text-lg shadow-lg"
+                      className="absolute -top-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-white bg-transparent text-lg shadow-lg"
                     >
                       {MOOD_OVERLAY[effectiveMood].badge}
                     </motion.div>
