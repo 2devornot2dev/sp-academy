@@ -7,7 +7,8 @@ export type SfxName =
   | "round-clear"
   | "victory"
   | "heart-lost"
-  | "notify";
+  | "notify"
+  | "like";
 
 const SFX_CONFIG: Record<SfxName, { src: string; volume: number }> = {
   tap: { src: "/sfx/tap.mp3", volume: 0.25 },
@@ -18,6 +19,7 @@ const SFX_CONFIG: Record<SfxName, { src: string; volume: number }> = {
   victory: { src: "/sfx/victory.mp3", volume: 0.5 },
   "heart-lost": { src: "/sfx/heart-lost.mp3", volume: 0.4 },
   notify: { src: "/sfx/notify.mp3", volume: 0.35 },
+  like: {src: "/sfx/like.mp3", volume: 0.4}
 };
 
 const MUTE_STORAGE_KEY = "spoon-sfx-muted";

@@ -5,7 +5,10 @@ import {
   ArrowRight,
   Building2,
   Check,
+  Crown,
   Infinity as InfinityIcon,
+  Lock,
+  ShieldCheck,
   Sparkles,
   Zap,
   type LucideIcon,
@@ -29,6 +32,13 @@ const PLAN_ICONS: Record<string, LucideIcon> = {
   founder: Sparkles,
   unlimited: InfinityIcon,
   enterprise: Building2,
+};
+
+// Icon shown inside each plan's badge pill.
+const BADGE_ICONS: Record<string, LucideIcon> = {
+  free: ShieldCheck,
+  founder: Lock,
+  unlimited: Crown,
 };
 
 // Plans that get a solid, filled card with white text.
@@ -187,6 +197,7 @@ export default function PricingSection() {
         <div className="mx-auto mt-[clamp(2rem,4vh,3rem)] grid max-w-6xl grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
           {PLANS.map((plan, index) => {
             const Icon = PLAN_ICONS[plan.id] ?? Sparkles;
+            const BadgeIcon = BADGE_ICONS[plan.id] ?? ShieldCheck;
             const accent = ACCENTS[plan.accent];
             const isLoading = loadingId === plan.id;
             const isSolid = SOLID_PLANS.includes(plan.id);
@@ -261,23 +272,19 @@ export default function PricingSection() {
                       {plan.name}
                     </h3>
 
-                    {/* Crossed-out original price, on its own line above the real price */}
-                    {displayOriginalPrice && (
-                      <p
-                        className={`mt-5 text-lg font-semibold line-through decoration-2 ${
-                          isSolid ? "text-white/70" : "text-muted-foreground"
-                        }`}
-                      >
-                        <span className="sr-only">Regular price </span>
-                        {displayOriginalPrice}
-                      </p>
-                    )}
+                    {/* Original price + price + period all on one baseline */}
+                    <div className="mt-5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                      {displayOriginalPrice && (
+                        <span
+                          className={`text-xl font-semibold line-through decoration-2 ${
+                            isSolid ? "text-white/60" : "text-muted-foreground"
+                          }`}
+                        >
+                          <span className="sr-only">Regular price </span>
+                          {displayOriginalPrice}
+                        </span>
+                      )}
 
-                    <div
-                      className={`${
-                        displayOriginalPrice ? "mt-1" : "mt-5"
-                      } flex flex-wrap items-baseline gap-x-2 gap-y-1`}
-                    >
                       <span
                         className={`text-[clamp(2.5rem,4.5vw,3.5rem)] font-bold leading-none tracking-[-0.05em] ${
                           isSolid ? "text-white" : "text-foreground"
@@ -299,15 +306,21 @@ export default function PricingSection() {
                       )}
                     </div>
 
-                    {/* Optional seat-limit pill, e.g. "First 100 founders only" */}
-                    {plan.seatNote && (
-                      <p
-                        className={`mt-3 w-fit rounded-full px-3 py-1 text-xs font-bold ${
-                          isSolid ? "bg-white/20 text-white" : accent.chip
+                    {/* Badge pill: same style + icon on every card */}
+                    {plan.badge && (
+                      <span
+                        className={`mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold ${
+                          isSolid
+                            ? "border-white/30 bg-white/20 text-white"
+                            : "border-emerald-500/30 bg-emerald-500/15 text-emerald-600"
                         }`}
                       >
-                        {plan.seatNote}
-                      </p>
+                        <BadgeIcon
+                          className="size-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        {plan.badge}
+                      </span>
                     )}
 
                     {isAnnual && plan.annualTotal && plan.id !== "free" && (

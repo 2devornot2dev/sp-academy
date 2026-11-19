@@ -120,24 +120,27 @@ export const Sidebar = ({
                       : "border-slate-200/90 border-b-slate-300 bg-white shadow-2xs hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-sm"
                   )}
                 >
-                  <div className="relative shrink-0">
-                    <Avatar className="h-9 w-9 rounded-xl border-b-2 border-blue-800 shadow-2xs">
-                      <AvatarImage
-                        src={user?.image || undefined}
-                        alt={user?.name || "User"}
-                        className="object-cover"
-                      />
-                      <AvatarFallback className="rounded-xl bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
+                 <div className="relative shrink-0 pb-[3px]">
+  <Avatar
+    className="h-9 w-9 rounded-full"
+    style={{ boxShadow: "0 3px 0 0 hsla(174, 5%, 44%, 0.84)" }}
+  >
+    <AvatarImage
+      src={user?.image || undefined}
+      alt={user?.name || "User"}
+      className="rounded-full object-cover"
+    />
+    <AvatarFallback className="rounded-full bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white">
+      {userInitials}
+    </AvatarFallback>
+  </Avatar>
 
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </div>
+  {unreadCount > 0 && (
+    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
+      {unreadCount}
+    </span>
+  )}
+</div>
 
                   <div className="grid flex-1 text-left leading-tight">
                     <span className="truncate text-xs font-black text-slate-900">

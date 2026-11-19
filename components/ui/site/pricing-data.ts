@@ -7,6 +7,7 @@ export type Plan = {
   id: string;
   name: string;
   label: string;
+  badge?: string;
   accent: PlanAccent;
   featured: boolean;
   price: string;
@@ -17,7 +18,6 @@ export type Plan = {
   annualSavingsLabel?: string;
   description: string;
   features: string[];
-  seatNote?: string;
   cta: { label: string; href: string };
 };
 
@@ -38,6 +38,7 @@ export const PLAN_FREE_MILESTONE: Plan = {
   id: "free",
   name: "Milestone 1 Pass",
   label: "Free Test Drive",
+  badge: "No Credit Card Required",
   accent: "secondary",
   featured: false,
   price: "$0",
@@ -49,7 +50,6 @@ export const PLAN_FREE_MILESTONE: Plan = {
     "Boss Stage 1 with live Azure speech scoring",
     "Interactive Chalkboard prep with Vox or Vivi",
     "Personal Word Matrix tracking",
-    "No credit card required",
   ],
   cta: {
     label: "Start Milestone 1 Free",
@@ -61,6 +61,7 @@ export const PLAN_CORE_FOUNDER: Plan = {
   id: "founder",
   name: "Founder",
   label: "Beta Founder Offer",
+  badge: "100 founders only · $35 locked for life",
   accent: "primary",
   featured: true,
   price: "$35",
@@ -69,7 +70,6 @@ export const PLAN_CORE_FOUNDER: Plan = {
   annualPrice: "$29",
   annualTotal: "$348 CAD billed annually",
   annualSavingsLabel: "2 months free (Save $72)",
-  seatNote: "First 100 founders only · $35 locked for life",
   description: "15 full learning cycles per month with 1-on-1 AI coaching.",
   features: [
     "45 Spoons + 45 Video Vocab Bridges /mo",
@@ -90,6 +90,7 @@ export const PLAN_UNLIMITED_PLUS: Plan = {
   id: "unlimited",
   name: "Unlimited+",
   label: "For Intensive Learners",
+  badge: "For Pro Learners",
   accent: "secondary",
   featured: false,
   price: "$125",
