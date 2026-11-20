@@ -46,20 +46,3 @@ export default async function DashboardLayout({
     </UserProvider>
   );
 }
-
-
-//  <UserProvider user={userData}>
-//       <SpriteProvider initialSprite={spriteData}>
-//         <S3Provider>
-//           <DashboardClientLayout isAdmin={isAdmin}>
-//             {children}
-//           </DashboardClientLayout>
-//         </S3Provider>
-//       </SpriteProvider>
-//     </UserProvider>
-
-  //  <DashboardClientLayout isAdmin={isAdmin} userData={userData} notifications={userNotifications}>
-  //     <S3Provider>
-  //       <SpriteProvider spriteData={spriteData}>{children}</SpriteProvider>
-  //     </S3Provider>
-  //   </DashboardClientLayout>

@@ -47,6 +47,7 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+
 interface SidebarProps {
   pathname: string;
   isAdmin?: boolean;
@@ -68,7 +69,7 @@ export const Sidebar = ({
   isAdmin = false,
   onOpenNotifications,
 }: SidebarProps) => {
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const sidebarOpen = state === "expanded" || isMobile;
   const router = useRouter();
   const { unreadCount } = useNotifications();
@@ -281,7 +282,10 @@ export const Sidebar = ({
                     <DropdownMenuItem
                       className="cursor-pointer gap-2 rounded-xl font-bold text-slate-700"
                       render={
-                        <Link href={settingItems[0]?.href || "/account"}>
+                        <Link 
+                        href={settingItems[0]?.href || "/account"}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                        >
                           <Settings className="size-4 text-indigo-500" />
                           <span>Settings &amp; Account</span>
                         </Link>
@@ -335,7 +339,11 @@ export const Sidebar = ({
                           : "border-2 border-transparent text-slate-600 hover:-translate-y-0.5 hover:border-slate-200 hover:border-b-4 hover:border-b-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-2xs active:translate-y-0.5 active:border-b-2"
                       )}
                       render={
-                        <Link href={navItem.href}>
+                        <Link 
+                        href={navItem.href}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                        
+                        >
                           {/* 3D Mini Squircle Icon Tile */}
                           <div
                             className={cn(
