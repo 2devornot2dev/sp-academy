@@ -1,120 +1,13 @@
 // app/books/page.tsx
-import { requireUser } from "@/lib/auth-guard";
-import { prisma } from "@/lib/prisma";
-import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 import { BookOpen } from "lucide-react";
-import {
-  BookshelfClient,
-  type BookshelfItem,
-} from "@/components/books/bookshelf-client";
-import type { LocalizedBookTranslationSchema } from "@/lib/schema/book-schema";
-import type { z } from "zod";
-
-type TranslationsMap = Record<
-  string,
-  z.infer<typeof LocalizedBookTranslationSchema>
->;
-
-async function resolveS3Url(
-  key?: string | null,
-  fallback?: string
-): Promise<string> {
-  if (!key) return fallback || "";
-  if (key.startsWith("http")) return key;
-  try {
-    const signed = await getPresignedImageUrl(key);
-    return signed || fallback || "";
-  } catch {
-    return fallback || "";
-  }
-}
+import { BookshelfClient } from "@/components/books/bookshelf-client";
+import { getBookshelfData } from "@/lib/actions/get-books";
 
 export default async function BooksPage() {
-  const user = await requireUser();
-
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: {
-      targetLanguage: true,
-      spriteProfile: { select: { targetLanguage: true } },
-    },
-  });
-
-  const userLang = dbUser?.spriteProfile?.targetLanguage || "fr-FR";
-
-  const books = await prisma.spoonBook.findMany({
-    where: { isPublished: true },
-    orderBy: { createdAt: "desc" },
-    include: {
-      progress: {
-        where: { userId: user.id },
-        orderBy: { updatedAt: "desc" },
-      },
-    },
-  });
-
-  // Presign each book's real coverImageS3Key (and introVideoS3Key) in parallel
-  const hydratedBooks: BookshelfItem[] = await Promise.all(
-    books.map(async (book) => {
-      const translations = (book.translations || {}) as TranslationsMap;
-      const availableLangs = Object.keys(translations);
-      const activeEdition =
-        translations[userLang] ||
-        translations["fr-FR"] ||
-        translations[availableLangs[0]];
-
-      const totalPages =
-        activeEdition?.pages?.length || book.pageImageS3Keys?.length || 8;
-
-      const userProgress =
-        book.progress.find((p) => p.targetLanguage === userLang) ||
-        book.progress[0];
-
-      const completedCheckpoints = Array.isArray(
-        userProgress?.completedCheckpoints
-      )
-        ? (userProgress.completedCheckpoints as number[])
-        : [];
-
-      const isCompleted =
-        Boolean(userProgress?.completedAt) ||
-        completedCheckpoints.length >= totalPages;
-
-      const [coverUrl, introVideoUrl] = await Promise.all([
-        resolveS3Url(book.coverImageS3Key, book.characterAvatarUrl),
-        book.introVideoS3Key
-          ? resolveS3Url(book.introVideoS3Key, "")
-          : Promise.resolve(""),
-      ]);
-
-      return {
-        id: book.id,
-        slug: book.slug,
-        title: activeEdition?.title || book.slug,
-        synopsis:
-          activeEdition?.synopsis ||
-          `Join ${book.characterName} in this interactive ${totalPages}-page story.`,
-        characterName: book.characterName,
-        characterAvatarUrl: book.characterAvatarUrl,
-        levelBand: book.levelBand,
-        genre: book.genre,
-        coverUrl,
-        introVideoUrl: introVideoUrl || null,
-        totalPages,
-        currentPage: userProgress?.currentPage ?? 0,
-        completedCheckpointsCount: completedCheckpoints.length,
-        isCompleted,
-        lastReadAt: userProgress?.updatedAt
-          ? userProgress.updatedAt.toISOString()
-          : null,
-        availableLanguages: availableLangs,
-      };
-    })
-  );
+  const hydratedBooks = await getBookshelfData();
 
   return (
     <div className="min-h-screen bg-slate-50/60 pb-20">
-      {/* Keep your signature Spoon gradient header */}
       <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-14 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
         <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
@@ -143,7 +36,6 @@ export default async function BooksPage() {
         </div>
       </header>
 
-      {/* Main Premium Bookshelf Client */}
       <BookshelfClient books={hydratedBooks} />
     </div>
   );

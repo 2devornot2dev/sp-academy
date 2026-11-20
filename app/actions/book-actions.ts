@@ -1,62 +1,69 @@
-// lib/actions/book-actions.ts
+// app/actions/book-actions.ts
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth-guard";
+import { prisma } from "@/lib/prisma";
 
-export async function saveBookProgress(progress: {
+export async function saveBookProgress(input: {
   bookId: string;
   targetLanguage: string;
   currentPage: number;
   completedCheckpoints: number[];
   isFinished: boolean;
+  pronunciationScores?: Record<string, any>;
 }) {
   const user = await requireUser();
 
-  // 1. Check if they ALREADY finished this book in the past
-  const existingProgress = await prisma.userBookProgress.findUnique({
+  const existing = await prisma.userBookProgress.findUnique({
     where: {
       userId_spoonBookId_targetLanguage: {
         userId: user.id,
-        spoonBookId: progress.bookId,
-        targetLanguage: progress.targetLanguage,
+        spoonBookId: input.bookId,
+        targetLanguage: input.targetLanguage,
       },
     },
-    select: { completedAt: true },
   });
 
-  const wasAlreadyCompleted = Boolean(existingProgress?.completedAt);
+  const mergedScores = {
+    ...((existing?.pronunciationScores as Record<string, any>) || {}),
+    ...(input.pronunciationScores || {}),
+  };
 
-  // 2. Save the actual reading progress
+  // Once hasRead is true, keep it true even when re-reading from page 1
+  const hasRead = Boolean(existing?.hasRead || input.isFinished);
+  const completedAt = input.isFinished
+    ? new Date()
+    : (existing?.completedAt ?? null);
+
   await prisma.userBookProgress.upsert({
     where: {
       userId_spoonBookId_targetLanguage: {
         userId: user.id,
-        spoonBookId: progress.bookId,
-        targetLanguage: progress.targetLanguage,
+        spoonBookId: input.bookId,
+        targetLanguage: input.targetLanguage,
       },
+    },
+    update: {
+      currentPage: input.currentPage,
+      completedCheckpoints: input.completedCheckpoints,
+      hasRead,
+      completedAt,
+      pronunciationScores: mergedScores,
+      ...(input.isFinished ? { readCount: { increment: 1 } } : {}),
     },
     create: {
       userId: user.id,
-      spoonBookId: progress.bookId,
-      targetLanguage: progress.targetLanguage,
-      currentPage: progress.currentPage,
-      completedCheckpoints: progress.completedCheckpoints,
-      quizScore: progress.isFinished ? 100 : null,
-      completedAt: progress.isFinished ? new Date() : null,
-    },
-    update: {
-      currentPage: progress.currentPage,
-      completedCheckpoints: progress.completedCheckpoints,
-      // Only stamp completedAt if they are finishing it right now for the first time
-      ...(progress.isFinished && !wasAlreadyCompleted
-        ? { quizScore: 100, completedAt: new Date() }
-        : {}),
+      spoonBookId: input.bookId,
+      targetLanguage: input.targetLanguage,
+      currentPage: input.currentPage,
+      completedCheckpoints: input.completedCheckpoints,
+      hasRead: input.isFinished,
+      readCount: input.isFinished ? 1 : 0,
+      completedAt: input.isFinished ? new Date() : null,
+      pronunciationScores: mergedScores,
     },
   });
 
-  // 3. Revalidate UI (The feed API route will automatically pick up the new completedAt stamp!)
   revalidatePath("/books");
-  revalidatePath("/dashboard"); // or wherever your feed lives
 }

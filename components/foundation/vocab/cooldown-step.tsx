@@ -11,6 +11,7 @@ import {
   Sparkles,
   Lock,
   Check,
+  Lightbulb,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
 import { useWordAudio } from "@/context/word-audio-context";
@@ -20,6 +21,77 @@ import {
   useSpeakWord,
   cleanWord,
 } from "@/components/foundation/word-tap";
+
+type HighlightColor = "amber" | "violet" | "teal" | "rose";
+
+interface HighlightLink {
+  promptTerm: string;
+  targetTerm: string;
+  replacedTerm?: string | null;
+  color?: HighlightColor;
+}
+
+const HIGHLIGHT_STYLES: Record<
+  HighlightColor,
+  {
+    promptPill: string;
+    replacedPill: string;
+    bankTile: string;
+    placedTile: string;
+    badge: string;
+  }
+> = {
+  amber: {
+    promptPill:
+      "rounded-md bg-amber-100 px-1.5 py-0.5 font-black text-amber-900 ring-1 ring-amber-300",
+    replacedPill:
+      "rounded-lg bg-amber-50 px-1.5 py-0.5 text-amber-800 line-through decoration-amber-500 decoration-2 ring-1 ring-amber-200",
+    bankTile:
+      "border-amber-400 border-b-amber-500 bg-amber-50 text-amber-950 shadow-2xs hover:-translate-y-0.5 hover:border-amber-500 hover:bg-amber-100/80 active:translate-y-0.5 active:border-b-2",
+    placedTile:
+      "border-amber-600 bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-sm",
+    badge: "bg-amber-100 text-amber-900 ring-amber-300",
+  },
+  violet: {
+    promptPill:
+      "rounded-md bg-violet-100 px-1.5 py-0.5 font-black text-violet-900 ring-1 ring-violet-300",
+    replacedPill:
+      "rounded-lg bg-violet-50 px-1.5 py-0.5 text-violet-800 line-through decoration-violet-500 decoration-2 ring-1 ring-violet-200",
+    bankTile:
+      "border-violet-400 border-b-violet-500 bg-violet-50 text-violet-950 shadow-2xs hover:-translate-y-0.5 hover:border-violet-500 hover:bg-violet-100/80 active:translate-y-0.5 active:border-b-2",
+    placedTile:
+      "border-violet-700 bg-gradient-to-b from-violet-400 to-violet-600 text-white shadow-sm",
+    badge: "bg-violet-100 text-violet-900 ring-violet-300",
+  },
+  teal: {
+    promptPill:
+      "rounded-md bg-teal-100 px-1.5 py-0.5 font-black text-teal-900 ring-1 ring-teal-300",
+    replacedPill:
+      "rounded-lg bg-teal-50 px-1.5 py-0.5 text-teal-800 line-through decoration-teal-500 decoration-2 ring-1 ring-teal-200",
+    bankTile:
+      "border-teal-400 border-b-teal-500 bg-teal-50 text-teal-950 shadow-2xs hover:-translate-y-0.5 hover:border-teal-500 hover:bg-teal-100/80 active:translate-y-0.5 active:border-b-2",
+    placedTile:
+      "border-teal-700 bg-gradient-to-b from-teal-400 to-teal-600 text-white shadow-sm",
+    badge: "bg-teal-100 text-teal-900 ring-teal-300",
+  },
+  rose: {
+    promptPill:
+      "rounded-md bg-rose-100 px-1.5 py-0.5 font-black text-rose-900 ring-1 ring-rose-300",
+    replacedPill:
+      "rounded-lg bg-rose-50 px-1.5 py-0.5 text-rose-800 line-through decoration-rose-500 decoration-2 ring-1 ring-rose-200",
+    bankTile:
+      "border-rose-400 border-b-rose-500 bg-rose-50 text-rose-950 shadow-2xs hover:-translate-y-0.5 hover:border-rose-500 hover:bg-rose-100/80 active:translate-y-0.5 active:border-b-2",
+    placedTile:
+      "border-rose-700 bg-gradient-to-b from-rose-400 to-rose-600 text-white shadow-sm",
+    badge: "bg-rose-100 text-rose-900 ring-rose-300",
+  },
+};
+
+const getColorStyle = (color?: string) =>
+  HIGHLIGHT_STYLES[(color as HighlightColor) || "amber"] ??
+  HIGHLIGHT_STYLES.amber;
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Lowercase, strip accents and punctuation, collapse spaces.
 const normalize = (s: string) =>
@@ -48,6 +120,36 @@ const shuffle = (arr: string[], seed: number) =>
     .map((x) => x.w);
 
 const hasLetters = (s: string) => /[\p{L}\p{N}]/u.test(s);
+
+function renderHighlightedPrompt(
+  text: string | undefined,
+  highlights: HighlightLink[]
+): React.ReactNode {
+  if (!text || highlights.length === 0) return text ?? "";
+
+  const terms = highlights
+    .filter((h) => h.promptTerm?.trim())
+    .sort((a, b) => b.promptTerm.length - a.promptTerm.length);
+
+  if (terms.length === 0) return text;
+
+  const pattern = new RegExp(
+    `(${terms.map((h) => escapeRegex(h.promptTerm.trim())).join("|")})`,
+    "gi"
+  );
+
+  return text.split(pattern).map((part, idx) => {
+    const match = terms.find(
+      (h) => h.promptTerm.trim().toLowerCase() === part.toLowerCase()
+    );
+    if (!match) return <React.Fragment key={idx}>{part}</React.Fragment>;
+    return (
+      <span key={idx} className={getColorStyle(match.color).promptPill}>
+        {part}
+      </span>
+    );
+  });
+}
 
 const MECHANIC_LABELS: Record<string, string> = {
   word_coupling: "Word Coupling",
@@ -84,9 +186,27 @@ export function CooldownStep({
   const isBuilder = item.mechanic === "variable_shift";
   const isMultipleChoice = !isBuilder;
 
-  const expectedTokens = useMemo(
-    () => tokenize(item.expected?.[0] ?? "").map(normalize),
+  const highlights: HighlightLink[] = useMemo(
+    () => (Array.isArray(item.highlights) ? item.highlights : []),
     [item]
+  );
+
+  // Use backend expectedChunks when available; fall back to tokenizing expected[0]
+  const expectedChunks = useMemo(() => {
+    if (Array.isArray(item.expectedChunks) && item.expectedChunks.length > 0) {
+      return item.expectedChunks as string[];
+    }
+    return tokenize(item.expected?.[0] ?? "");
+  }, [item]);
+
+  const expectedChunksNorm = useMemo(
+    () => expectedChunks.map(normalize),
+    [expectedChunks]
+  );
+
+  const isChunkMode = useMemo(
+    () => expectedChunks.some((c) => c.trim().includes(" ")),
+    [expectedChunks]
   );
 
   // Matrix: the words shown in this drill count as "seen"
@@ -104,11 +224,14 @@ export function CooldownStep({
 
   const bank = useMemo(() => {
     if (!isBuilder) return [] as string[];
+    if (Array.isArray(item.chunkBank) && item.chunkBank.length > 0) {
+      return item.chunkBank as string[];
+    }
     if (Array.isArray(item.wordBank) && item.wordBank.length > 0) {
       return shuffle(item.wordBank, currentIndex + 1);
     }
 
-    const answer = tokenize(item.expected?.[0] ?? "");
+    const answer = expectedChunks;
     const seen = new Set(answer.map(normalize));
     const extras: string[] = [];
 
@@ -124,9 +247,32 @@ export function CooldownStep({
       }
     }
     return shuffle([...answer, ...extras], currentIndex + 1);
-  }, [item, currentIndex, isBuilder]);
+  }, [item, currentIndex, isBuilder, expectedChunks]);
 
   const placedWords = selected.map((i) => bank[i]);
+
+  // Match a bank/placed tile against a highlight targetTerm
+  const getTileHighlight = (tile: string): HighlightLink | undefined => {
+    const nTile = normalize(tile);
+    return highlights.find((h) => {
+      const nTarget = normalize(h.targetTerm);
+      return (
+        nTarget &&
+        (nTile === nTarget || nTile.includes(nTarget))
+      );
+    });
+  };
+
+  // Match a word in baseSentence against a highlight replacedTerm
+  const getBaseWordHighlight = (token: string): HighlightLink | undefined => {
+    const nToken = normalize(token);
+    if (!nToken) return undefined;
+    return highlights.find((h) => {
+      if (!h.replacedTerm) return false;
+      const nRep = normalize(h.replacedTerm);
+      return nRep === nToken || nRep.split(" ").includes(nToken);
+    });
+  };
 
   const handleNextQuestion = () => {
     stopAudio();
@@ -174,9 +320,23 @@ export function CooldownStep({
     }
   };
 
+  const markBuilderCorrect = (chunks: string[]) => {
+    setStatus("correct");
+    setFeedbackMsg(
+      item.whyNote?.trim()
+        ? `Spot on! ${item.whyNote.trim()}`
+        : "Perfect sentence adaptation!"
+    );
+    chunks
+      .flatMap((c) => tokenize(c))
+      .forEach((w) => trackInteraction(cleanWord(w), { tappedCorrect: 1 }));
+    speak(chunks.join(" "), { each: true });
+  };
+
   const addWord = (bankIndex: number) => {
     if (status === "correct" || selected.includes(bankIndex)) return;
-    speak(bank[bankIndex]);
+    const chunk = bank[bankIndex];
+    speak(chunk, { each: chunk.includes(" ") });
 
     const nextSelected = [...selected, bankIndex];
     setSelected(nextSelected);
@@ -189,12 +349,7 @@ export function CooldownStep({
     ].map(normalize);
 
     if (accepted.includes(guess)) {
-      setStatus("correct");
-      setFeedbackMsg("Perfect sentence adaptation!");
-      nextPlaced.forEach((w) =>
-        trackInteraction(cleanWord(w), { tappedCorrect: 1 })
-      );
-      speak(nextPlaced.join(" "), { each: true });
+      markBuilderCorrect(nextPlaced);
       return;
     }
 
@@ -219,29 +374,26 @@ export function CooldownStep({
       ...(item.expected ?? []),
       ...(item.expectedFolds ?? []),
     ].map(normalize);
-    const answerWords = new Set(expectedTokens);
+    const answerSet = new Set(expectedChunksNorm);
 
     if (accepted.includes(guess)) {
-      setStatus("correct");
-      setFeedbackMsg("Perfect sentence adaptation!");
-      placedWords.forEach((w) =>
-        trackInteraction(cleanWord(w), { tappedCorrect: 1 })
-      );
-      speak(placedWords.join(" "), { each: true });
+      markBuilderCorrect(placedWords);
       return;
     }
 
     placedWords
-      .filter((w) => !answerWords.has(normalize(w)))
+      .filter((c) => !answerSet.has(normalize(c)))
+      .flatMap((c) => tokenize(c))
       .forEach((w) => trackInteraction(cleanWord(w), { tappedWrong: 1 }));
 
     setStatus("incorrect");
     const rejectKey = Object.keys(item.rejectFeedback ?? {}).find(
       (k) => normalize(k) === guess
     );
-    const hint = rejectKey
-      ? item.rejectFeedback[rejectKey]
-      : "Green words are in the right spot! Tap any red word to adjust.";
+    const hint =
+      (rejectKey ? item.rejectFeedback[rejectKey] : "") ||
+      item.whyNote?.trim() ||
+      "Green chunks are in the right spot! Tap any red chunk to adjust.";
     setFeedbackMsg(hint);
   };
 
@@ -309,18 +461,18 @@ export function CooldownStep({
           </div>
         )}
 
-        {/* Context & Instruction Prompt Card */}
+        {/* Context & Instruction Prompt Card (with color-coded clue words) */}
         <div className="mb-6 flex items-start gap-4 rounded-3xl bg-slate-50 p-5 sm:p-6 ring-1 ring-slate-200/80">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-sm">
             <Zap className="h-5 w-5 fill-current" />
           </div>
 
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <p className="text-sm sm:text-base font-semibold leading-relaxed text-slate-600">
-              {item.contextNative}
+              {renderHighlightedPrompt(item.contextNative, highlights)}
             </p>
             <p className="text-base sm:text-lg font-black text-slate-900">
-              {item.instructionNative}
+              {renderHighlightedPrompt(item.instructionNative, highlights)}
             </p>
           </div>
         </div>
@@ -339,12 +491,17 @@ export function CooldownStep({
                 {(item.baseSentence ?? "")
                   .split(/\s+/)
                   .filter(Boolean)
-                  .map((token: string, i: number) =>
-                    hasLetters(token) ? (
+                  .map((token: string, i: number) => {
+                    const hl = getBaseWordHighlight(token);
+                    const hlClass = hl
+                      ? getColorStyle(hl.color).replacedPill
+                      : "rounded-lg px-1.5 py-0.5 text-slate-900 hover:bg-sky-50 hover:text-blue-600";
+
+                    return hasLetters(token) ? (
                       <WordTap
                         key={i}
                         word={token}
-                        className="rounded-lg px-1.5 py-0.5 text-xl sm:text-2xl font-black text-slate-900 hover:bg-sky-50 hover:text-blue-600"
+                        className={`text-xl sm:text-2xl font-black ${hlClass}`}
                       />
                     ) : (
                       <span
@@ -353,8 +510,8 @@ export function CooldownStep({
                       >
                         {token}
                       </span>
-                    )
-                  )}
+                    );
+                  })}
 
                 <button
                   type="button"
@@ -371,9 +528,36 @@ export function CooldownStep({
                   <Volume2 size={18} />
                 </button>
               </div>
+
+              {/* Color-coded swap legend */}
+              {highlights.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 pt-3">
+                  {highlights.map((h, i) => {
+                    const style = getColorStyle(h.color);
+                    return (
+                      <span
+                        key={i}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${style.badge}`}
+                      >
+                        <Lightbulb size={13} className="shrink-0" />
+                        {h.replacedTerm ? (
+                          <span>
+                            Swap <strong>{h.replacedTerm}</strong> for{" "}
+                            <strong>{h.promptTerm}</strong>
+                          </span>
+                        ) : (
+                          <span>
+                            Include phrase for <strong>{h.promptTerm}</strong>
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Answer Tray (Placed 3D Word Pills) */}
+            {/* Answer Tray (Placed 3D Chunk/Word Pills) */}
             <div
               className={`mb-5 flex min-h-[84px] flex-wrap items-center gap-2.5 rounded-3xl border-2 border-dashed p-4 transition-colors ${
                 status === "correct"
@@ -385,7 +569,9 @@ export function CooldownStep({
             >
               {placedWords.length === 0 && (
                 <span className="w-full text-center text-sm font-bold text-slate-400">
-                  Tap the 3D word tiles below to build your sentence...
+                  {isChunkMode
+                    ? "Tap the phrase chunks below to build your sentence..."
+                    : "Tap the 3D word tiles below to build your sentence..."}
                 </span>
               )}
 
@@ -393,10 +579,11 @@ export function CooldownStep({
                 const word = bank[bankIndex];
                 const isRightSpot =
                   status === "correct" ||
-                  (expectedTokens[posIdx] !== undefined &&
-                    normalize(word) === expectedTokens[posIdx]);
+                  (expectedChunksNorm[posIdx] !== undefined &&
+                    normalize(word) === expectedChunksNorm[posIdx]);
 
                 const isWrongSpot = status === "incorrect" && !isRightSpot;
+                const hl = getTileHighlight(word);
 
                 return (
                   <button
@@ -405,14 +592,16 @@ export function CooldownStep({
                     onClick={() => removeWord(bankIndex)}
                     disabled={status === "correct"}
                     title={
-                      isRightSpot ? "Correct position!" : "Tap to remove word"
+                      isRightSpot ? "Correct position!" : "Tap to remove chunk"
                     }
                     className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-base sm:text-lg font-black transition-all active:translate-y-0.5 active:border-b-2 disabled:cursor-default ${
                       isRightSpot
                         ? "border-emerald-600 bg-gradient-to-b from-emerald-400 to-emerald-500 text-white shadow-sm"
                         : isWrongSpot
                           ? "border-rose-600 bg-gradient-to-b from-rose-400 to-rose-500 text-white"
-                          : "border-blue-700 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm hover:brightness-105"
+                          : hl
+                            ? getColorStyle(hl.color).placedTile
+                            : "border-blue-700 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm hover:brightness-105"
                     }`}
                   >
                     <span>{word}</span>
@@ -424,10 +613,12 @@ export function CooldownStep({
               })}
             </div>
 
-            {/* 3D Word Bank */}
+            {/* 3D Chunk / Word Bank */}
             <div className="mb-6 flex flex-wrap justify-center gap-2.5">
               {bank.map((word, bankIndex) => {
                 const used = selected.includes(bankIndex);
+                const hl = getTileHighlight(word);
+
                 return (
                   <button
                     key={bankIndex}
@@ -439,7 +630,9 @@ export function CooldownStep({
                         ? "cursor-not-allowed border-slate-200/60 bg-slate-100 text-transparent select-none"
                         : activeWord === word
                           ? "-translate-y-0.5 border-blue-600 bg-sky-50 text-blue-800 shadow-sm"
-                          : "border-slate-200 border-b-slate-300 bg-white text-slate-800 shadow-2xs hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
+                          : hl
+                            ? getColorStyle(hl.color).bankTile
+                            : "border-slate-200 border-b-slate-300 bg-white text-slate-800 shadow-2xs hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
                     }`}
                   >
                     {word}

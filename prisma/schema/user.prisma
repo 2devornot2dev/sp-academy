@@ -220,6 +220,9 @@ model UserBookProgress {
   currentPage          Int       @default(1) // 1..5
   completedCheckpoints Json      @default("[]") // e.g. [1, 2, 3]
   quizScore            Int? // 0..100
+  hasRead              Boolean   @default(false)
+  readCount            Int       @default(0)
+  pronunciationScores  Json      @default("{}")
   completedAt          DateTime?
 
   createdAt DateTime @default(now())
