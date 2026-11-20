@@ -26,7 +26,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useSprite } from "@/context/sprite-context";
-import { usePronunciation } from "@/context/pronunciation-context"; // adjust path if needed
+import { usePronunciation } from "@/context/pronunciation-context";
 import { playSfx, preloadSfx } from "@/lib/sfx";
 import type {
   SpoonBookWebhookPayload,
@@ -58,6 +58,8 @@ const CAMERA_MOTIONS = [
   { scale: [1.04, 1.0], x: ["1%", "-0.8%"], y: ["0.5%", "-0.5%"] },
 ];
 
+export type ReadingMode = "listen" | "read";
+
 export interface WordPronResult {
   word: string;
   accuracy: number;
@@ -66,7 +68,7 @@ export interface WordPronResult {
 
 export interface PagePronResult {
   overallScore: number;
-  wordScores: Record<string, WordPronResult>; // keyed by normalized word or `${sIdx}:${wIdx}`
+  wordScores: Record<string, WordPronResult>;
 }
 
 const cleanTokenKey = (w: string) =>
@@ -77,9 +79,6 @@ const cleanTokenKey = (w: string) =>
     .replace(/[^\p{L}\p{N}]/gu, "")
     .trim();
 
-/**
- * Normalizes Azure PronunciationScore (supports both camelCase wrapper and raw NBest Words).
- */
 function parseAzurePronunciation(rawResult: any): PagePronResult | null {
   if (!rawResult) return null;
 
@@ -205,7 +204,8 @@ export function BookWrapper({
     currentTranslation?.pages?.length || book.pageImageS3Keys?.length || 5;
   const outroPage = totalPages + 1;
 
-  // 3. READER, KARAOKE & PRONUNCIATION STATE
+  // 3. MODE ("listen" = AI reads to you | "read" = You read out loud to pass each page)
+  const [readingMode, setReadingMode] = useState<ReadingMode>("read");
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [completedCheckpoints, setCompletedCheckpoints] = useState<Set<number>>(
     new Set(initialCompletedCheckpoints)
@@ -215,7 +215,7 @@ export function BookWrapper({
   >(initialPronunciationScores);
   const [checkpointPronResult, setCheckpointPronResult] =
     useState<PagePronResult | null>(null);
-  const [recordingMode, setRecordingMode] = useState<
+  const [recordingTarget, setRecordingTarget] = useState<
     "page" | "checkpoint" | null
   >(null);
 
@@ -226,9 +226,8 @@ export function BookWrapper({
   const [emojiBurstKey, setEmojiBurstKey] = useState<number>(0);
   const [wrongShakeKey, setWrongShakeKey] = useState<number>(0);
 
-  // Audio + 60fps Word Tracking + Auto Read-Along + Ambient Music State
+  // Audio + 60fps Word Tracking + Ambient Music State
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(0.85);
-  const [autoReadAlong, setAutoReadAlong] = useState<boolean>(true);
   const [activeSentenceIdx, setActiveSentenceIdx] = useState<number | null>(
     null
   );
@@ -241,6 +240,11 @@ export function BookWrapper({
 
   const pageScoreKey = `${selectedLang}:p${currentPage}`;
   const currentPagePron = pagePronScores[pageScoreKey] || null;
+  const hasReadCurrentPageAloud = Boolean(currentPagePron);
+
+  // Play button is disabled in Read-Along mode until the user has read the page out loud
+  const isPlayDisabled =
+    isRecording || (readingMode === "read" && !hasReadCurrentPageAloud);
 
   const activePageContent: LocalizedPage | undefined =
     currentPage >= 1 && currentPage <= totalPages
@@ -281,7 +285,6 @@ export function BookWrapper({
     };
   }, []);
 
-  // Pause ambient music during recording as well as speaking checkpoints
   useEffect(() => {
     const bg = ambientAudioRef.current;
     if (!bg) return;
@@ -474,13 +477,19 @@ export function BookWrapper({
   );
 
   const handlePlayAllSentences = useCallback(async () => {
-    if (!activePageContent?.sentences?.length) return;
+    if (isPlayDisabled || !activePageContent?.sentences?.length) return;
     if (isPlayingPage) {
       stopAudio();
       return;
     }
     await runPageNarration(activePageContent.sentences);
-  }, [activePageContent, isPlayingPage, runPageNarration, stopAudio]);
+  }, [
+    isPlayDisabled,
+    activePageContent,
+    isPlayingPage,
+    runPageNarration,
+    stopAudio,
+  ]);
 
   const syncProgress = useCallback(
     (
@@ -501,14 +510,14 @@ export function BookWrapper({
     [book.id, selectedLang, onSaveProgress, outroPage, pagePronScores]
   );
 
-  // Read-Aloud Mic Assessment for the Active Page
+  // READ-ALONG: User reads the page out loud -> highlights words & unlocks page (NO score punishment!)
   const handleReadPageAloud = useCallback(async () => {
     if (!activePageContent?.sentences?.length) return;
     stopAudio();
 
-    if (isRecording && recordingMode === "page") {
+    if (isRecording && recordingTarget === "page") {
       stopRecording();
-      setRecordingMode(null);
+      setRecordingTarget(null);
       return;
     }
 
@@ -516,69 +525,74 @@ export function BookWrapper({
       .map((s) => s.textTarget.trim())
       .join(" ");
 
-    setRecordingMode("page");
+    setRecordingTarget("page");
     const rawResult = await assessSpeech(referenceText, selectedLang);
-    setRecordingMode(null);
+    setRecordingTarget(null);
 
-    const parsed = parseAzurePronunciation(rawResult);
-    if (parsed) {
-      playSfx(parsed.overallScore >= 70 ? "correct" : "tap");
-      const nextScores = { ...pagePronScores, [pageScoreKey]: parsed };
-      setPagePronScores(nextScores);
-      syncProgress(currentPage, completedCheckpoints, nextScores);
-    }
+    const parsed = parseAzurePronunciation(rawResult) ?? {
+      overallScore: 100,
+      wordScores: {},
+    };
+
+    playSfx("correct");
+    const nextScores = { ...pagePronScores, [pageScoreKey]: parsed };
+    setPagePronScores(nextScores);
+
+    // Mark page completed immediately without punishing for score
+    const nextSet = new Set(completedCheckpoints);
+    nextSet.add(currentPage);
+    setCompletedCheckpoints(nextSet);
+    syncProgress(currentPage, nextSet, nextScores);
   }, [
     activePageContent,
     stopAudio,
     isRecording,
-    recordingMode,
+    recordingTarget,
     stopRecording,
     assessSpeech,
     selectedLang,
     pagePronScores,
     pageScoreKey,
-    syncProgress,
-    currentPage,
     completedCheckpoints,
+    currentPage,
+    syncProgress,
   ]);
 
-  // Speak Checkpoint Assessment inside Drawer
+  // CHECKPOINT SPEAK: User speaks phrase -> highlights words & unlocks immediately (NO score punishment!)
   const handleCheckpointSpeak = useCallback(async () => {
     const targetPhrase =
       activePageContent?.checkpoint?.speakChallenge?.targetPhrase;
     if (!targetPhrase) return;
     stopAudio();
 
-    if (isRecording && recordingMode === "checkpoint") {
+    if (isRecording && recordingTarget === "checkpoint") {
       stopRecording();
-      setRecordingMode(null);
+      setRecordingTarget(null);
       return;
     }
 
-    setRecordingMode("checkpoint");
+    setRecordingTarget("checkpoint");
     const rawResult = await assessSpeech(targetPhrase, selectedLang);
-    setRecordingMode(null);
+    setRecordingTarget(null);
 
-    const parsed = parseAzurePronunciation(rawResult);
-    if (parsed) {
-      setCheckpointPronResult(parsed);
-      if (parsed.overallScore >= 60) {
-        playSfx("correct");
-        setEmojiBurstKey((prev) => prev + 1);
-        const nextSet = new Set(completedCheckpoints);
-        nextSet.add(currentPage);
-        setCompletedCheckpoints(nextSet);
-        syncProgress(currentPage, nextSet);
-      } else {
-        playSfx("wrong");
-        setWrongShakeKey((prev) => prev + 1);
-      }
-    }
+    const parsed = parseAzurePronunciation(rawResult) ?? {
+      overallScore: 100,
+      wordScores: {},
+    };
+
+    setCheckpointPronResult(parsed);
+    playSfx("correct");
+    setEmojiBurstKey((prev) => prev + 1);
+
+    const nextSet = new Set(completedCheckpoints);
+    nextSet.add(currentPage);
+    setCompletedCheckpoints(nextSet);
+    syncProgress(currentPage, nextSet);
   }, [
     activePageContent,
     stopAudio,
     isRecording,
-    recordingMode,
+    recordingTarget,
     stopRecording,
     assessSpeech,
     selectedLang,
@@ -587,17 +601,18 @@ export function BookWrapper({
     syncProgress,
   ]);
 
+  // Only auto-narrate in "listen" mode (NEVER in "read" mode!)
   useEffect(() => {
     stopAudio();
     cancelAssessment();
-    setRecordingMode(null);
+    setRecordingTarget(null);
     setCheckpointPronResult(null);
     setActiveVocab(null);
     setSelectedOption(null);
     setEmojiBurstKey(0);
 
     if (
-      autoReadAlong &&
+      readingMode === "listen" &&
       !isAudioMuted &&
       currentPage >= 1 &&
       currentPage <= totalPages &&
@@ -611,7 +626,7 @@ export function BookWrapper({
   }, [
     currentPage,
     selectedLang,
-    autoReadAlong,
+    readingMode,
     isAudioMuted,
     totalPages,
     activePageContent,
@@ -622,6 +637,7 @@ export function BookWrapper({
 
   const handleTapSentence = useCallback(
     async (index: number, sentence: BookSentence) => {
+      if (isPlayDisabled) return;
       stopAudio();
       sequenceCancelledRef.current = false;
       setActiveSentenceIdx(index);
@@ -631,7 +647,7 @@ export function BookWrapper({
         setActiveWordIdx(null);
       }
     },
-    [playSentenceWithWordTracking, stopAudio]
+    [isPlayDisabled, playSentenceWithWordTracking, stopAudio]
   );
 
   const handleTapVocab = useCallback(
@@ -680,9 +696,14 @@ export function BookWrapper({
     syncProgress(currentPage, nextSet);
   };
 
+  // GATING LOGIC:
+  // - In "read" mode (Read Along): user MUST read the page out loud to unlock Next Page.
+  // - In "listen" mode (Listen Along): user solves the page checkpoint to unlock Next Page.
   const isCurrentPageSolved = completedCheckpoints.has(currentPage);
   const isCurrentPageGated =
-    currentPage >= 1 && currentPage <= totalPages && !isCurrentPageSolved;
+    currentPage >= 1 &&
+    currentPage <= totalPages &&
+    (readingMode === "read" ? !hasReadCurrentPageAloud : !isCurrentPageSolved);
 
   const pageVocabSet = useMemo(() => {
     const map = new Map<string, PageDefinition>();
@@ -692,7 +713,6 @@ export function BookWrapper({
     return map;
   }, [activePageContent?.definitions]);
 
-  // Helper to get inline pronunciation highlight class for a word on the page
   const getWordPronClass = (wordToken: string, flatWordIdx: number) => {
     if (!currentPagePron) return null;
     const key = cleanTokenKey(wordToken);
@@ -728,7 +748,7 @@ export function BookWrapper({
       )}
 
       {/* =====================================================================
-          1. 3D TACTILE HEADER BAR
+          1. 3D TACTILE HEADER BAR (With Read-Along vs Listen-Along Mode Switch)
           ===================================================================== */}
       <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 backdrop-blur-md sm:px-8">
         <button
@@ -769,21 +789,36 @@ export function BookWrapper({
           </div>
         </div>
 
-        {/* Right Controls */}
+        {/* Right Controls: Mode Switch (Read Along vs Listen Along) + Speed + Lang + Music */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAutoReadAlong((prev) => !prev)}
-            className={`hidden items-center gap-1.5 rounded-xl border-b-[3px] px-3 py-1.5 text-[11px] font-black transition active:translate-y-0.5 active:border-b-0 md:inline-flex ${
-              autoReadAlong
-                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
-                : "border-slate-300 bg-slate-100 text-slate-500"
-            }`}
-            title="Automatically narrate each page when turning pages"
-          >
-            <Headphones className="h-3.5 w-3.5" />
-            <span>Read-Along: {autoReadAlong ? "ON" : "OFF"}</span>
-          </button>
+          <div className="hidden items-center rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70 md:flex">
+            <button
+              type="button"
+              onClick={() => setReadingMode("read")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black transition ${
+                readingMode === "read"
+                  ? "bg-emerald-500 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="You read each page out loud"
+            >
+              <Mic className="h-3.5 w-3.5" />
+              <span>Read Along</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setReadingMode("listen")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black transition ${
+                readingMode === "listen"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              title="Narrator reads each page to you"
+            >
+              <Headphones className="h-3.5 w-3.5" />
+              <span>Listen Along</span>
+            </button>
+          </div>
 
           <div className="hidden items-center gap-0.5 rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70 sm:flex">
             <Gauge className="mx-1.5 h-3.5 w-3.5 text-blue-600" />
@@ -865,7 +900,7 @@ export function BookWrapper({
       <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-3 sm:px-6">
         <AnimatePresence mode="wait">
           {currentPage === 0 ? (
-            /* ================= PAGE 0: CINEMATIC COVER ================= */
+            /* ================= PAGE 0: CINEMATIC COVER + MODE CHOICE ================= */
             <motion.div
               key="book-intro"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -873,7 +908,7 @@ export function BookWrapper({
               exit={{ opacity: 0, scale: 0.98 }}
               className="relative w-full overflow-hidden rounded-[2.25rem] border-2 border-b-[6px] border-slate-900 bg-slate-950 shadow-2xl"
             >
-              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950">
+              <div className="relative aspect-[16/9] min-h-[440px] w-full overflow-hidden bg-slate-950">
                 {book.mediaUrls?.introVideoUrl ? (
                   <video
                     src={book.mediaUrls.introVideoUrl}
@@ -899,7 +934,7 @@ export function BookWrapper({
                     className="h-full w-full object-cover"
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
 
                 <div className="absolute inset-x-0 bottom-0 flex flex-col items-start justify-end p-6 text-white sm:p-10">
                   <div className="mb-3 flex items-center gap-2">
@@ -918,7 +953,66 @@ export function BookWrapper({
                     {currentTranslation?.synopsis}
                   </p>
 
-                  <div className="mt-6 flex w-full flex-wrap items-center justify-between gap-4">
+                  {/* CHOOSE HOW TO EXPERIENCE THIS STORY */}
+                  <div className="mt-5 grid w-full max-w-xl grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setReadingMode("read")}
+                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-3 text-left transition-all ${
+                        readingMode === "read"
+                          ? "border-emerald-400 bg-emerald-950/85 text-white shadow-lg"
+                          : "border-white/20 bg-white/10 text-white/75 backdrop-blur-md hover:bg-white/15"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          readingMode === "read"
+                            ? "bg-emerald-400 text-slate-950"
+                            : "bg-white/15 text-white"
+                        }`}
+                      >
+                        <Mic className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wide">
+                          Read Along (You Speak)
+                        </p>
+                        <p className="text-[11px] text-white/75">
+                          Read each page out loud with live word highlights
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReadingMode("listen")}
+                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-3 text-left transition-all ${
+                        readingMode === "listen"
+                          ? "border-sky-400 bg-sky-950/85 text-white shadow-lg"
+                          : "border-white/20 bg-white/10 text-white/75 backdrop-blur-md hover:bg-white/15"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          readingMode === "listen"
+                            ? "bg-sky-400 text-slate-950"
+                            : "bg-white/15 text-white"
+                        }`}
+                      >
+                        <Headphones className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wide">
+                          Listen Along (AI Narrator)
+                        </p>
+                        <p className="text-[11px] text-white/75">
+                          Narrator reads to you • Answer checkpoints
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="mt-5 flex w-full flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3 rounded-full border border-white/15 bg-white/15 py-1.5 pr-4 pl-1.5 backdrop-blur-md">
                       <img
                         src={book.characterAvatarUrl}
@@ -935,8 +1029,16 @@ export function BookWrapper({
                       onClick={handleNextPage}
                       className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 sm:text-base"
                     >
-                      <Play className="h-4 w-4 fill-current" />
-                      <span>Start Story</span>
+                      {readingMode === "read" ? (
+                        <Mic className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4 fill-current" />
+                      )}
+                      <span>
+                        {readingMode === "read"
+                          ? "Start Read-Along"
+                          : "Start Listen-Along"}
+                      </span>
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -985,17 +1087,12 @@ export function BookWrapper({
                     </span>
 
                     {currentPagePron && (
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-black shadow-sm backdrop-blur-md ${
-                          currentPagePron.overallScore >= 80
-                            ? "border-emerald-400/50 bg-emerald-950/80 text-emerald-300"
-                            : currentPagePron.overallScore >= 60
-                              ? "border-amber-400/50 bg-amber-950/80 text-amber-300"
-                              : "border-rose-400/50 bg-rose-950/80 text-rose-300"
-                        }`}
-                      >
-                        <Mic className="h-3.5 w-3.5" />
-                        <span>Pronunciation: {currentPagePron.overallScore}%</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-950/80 px-3 py-1 text-xs font-black text-emerald-300 shadow-sm backdrop-blur-md">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>
+                          Read Aloud ({currentPagePron.overallScore}%) • Tap any
+                          word to hear
+                        </span>
                       </span>
                     )}
                   </div>
@@ -1026,23 +1123,52 @@ export function BookWrapper({
                   </button>
                 </div>
 
-                {/* CINEMA SUBTITLE STAGE (With Play + Read-Aloud Mic + Word Pronunciation Highlighting) */}
+                {/* CINEMA SUBTITLE STAGE */}
                 <div className="absolute inset-x-4 bottom-3 z-10 flex items-end justify-between gap-4 sm:inset-x-7 sm:bottom-5">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {/* Play Narration Button */}
+                    {/* In Read-Along mode, Mic is the primary button; Play is locked until they read the page! */}
+                    {readingMode === "read" && (
+                      <button
+                        type="button"
+                        onClick={handleReadPageAloud}
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                          recordingTarget === "page" &&
+                          pronStatus === "listening"
+                            ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
+                            : recordingTarget === "page" &&
+                                pronStatus === "analyzing"
+                              ? "border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
+                              : "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                        }`}
+                        title="Tap and read this page out loud"
+                      >
+                        {recordingTarget === "page" &&
+                        pronStatus === "analyzing" ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </button>
+                    )}
+
+                    {/* Play Narration Button (Disabled in Read-Along mode until user has read the page!) */}
                     <button
                       type="button"
                       onClick={handlePlayAllSentences}
-                      disabled={isRecording}
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
-                        isPlayingPage
-                          ? "border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
-                          : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
+                      disabled={isPlayDisabled}
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all ${
+                        isPlayDisabled
+                          ? "cursor-not-allowed border-slate-700 bg-slate-800/80 text-slate-500"
+                          : isPlayingPage
+                            ? "border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
+                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
                       }`}
                       title={
-                        isPlayingPage
-                          ? "Stop reading"
-                          : "Listen to page word-by-word"
+                        isPlayDisabled
+                          ? "Read this page out loud first to unlock narrator audio"
+                          : isPlayingPage
+                            ? "Stop narrator"
+                            : "Listen to narrator"
                       }
                     >
                       {isPlayingPage ? (
@@ -1052,34 +1178,21 @@ export function BookWrapper({
                       )}
                     </button>
 
-                    {/* Read-Aloud Pronunciation Mic Button */}
-                    <button
-                      type="button"
-                      onClick={handleReadPageAloud}
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
-                        recordingMode === "page" && pronStatus === "listening"
-                          ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
-                          : recordingMode === "page" &&
-                              pronStatus === "analyzing"
-                            ? "border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
-                            : "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                      }`}
-                      title="Read this page out loud to score and highlight your pronunciation"
-                    >
-                      {recordingMode === "page" &&
-                      pronStatus === "analyzing" ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Mic className="h-5 w-5" />
-                      )}
-                    </button>
-
                     <div className="min-w-0 flex-1 space-y-1">
-                      {recordingMode === "page" && pronStatus !== "idle" && (
+                      {readingMode === "read" &&
+                        !hasReadCurrentPageAloud &&
+                        pronStatus === "idle" && (
+                          <p className="text-xs font-black tracking-wide text-emerald-300 uppercase">
+                            🎙️ Your turn: Tap the Mic and read this page out loud
+                            to continue
+                          </p>
+                        )}
+
+                      {recordingTarget === "page" && pronStatus !== "idle" && (
                         <p className="text-xs font-black tracking-wide text-amber-300 uppercase">
                           {pronStatus === "listening"
-                            ? "🎙️ Listening... Read the page out loud (tap mic when done)"
-                            : "✨ Scoring your pronunciation..."}
+                            ? "🎙️ Listening... Read the page out loud (tap mic when finished)"
+                            : "✨ Highlighting your pronunciation..."}
                         </p>
                       )}
 
@@ -1092,7 +1205,11 @@ export function BookWrapper({
                             <span
                               key={sent.sentenceIndex ?? sIdx}
                               onClick={() => handleTapSentence(sIdx, sent)}
-                              className={`mr-2.5 inline cursor-pointer rounded-lg px-1 py-0.5 transition-opacity ${
+                              className={`mr-2.5 inline rounded-lg px-1 py-0.5 transition-opacity ${
+                                isPlayDisabled
+                                  ? "cursor-default"
+                                  : "cursor-pointer"
+                              } ${
                                 activeSentenceIdx !== null && !isSentenceActive
                                   ? "opacity-65 hover:opacity-100"
                                   : "opacity-100"
@@ -1221,17 +1338,38 @@ export function BookWrapper({
                   </button>
 
                   {isCurrentPageGated ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSfx("tap");
-                        setIsCheckpointDrawerOpen(true);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                      <span>Answer Checkpoint</span>
-                    </button>
+                    readingMode === "read" ? (
+                      <button
+                        type="button"
+                        onClick={handleReadPageAloud}
+                        className={`inline-flex items-center gap-2 rounded-2xl border-b-4 px-5 py-2.5 text-xs font-black shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                          recordingTarget === "page" &&
+                          pronStatus === "listening"
+                            ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
+                            : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/20"
+                        }`}
+                      >
+                        <Mic className="h-4 w-4" />
+                        <span>
+                          {recordingTarget === "page" &&
+                          pronStatus === "listening"
+                            ? "Tap When Done Reading"
+                            : "Read Page Out Loud to Continue"}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSfx("tap");
+                          setIsCheckpointDrawerOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        <span>Answer Checkpoint</span>
+                      </button>
+                    )
                   ) : (
                     <button
                       type="button"
@@ -1306,7 +1444,7 @@ export function BookWrapper({
       </main>
 
       {/* =====================================================================
-          3. ZERO-SHIFT GAMIFIED CHECKPOINT DRAWER + REAL SPEAK ASSESSMENT
+          3. CHECKPOINT DRAWER (Zero Score Punishment on Speak Challenges)
           ===================================================================== */}
       <AnimatePresence>
         {isCheckpointDrawerOpen && activePageContent?.checkpoint && (
@@ -1446,7 +1584,6 @@ export function BookWrapper({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Speak Phrase Box with Word-by-Word Pronunciation Highlights */}
                   <div className="rounded-2xl bg-sky-50 p-4 text-center">
                     <p className="flex flex-wrap items-center justify-center gap-1.5 text-lg font-black text-sky-900">
                       {(
@@ -1490,7 +1627,7 @@ export function BookWrapper({
                     type="button"
                     onClick={handleCheckpointSpeak}
                     className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 py-3.5 text-sm font-black transition ${
-                      recordingMode === "checkpoint" &&
+                      recordingTarget === "checkpoint" &&
                       pronStatus === "listening"
                         ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
                         : isCurrentPageSolved
@@ -1498,22 +1635,22 @@ export function BookWrapper({
                           : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
                     }`}
                   >
-                    {recordingMode === "checkpoint" &&
+                    {recordingTarget === "checkpoint" &&
                     pronStatus === "analyzing" ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Scoring Pronunciation...</span>
+                        <span>Highlighting Pronunciation...</span>
                       </>
                     ) : (
                       <>
                         <Mic className="h-4 w-4" />
                         <span>
-                          {recordingMode === "checkpoint" &&
+                          {recordingTarget === "checkpoint" &&
                           pronStatus === "listening"
                             ? "Listening... Tap when done"
                             : isCurrentPageSolved
-                              ? `Awesome Pronunciation (${checkpointPronResult?.overallScore ?? 100}%)! 🎉`
-                              : "Tap & Speak Phrase Out Loud"}
+                              ? "Great Job Reading! 🎉"
+                              : "Tap & Read Phrase Out Loud"}
                         </span>
                       </>
                     )}
@@ -1521,7 +1658,6 @@ export function BookWrapper({
                 </div>
               )}
 
-              {/* RESERVED FIXED-HEIGHT FEEDBACK & CONTINUE SLOT */}
               <div className="mt-4 flex min-h-[76px] items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
                 <div className="flex-1 text-xs leading-relaxed">
                   {selectedOption ? (
@@ -1540,14 +1676,9 @@ export function BookWrapper({
                       </span>
                       {selectedOption.spriteReaction}
                     </motion.p>
-                  ) : checkpointPronResult && !isCurrentPageSolved ? (
-                    <p className="font-semibold text-rose-700">
-                      Scored {checkpointPronResult.overallScore}% — try saying the
-                      red/amber words one more time!
-                    </p>
                   ) : isCurrentPageSolved ? (
                     <p className="font-semibold text-emerald-700">
-                      🎉 Checkpoint cleared! You&apos;re ready for the next page.
+                      🎉 Challenge complete! You&apos;re ready for the next page.
                     </p>
                   ) : (
                     <p className="font-medium text-slate-400">
