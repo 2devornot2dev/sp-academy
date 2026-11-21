@@ -1,4 +1,3 @@
-// components/foundation/boss/boss-foundation-client.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -88,7 +87,7 @@ export default function BossFoundationClient({
 
   const avatarKeys = useMemo(() => getBossAvatarKeys(boss), [boss]);
 
-const allKeys = useMemo(() => {
+  const allKeys = useMemo(() => {
     const keys: (string | undefined)[] = [
       avatarKeys.default,
       boss?.coverUrl ?? undefined,
@@ -129,15 +128,15 @@ const allKeys = useMemo(() => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col justify-center overflow-hidden animate-bg p-4 sm:p-6">
+    <div className="relative flex min-h-full w-full flex-col justify-center overflow-x-hidden animate-bg p-3 sm:p-6">
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       {!hasStarted ? (
-        <div className="relative z-10 flex w-full flex-col items-center justify-center py-6">
+        <div className="relative z-10 flex w-full flex-col items-center justify-center py-2 sm:py-6">
           {/* 3D Tactile Pre-Boss Arena Card */}
-          <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white text-center shadow-2xl">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white text-center shadow-2xl sm:rounded-[2rem]">
             {/* Widescreen Cover Banner */}
-            <div className="relative h-60 w-full bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 sm:h-72">
+            <div className="relative h-44 w-full bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 sm:h-64 md:h-72">
               {resolvedCoverUrl ? (
                 <img
                   src={resolvedCoverUrl}
@@ -154,15 +153,15 @@ const allKeys = useMemo(() => {
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-slate-950/30" />
 
               {/* Top-left Milestone Badge */}
-              <div className="absolute top-5 left-5 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-slate-950/60 px-3.5 py-1.5 text-xs font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
-                <Sparkles size={14} className="text-amber-300" />
+              <div className="absolute top-3.5 left-3.5 sm:top-5 sm:left-5 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-slate-950/60 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-xs font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
+                <Sparkles size={13} className="text-amber-300" />
                 Milestone {milestoneIndex} Boss Arena
               </div>
 
               {/* Top-right Attempts / Best Score pill */}
               {attempts > 0 && (
-                <div className="absolute top-5 right-5 flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/60 px-3.5 py-1.5 text-xs font-black text-white shadow-sm backdrop-blur-md">
-                  <RotateCcw size={13} className="text-sky-300" />
+                <div className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/60 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-xs font-black text-white shadow-sm backdrop-blur-md">
+                  <RotateCcw size={12} className="text-sky-300" />
                   Attempt #{attempts + 1}
                   {bestScore !== null &&
                     ` • Last: ${bestScore}/${totalExercises}`}
@@ -171,9 +170,9 @@ const allKeys = useMemo(() => {
             </div>
 
             {/* Card Body */}
-            <div className="relative px-6 pt-16 pb-8 sm:px-10">
-              {/* Overlapping 3D Squircle Boss Avatar (Matches AI Tutor Portrait) */}
-              <div className="absolute -top-14 left-1/2 flex h-28 w-28 -translate-x-1/2 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl">
+            <div className="relative px-4 pt-14 pb-6 sm:px-10 sm:pt-16 sm:pb-8">
+              {/* Overlapping 3D Squircle Boss Avatar */}
+              <div className="absolute -top-12 left-1/2 flex h-24 w-24 -translate-x-1/2 items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl sm:-top-14 sm:h-28 sm:w-28 sm:rounded-[2rem]">
                 {isLoading && !resolvedDefaultAvatarUrl ? (
                   <Loader2 className="animate-spin text-sky-300" size={32} />
                 ) : (
@@ -185,59 +184,59 @@ const allKeys = useMemo(() => {
                 )}
               </div>
 
-              <h1 className="mb-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              <h1 className="mb-3 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">
                 {boss?.name || "Milestone Boss"}
               </h1>
 
               {/* Persona Bio Card */}
-              <div className="mb-6 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-6 py-4 text-center shadow-2xs">
-                <p className="text-sm font-bold leading-relaxed text-slate-700 sm:text-[15px]">
+              <div className="mb-5 sm:mb-6 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-4 py-3 sm:px-6 sm:py-4 text-center shadow-2xs">
+                <p className="text-xs sm:text-[15px] font-bold leading-relaxed text-slate-700">
                   {boss?.persona ||
                     "Prove your language skills in this final milestone checkpoint."}
                 </p>
               </div>
 
               {/* 3-Column 3D Tactile Stats Row */}
-              <div className="mb-7 grid w-full grid-cols-3 gap-3 sm:gap-4">
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/60 py-3.5">
-                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">
-                    <Target size={18} strokeWidth={2.5} />
+              <div className="mb-6 sm:mb-7 grid w-full grid-cols-3 gap-2.5 sm:gap-4">
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/60 py-3 sm:py-3.5">
+                  <div className="mb-0.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">
+                    <Target size={16} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                  <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-blue-600 uppercase">
                     Challenges
                   </span>
-                  <span className="text-2xl font-black text-slate-900">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">
                     {totalExercises}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-emerald-200 border-b-emerald-300 bg-emerald-50/60 py-3.5">
-                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs">
-                    <Trophy size={18} strokeWidth={2.5} />
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-emerald-200 border-b-emerald-300 bg-emerald-50/60 py-3 sm:py-3.5">
+                  <div className="mb-0.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs">
+                    <Trophy size={16} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                  <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-emerald-600 uppercase">
                     To Pass
                   </span>
-                  <span className="text-2xl font-black text-slate-900">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">
                     {passingScore}/{totalExercises}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-rose-200 border-b-rose-300 bg-rose-50/60 py-3.5">
-                  <div className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl border-b-2 border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-2xs">
-                    <ShieldAlert size={18} strokeWidth={2.5} />
+                <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-rose-200 border-b-rose-300 bg-rose-50/60 py-3 sm:py-3.5">
+                  <div className="mb-0.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border-b-2 border-rose-800 bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-2xs">
+                    <ShieldAlert size={16} strokeWidth={2.5} />
                   </div>
-                  <span className="text-[10px] font-black tracking-widest text-rose-600 uppercase">
+                  <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-rose-600 uppercase">
                     Lives
                   </span>
-                  <span className="text-2xl font-black text-slate-900">3</span>
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">3</span>
                 </div>
               </div>
 
               <button
                 onClick={handleStartEncounter}
                 disabled={isLoading}
-                className={`group relative flex w-full items-center justify-center gap-2.5 rounded-2xl border-b-4 py-4 text-base font-black text-white shadow-xl transition-all ${
+                className={`group relative flex w-full items-center justify-center gap-2.5 rounded-2xl border-b-4 py-3.5 sm:py-4 text-sm sm:text-base font-black text-white shadow-xl transition-all ${
                   isLoading
                     ? "cursor-not-allowed border-slate-300 bg-slate-300"
                     : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"

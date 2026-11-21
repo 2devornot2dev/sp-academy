@@ -25,7 +25,7 @@ import { QuizStep } from "./quiz-step";
 import { FreestyleStep } from "./freestyle-step";
 import { OutroStep } from "./outro-step";
 
-import { WordAudioProvider } from "@/context/word-audio-context";
+import { WordAudioProvider, useWordAudio } from "@/context/word-audio-context";
 import { MatrixProvider, useMatrix } from "@/context/matrix-context";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { completeLesson } from "@/app/actions/complete-lesson";
@@ -79,6 +79,16 @@ const STEPS_CONFIG = [
   },
 ];
 
+function AudioStepGuard({ step }: { step: number }) {
+  const { stopAudio } = useWordAudio();
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [step, stopAudio]);
+  return null;
+}
+
 interface FoundationContentProps {
   foundation: NonNullable<UserFoundation>;
 }
@@ -89,6 +99,10 @@ function FoundationContent({ foundation }: FoundationContentProps) {
 
   const { syncCart } = useMatrix();
   const router = useRouter();
+
+  useEffect(() => {
+    preloadSfx();
+  }, []);
 
   const userId = foundation.userId;
   const courseId = foundation.foundationCourseId;
@@ -123,10 +137,6 @@ function FoundationContent({ foundation }: FoundationContentProps) {
     spoon: nextLessonNumber,
     isOnboarding: false,
   };
-
-  useEffect(() => {
-    preloadSfx();
-  }, []);
 
   const handleNext = (nextStepIndex: number) => {
     playSfx(nextStepIndex === 8 ? "victory" : "round-clear");
@@ -222,8 +232,8 @@ function FoundationContent({ foundation }: FoundationContentProps) {
                   }).catch((err) =>
                     console.error(
                       "Failed to trigger milestone boss & next spoon:",
-                      err,
-                    ),
+                      err
+                    )
                   );
                 }
 
@@ -244,16 +254,43 @@ function FoundationContent({ foundation }: FoundationContentProps) {
   };
 
   const progressPct = Math.round(
-    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100,
+    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100
   );
 
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 p-4 md:flex-row md:gap-8 md:p-8">
+      <AudioStepGuard step={step} />
+
+      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-3 p-3 sm:gap-5 sm:p-5 md:flex-row md:gap-8 md:p-8">
         {/* =================================================================
-            LEFT SIDEBAR: 3D PRIMARY BLUE SPOON STEPPER CARD
+            MOBILE-ONLY SLIM TOP PROGRESS HEADER (< md)
             ================================================================= */}
-        <div className="flex h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200/80 md:w-72 md:p-7 lg:w-80">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-xs ring-1 ring-slate-200/80 md:hidden">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-gradient-to-b from-sky-400 to-blue-600 px-2 py-0.5 text-[10px] font-black tracking-wide text-white uppercase">
+                Spoon {currentSpoon}
+              </span>
+              <span className="truncate text-xs font-black text-slate-900">
+                {STEPS_CONFIG[step - 1]?.title}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all duration-500"
+                style={{ width: `${Math.max(12, progressPct)}%` }}
+              />
+            </div>
+          </div>
+          <span className="shrink-0 text-xs font-black text-blue-600">
+            {step}/8
+          </span>
+        </div>
+
+        {/* =================================================================
+            LEFT SIDEBAR: 3D PRIMARY BLUE SPOON STEPPER CARD (md+)
+            ================================================================= */}
+        <div className="hidden h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200/80 md:flex md:w-72 md:p-7 lg:w-80">
           <div>
             {/* Primary Blue 3D Spoon Badge (Distinct from Vocab Bridge's Amber!) */}
             <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-3 py-1 text-[11px] font-black tracking-wide text-white uppercase shadow-2xs">
@@ -361,7 +398,7 @@ function FoundationContent({ foundation }: FoundationContentProps) {
         {/* =================================================================
             RIGHT SIDE: MAIN INTERACTIVE STAGE CARD
             ================================================================= */}
-        <div className="relative flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-200/80">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/80 md:min-h-[620px] md:rounded-[2rem]">
           {isFinishing && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/85 backdrop-blur-xs">
               <Loader2 className="h-9 w-9 animate-spin text-blue-600" />

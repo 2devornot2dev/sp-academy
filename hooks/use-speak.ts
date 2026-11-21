@@ -5,33 +5,91 @@ import { useState, useRef, useCallback, useEffect } from "react";
 export function useSpeak() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const operationIdRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  // Initialize audio element
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+
+  const stop = useCallback(() => {
+    operationIdRef.current += 1;
+
+    abortRef.current?.abort();
+    abortRef.current = null;
+
+    readerRef.current?.cancel().catch(() => {});
+    readerRef.current = null;
+
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+
+    revokeObjectUrl();
+    if (mountedRef.current) {
+      setIsLoading(false);
+      setIsPlaying(false);
+    }
+  }, [revokeObjectUrl]);
+
   useEffect(() => {
+    mountedRef.current = true;
     const audio = new Audio();
     audioRef.current = audio;
 
-    const onPlay = () => setIsPlaying(true);
-    const onEnded = () => setIsPlaying(false);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      if (mountedRef.current) {
+        setIsLoading(false);
+        setIsPlaying(true);
+      }
+    };
+    const onEnded = () => {
+      if (mountedRef.current) {
+        setIsLoading(false);
+        setIsPlaying(false);
+      }
+    };
+    const onPause = () => {
+      if (mountedRef.current) setIsPlaying(false);
+    };
 
     audio.addEventListener("play", onPlay);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("pause", onPause);
 
     return () => {
+      mountedRef.current = false;
+      operationIdRef.current += 1;
+
+      abortRef.current?.abort();
+      abortRef.current = null;
+
+      readerRef.current?.cancel().catch(() => {});
+      readerRef.current = null;
+
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("pause", onPause);
+
       audio.pause();
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
+      audio.removeAttribute("src");
+      audio.load();
+
+      revokeObjectUrl();
+      audioRef.current = null;
     };
-  }, []);
+  }, [revokeObjectUrl]);
 
   const speak = useCallback(
     async (
@@ -40,19 +98,19 @@ export function useSpeak() {
       speed: number = 0.9,
       gender?: "male" | "female",
     ) => {
-      try {
-        setIsLoading(true);
-        abortRef.current?.abort();
-        abortRef.current = new AbortController();
+      stop();
 
-        // Cleanup previous playback
-        if (audioRef.current) {
-          audioRef.current.pause();
-          if (objectUrlRef.current) {
-            URL.revokeObjectURL(objectUrlRef.current);
-            objectUrlRef.current = null;
-          }
-        }
+      const operationId = operationIdRef.current;
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const isCurrent = () =>
+        mountedRef.current &&
+        operationId === operationIdRef.current &&
+        !controller.signal.aborted;
+
+      try {
+        if (mountedRef.current) setIsLoading(true);
 
         const response = await fetch("/api/tts", {
           method: "POST",
@@ -63,46 +121,59 @@ export function useSpeak() {
             speed,
             gender,
           }),
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         });
 
+        if (!isCurrent()) return;
         if (!response.ok) throw new Error("Failed to generate speech");
         if (!response.body) throw new Error("No stream body");
 
-        const mimeType = "audio/mpeg";
+        const audio = audioRef.current;
+        if (!audio) return;
 
-        // Check if browser supports MSE for MP3 streaming
+        const mimeType = "audio/mpeg";
         const canStreamMse =
           typeof MediaSource !== "undefined" &&
           MediaSource.isTypeSupported(mimeType);
 
-        if (canStreamMse && audioRef.current) {
-          // ========== STREAMING PATH (Chrome/Edge/Firefox) ==========
+        if (canStreamMse) {
           const mediaSource = new MediaSource();
           const streamUrl = URL.createObjectURL(mediaSource);
           objectUrlRef.current = streamUrl;
-          audioRef.current.src = streamUrl;
+          audio.src = streamUrl;
 
-          // Wait for MediaSource to open
-          await new Promise<void>((resolve) => {
-            mediaSource.addEventListener("sourceopen", () => resolve(), {
-              once: true,
-            });
+          await new Promise<void>((resolve, reject) => {
+            const onOpen = () => {
+              cleanup();
+              resolve();
+            };
+            const onAbort = () => {
+              cleanup();
+              reject(new DOMException("Aborted", "AbortError"));
+            };
+            const cleanup = () => {
+              mediaSource.removeEventListener("sourceopen", onOpen);
+              controller.signal.removeEventListener("abort", onAbort);
+            };
+            mediaSource.addEventListener("sourceopen", onOpen, { once: true });
+            controller.signal.addEventListener("abort", onAbort, { once: true });
           });
+
+          if (!isCurrent()) return;
 
           const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
           const reader = response.body.getReader();
+          readerRef.current = reader;
+
           const queue: Uint8Array[] = [];
           let streamDone = false;
 
-          // Drain the queue whenever the sourceBuffer is ready
           const drainQueue = () => {
-            if (sourceBuffer.updating) return;
+            if (!isCurrent() || sourceBuffer.updating) return;
 
             if (queue.length > 0) {
               const chunk = queue.shift()!;
               try {
-                // 💡 Fix: cast the stream chunk to BufferSource
                 sourceBuffer.appendBuffer(chunk as BufferSource);
               } catch (err) {
                 console.error("MSE append error:", err);
@@ -124,53 +195,48 @@ export function useSpeak() {
 
           sourceBuffer.addEventListener("updateend", drainQueue);
 
-          // Start playback as soon as the pipeline is ready — audio will
-          // begin when the first chunk is appended
-          setIsLoading(false);
-          audioRef.current.play().catch(() => {});
+          if (mountedRef.current) setIsLoading(false);
+          audio.play().catch(() => {});
 
-          // Read chunks from the network as fast as they arrive
-          while (!streamDone) {
-            const { done, value } = await reader.read();
-            if (done) {
-              streamDone = true;
+          try {
+            while (isCurrent() && !streamDone) {
+              const { done, value } = await reader.read();
+              if (!isCurrent()) break;
+              if (done) {
+                streamDone = true;
+                drainQueue();
+                break;
+              }
+              queue.push(value);
               drainQueue();
-              break;
             }
-            queue.push(value);
-            drainQueue();
+          } finally {
+            sourceBuffer.removeEventListener("updateend", drainQueue);
+            if (readerRef.current === reader) readerRef.current = null;
           }
         } else {
-          // ========== SAFARI FALLBACK: buffer blob ==========
           const audioBlob = await response.blob();
+          if (!isCurrent()) return;
+
           const blobUrl = URL.createObjectURL(audioBlob);
           objectUrlRef.current = blobUrl;
+          audio.src = blobUrl;
 
-          if (audioRef.current) {
-            audioRef.current.src = blobUrl;
-            setIsLoading(false);
-            await audioRef.current.play();
-          }
+          if (mountedRef.current) setIsLoading(false);
+          await audio.play();
         }
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           console.error("TTS Error:", error);
         }
-        setIsLoading(false);
-        setIsPlaying(false);
+        if (isCurrent()) {
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
       }
     },
-    [],
+    [stop],
   );
-
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-    }
-  }, []);
 
   return { speak, stop, isPlaying, isLoading };
 }

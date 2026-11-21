@@ -17,6 +17,7 @@ import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
 import { useSpeakWord, cleanWord } from "@/components/foundation/word-tap";
 import { getPresignedUrls } from "@/app/actions/s3";
+import { playSfx } from "@/lib/sfx";
 
 // Extracts gender icon, badge theme, and splits article ("le", "la", "l'") from the root noun
 function parseWordLinguistics(rawWord: string): {
@@ -188,6 +189,7 @@ export function VocabMomentStep({
     speak(item.word);
 
     if (!allHeard) {
+      playSfx("tap");
       setHeardIndices((prev) => {
         const next = new Set(prev);
         next.add(idx);
@@ -200,6 +202,8 @@ export function VocabMomentStep({
       if (matchedIndices.has(idx)) return;
 
       if (idx === activeQuizTargetIdx) {
+        const willComplete = matchedIndices.size + 1 >= totalWords;
+        playSfx(willComplete ? "spark" : "correct");
         setWrongIdx(null);
         setMatchedIndices((prev) => {
           const next = new Set(prev);
@@ -207,6 +211,7 @@ export function VocabMomentStep({
           return next;
         });
       } else {
+        playSfx("wrong");
         setWrongIdx(idx);
         setTimeout(() => setWrongIdx(null), 500);
       }
@@ -219,13 +224,13 @@ export function VocabMomentStep({
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col justify-between p-6 sm:p-8 animate-in fade-in duration-500">
+    <div className="flex h-full flex-1 flex-col justify-between p-4 sm:p-8 animate-in fade-in duration-500">
       {/* =====================================================================
           1. CLEAN HEADER + PICTURE/AUDIO CONNECTION BANNER
           ===================================================================== */}
-      <div className="space-y-4 text-center">
+      <div className="space-y-3 sm:space-y-4 text-center">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+          <h2 className="text-xl font-black tracking-tight text-slate-900 sm:text-3xl">
             {allMatched
               ? "Vocabulary Locked In! 🎉"
               : allHeard
@@ -242,9 +247,9 @@ export function VocabMomentStep({
         </div>
 
         {/* Live Step / Target Prompt Banner */}
-        <div className="mx-auto flex max-w-xl items-center justify-center gap-3.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50/90 px-5 py-3 shadow-2xs">
+        <div className="mx-auto flex max-w-xl items-center justify-center gap-3 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50/90 px-4 py-2.5 sm:px-5 sm:py-3 shadow-2xs">
           {allHeard && !allMatched && activeQuizImageUrl ? (
-            <div className="h-14 w-16 shrink-0 overflow-hidden rounded-xl border-2 border-amber-300 bg-white shadow-xs">
+            <div className="h-12 w-14 sm:h-14 sm:w-16 shrink-0 overflow-hidden rounded-xl border-2 border-amber-300 bg-white shadow-xs">
               <img
                 src={activeQuizImageUrl}
                 alt={activeQuizItem?.gloss || "Target"}
@@ -253,7 +258,7 @@ export function VocabMomentStep({
             </div>
           ) : (
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-white shadow-2xs ${
+              className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-white shadow-2xs ${
                 allMatched
                   ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600"
                   : allHeard
@@ -271,7 +276,7 @@ export function VocabMomentStep({
             </div>
           )}
 
-          <div className="text-left">
+          <div className="min-w-0 text-left">
             {!allHeard ? (
               <>
                 <p className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
@@ -312,8 +317,8 @@ export function VocabMomentStep({
       {/* =====================================================================
           2. VERTICALLY CENTERED 3D PICTURE + LINGUISTIC CARDS GRID
           ===================================================================== */}
-      <div className="my-auto py-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="my-auto py-3 sm:py-4">
+        <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-3">
           {data.map((item, idx) => {
             const isSpeakingThis = isPlaying && activeWord === item.word;
             const isHeard = heardIndices.has(idx);
@@ -329,7 +334,7 @@ export function VocabMomentStep({
                 key={idx}
                 type="button"
                 onClick={() => handleCardTap(idx, item)}
-                className={`group relative flex flex-col items-center justify-between overflow-hidden rounded-3xl p-4 text-center transition-all duration-200 focus:outline-none sm:p-5 ${
+                className={`group relative flex min-w-0 flex-col items-center justify-between overflow-hidden rounded-3xl p-4 text-center transition-all duration-200 focus:outline-none sm:p-5 ${
                   isWrongShake
                     ? "translate-x-1 border-2 border-b-[6px] border-rose-400 bg-rose-50/70"
                     : isMatched
@@ -367,9 +372,9 @@ export function VocabMomentStep({
                   )}
                 </div>
 
-                {/* Visual Scene Thumbnail (from prunaai/p-image) OR 3D Speaker Tile Fallback */}
+                {/* Visual Scene Thumbnail OR 3D Speaker Tile Fallback */}
                 {imageUrl ? (
-                  <div className="relative mb-3.5 h-32 w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner sm:h-36">
+                  <div className="relative mb-3.5 h-40 w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner sm:h-36">
                     <img
                       src={imageUrl}
                       alt={item.word}
@@ -427,8 +432,8 @@ export function VocabMomentStep({
                   </h3>
                 </div>
 
-                {/* Bottom Meaning & Memory Hook Slot */}
-                <div className="w-full space-y-1.5 rounded-2xl bg-slate-50 px-3.5 py-2.5 ring-1 ring-slate-200/70">
+                {/* Bottom Meaning & Memory Hook Slot (cleanly wraps, never clips) */}
+                <div className="w-full space-y-1.5 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200/70">
                   {hideGlossForQuiz ? (
                     <span className="inline-flex items-center gap-1.5 py-1 text-xs font-extrabold text-blue-600">
                       <HelpCircle className="h-3.5 w-3.5" />
@@ -442,9 +447,9 @@ export function VocabMomentStep({
                       {item.labelHint &&
                         item.labelHint.toLowerCase() !==
                           item.gloss?.toLowerCase() && (
-                          <div className="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-slate-500">
-                            <Lightbulb className="h-3 w-3 shrink-0 text-amber-500" />
-                            <span className="truncate">{item.labelHint}</span>
+                          <div className="flex w-full items-start justify-center gap-1 text-center text-[11px] leading-snug font-bold text-slate-500">
+                            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                            <span className="break-words">{item.labelHint}</span>
                           </div>
                         )}
                     </>
@@ -459,7 +464,7 @@ export function VocabMomentStep({
       {/* =====================================================================
           3. CLEAN FOOTER CTA
           ===================================================================== */}
-      <div className="flex justify-center border-t border-slate-100 pt-5">
+      <div className="flex justify-center border-t border-slate-100 pt-4 sm:pt-5">
         <button
           type="button"
           disabled={!allMatched}

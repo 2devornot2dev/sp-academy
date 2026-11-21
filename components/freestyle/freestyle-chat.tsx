@@ -1,4 +1,3 @@
-// components/freestyle/freestyle-chat.tsx
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -41,6 +40,7 @@ import {
 } from "@/lib/freestyle/tutors";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+
 interface FreestyleChatProps {
   session: any;
   livekitToken: string;
@@ -188,7 +188,6 @@ function LiveFreestyleChatInner({
   const { trackInteraction } = useMatrix();
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
 
-  // #3 View Mode Toggle ("single" 1-on-1 stage vs "multi" thread) + Tutor Mood
   const [viewMode, setViewMode] = useState<"single" | "multi">("single");
   const [tutorMood, setTutorMood] = useState<TutorMood>("default");
 
@@ -201,18 +200,15 @@ function LiveFreestyleChatInner({
   const [showTranslations, setShowTranslations] = useState(true);
   const [isEnding, setIsEnding] = useState(false);
 
-  // #1 Live Tutor Notepad State (Real-time corrections & upgrades + sent to Review!)
   const [notepadNotes, setNotepadNotes] = useState<NotepadNote[]>([]);
   const [isAnalyzingNote, setIsAnalyzingNote] = useState(false);
 
-  // #5 Live Micro-Wins / Speech Sparks State
   const [sparks, setSparks] = useState<SpeechSpark[]>([]);
   const [activeSparkToast, setActiveSparkToast] = useState<SpeechSpark | null>(
     null,
   );
   const flowStreakRef = useRef(0);
 
-  // Dynamic Coaching Hint State
   const [coachingTip, setCoachingTip] = useState<string>(
     session?.openingLine ||
       "Listen to your partner's opening question and work in Goal #1!",
@@ -225,7 +221,7 @@ function LiveFreestyleChatInner({
     translation: session?.starterHintNative,
   });
   const [isHintUpdating, setIsHintUpdating] = useState(false);
-  const  [noteIdx, setNoteIdx] = useState(0);
+  const [noteIdx, setNoteIdx] = useState(0);
 
   const isZeroLevel = session?.level === "ZERO";
   const [revealReply, setRevealReply] = useState<boolean>(isZeroLevel);
@@ -251,7 +247,6 @@ function LiveFreestyleChatInner({
   const tutorConfig = getFreestyleTutor(session?.voiceGender);
   const tutorName = session?.tutorName || tutorConfig.name;
 
-  // Resolve current Tutor Emote Avatar URL
   const effectiveMood: TutorMood =
     agentState === "thinking" ? "thinking" : tutorMood;
   const currentTutorAvatar = getTutorAvatarByMood(
@@ -278,7 +273,6 @@ function LiveFreestyleChatInner({
     }, 3800);
   }, []);
 
-  // #1 Analyze user turn in background for Sophie's Live Notepad
   const analyzeUserTurnForNotepad = useCallback(
     async (userText: string, turnId: string) => {
       if (!userText || !session?.userId) return;
@@ -341,7 +335,6 @@ function LiveFreestyleChatInner({
     [session?.nativeLanguage, session?.targetLanguage, session?.userId],
   );
 
-  // Refresh next reply coaching hint when AI finishes speaking
   const refreshDynamicHint = useCallback(
     async (aiText: string, aiTranslation?: string | null) => {
       if (!aiText || !session?.userId) return;
@@ -410,14 +403,13 @@ function LiveFreestyleChatInner({
     if (viewMode === "multi") {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, agentState, viewMode]);
+  }, [messages, streamingUserTurn, agentState, viewMode]);
 
-  // Listen to "spoon-meta" data channel from Python Agent
   useDataChannel("spoon-meta", (msg) => {
     try {
       const payload = JSON.parse(new TextDecoder().decode(msg.payload));
 
-      // 0. Real-time streaming partial/final STT words while the user speaks
+      // 0. Real-time streaming partial/final STT words while user speaks
       if (payload.type === "USER_TRANSCRIPT_STREAM" && payload.text) {
         const liveText = String(payload.text).trim();
         setStreamingUserTurn({
@@ -425,7 +417,6 @@ function LiveFreestyleChatInner({
           isFinal: Boolean(payload.isFinal),
         });
 
-        // Light up Phrase Goals immediately as soon as they say the words!
         if (liveText && requiredChunks.length > 0) {
           const next = new Set(matchedChunksRef.current);
           let hitNew = false;
@@ -474,7 +465,7 @@ function LiveFreestyleChatInner({
         }
       }
 
-      // 2. User spoke -> Azure Pronunciation + Micro-Wins (#5) + Notepad (#1)
+      // 2. User spoke -> Azure Pronunciation + Micro-Wins + Notepad
       if (payload.type === "TURN_META" && payload.role === "user") {
         setStreamingUserTurn(null);
         const text = (payload.originalText || payload.text || "").trim();
@@ -490,7 +481,6 @@ function LiveFreestyleChatInner({
             )
           : 0;
 
-        // --- #5 MICRO-WIN DETECTOR (Client-Side Instant Sparks!) ---
         let newlyMatchedGoal: string | null = null;
         if (text && requiredChunks.length > 0) {
           const next = new Set(matchedChunksRef.current);
@@ -554,7 +544,6 @@ function LiveFreestyleChatInner({
           setTutorMood("default");
         }
 
-        // Bank words in Word Matrix
         if (pron?.words?.length) {
           pron.words.forEach((w: any) => {
             if (!w.word) return;
@@ -578,7 +567,6 @@ function LiveFreestyleChatInner({
           },
         ]);
 
-        // Trigger #1 Sophie's Live Notepad check in background
         if (wordCount >= 2) {
           void analyzeUserTurnForNotepad(text, turnId);
         }
@@ -598,7 +586,7 @@ function LiveFreestyleChatInner({
     );
   };
 
-const handleEndSession = async () => {
+  const handleEndSession = async () => {
     if (isEnding) return;
     setIsEnding(true);
 
@@ -607,7 +595,6 @@ const handleEndSession = async () => {
       description: "Checking your speaking turns with AI.",
     });
 
-    // Convert Live Notepad corrections into the exact mistake schema for the Review Lambda!
     const compiledMistakes = notepadNotes
       .filter((n) => n.hasCorrection)
       .map((n) => ({
@@ -699,7 +686,7 @@ const handleEndSession = async () => {
   }, []);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col gap-5 overflow-hidden animate-bg p-4 sm:p-6 lg:flex-row">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-y-auto animate-bg p-3 sm:p-5 lg:flex-row lg:gap-5 lg:overflow-hidden lg:p-6">
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       <RoomAudioRenderer />
@@ -707,46 +694,45 @@ const handleEndSession = async () => {
       {/* =========================================================
           LEFT / MAIN STAGE (SINGLE 1-ON-1 STAGE vs MULTI THREAD)
       ========================================================= */}
-      <div className="relative z-10 flex flex-1 flex-col overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl">
+      <div className="relative z-10 flex min-h-[540px] shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl sm:rounded-[2rem] lg:min-h-0 lg:flex-1">
         {/* 1. Vibrant Arena Header + Single/Multi View Switcher */}
-        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-6 py-3.5 text-white">
+        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-4 py-3 text-white sm:px-6 sm:py-3.5">
           <div className="pointer-events-none absolute -top-12 right-10 h-32 w-32 rounded-full bg-sky-500/20 blur-2xl" />
 
-          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3.5">
+              <div className="relative h-9 w-9 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
                 <img
                   src={currentTutorAvatar}
                   alt={tutorName}
                   className="h-full w-full object-cover object-top transition-all duration-300"
                 />
-                <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+                <span className="absolute right-0.5 bottom-0.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
               </div>
 
               <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h2 className="text-sm sm:text-lg font-black tracking-tight text-white">
                     {session?.topic || "Live Conversation Arena"}
                   </h2>
-                  <span className="rounded-lg border border-sky-400/40 bg-sky-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-sky-300 uppercase">
+                  <span className="rounded-lg border border-sky-400/40 bg-sky-500/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-black tracking-wider text-sky-300 uppercase">
                     {session?.level || "ZERO"}
                   </span>
                 </div>
-                <p className="text-xs font-semibold text-slate-300">
+                <p className="text-[11px] sm:text-xs font-semibold text-slate-300">
                   Partner: <strong className="text-white">{tutorName}</strong> •{" "}
                   <span className="text-amber-300">{sparks.length} Sparks</span>{" "}
-                  • {notepadNotes.length} Notepad Notes
+                  • {notepadNotes.length} Notes
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Single / Multi View Switcher (Matches SpriteChat!) */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-900/90 p-1">
                 <button
                   type="button"
                   onClick={() => setViewMode("single")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  className={`flex items-center gap-1 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-black transition ${
                     viewMode === "single"
                       ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
                       : "text-slate-400 hover:text-white"
@@ -759,7 +745,7 @@ const handleEndSession = async () => {
                 <button
                   type="button"
                   onClick={() => setViewMode("multi")}
-                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition ${
+                  className={`flex items-center gap-1 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-black transition ${
                     viewMode === "multi"
                       ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
                       : "text-slate-400 hover:text-white"
@@ -774,7 +760,7 @@ const handleEndSession = async () => {
               <button
                 type="button"
                 onClick={() => setShowTranslations((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition ${
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-extrabold transition ${
                   showTranslations
                     ? "border-sky-400/40 bg-sky-500/20 text-sky-200"
                     : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
@@ -785,18 +771,18 @@ const handleEndSession = async () => {
                   {showTranslations ? "Translations On" : "Translations Off"}
                 </span>
               </button>
-              <FreestyleTimer initialTime={180} onTimeUp={stableOnTimeUp} />.
+              <FreestyleTimer initialTime={180} onTimeUp={stableOnTimeUp} />
             </div>
           </div>
         </div>
 
         {/* 2. Interactive Target Phrases Strip */}
         {requiredChunks.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-6 py-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-black tracking-wider text-indigo-900 uppercase">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-4 py-2 sm:px-6 sm:py-2.5">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black tracking-wider text-indigo-900 uppercase">
                 <Target className="h-3.5 w-3.5 text-indigo-600" />
-                Phrase Goals ({matchedChunks.size}/{requiredChunks.length}):
+                Goals ({matchedChunks.size}/{requiredChunks.length}):
               </span>
 
               {requiredChunks.map((chunk, idx) => {
@@ -814,7 +800,7 @@ const handleEndSession = async () => {
                         ? `${meaning} (Click to hear pronunciation)`
                         : "Click to hear pronunciation"
                     }
-                    className={`group inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] px-3 py-1 text-xs font-black transition-all active:translate-y-0.5 ${
+                    className={`group inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] px-2.5 py-1 sm:px-3 text-[11px] sm:text-xs font-black transition-all active:translate-y-0.5 ${
                       isHit
                         ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
                         : isNextGoal
@@ -847,16 +833,16 @@ const handleEndSession = async () => {
           </div>
         )}
 
-        {/* Floating #5 Micro-Win Spark Celebration Banner */}
+        {/* Floating Micro-Win Spark Celebration Banner */}
         {activeSparkToast && (
-          <div className="pointer-events-none absolute top-28 left-1/2 z-30 -translate-x-1/2 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200">
-            <div className="inline-flex items-center gap-2.5 rounded-2xl border-2 border-b-4 border-amber-600 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-400 px-5 py-2 text-slate-950 shadow-xl">
+          <div className="pointer-events-none absolute top-24 sm:top-28 left-1/2 z-30 -translate-x-1/2 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200">
+            <div className="inline-flex items-center gap-2.5 rounded-2xl border-2 border-b-4 border-amber-600 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-400 px-4 py-2 sm:px-5 text-slate-950 shadow-xl">
               <Award className="h-5 w-5 fill-amber-600 text-slate-950" />
               <div>
-                <span className="block text-xs font-black uppercase tracking-wider">
+                <span className="block text-[11px] sm:text-xs font-black uppercase tracking-wider">
                   ⚡ {activeSparkToast.label}
                 </span>
-                <span className="block text-[11px] font-extrabold text-slate-800">
+                <span className="block text-[10px] sm:text-[11px] font-extrabold text-slate-800">
                   {activeSparkToast.subLabel}
                 </span>
               </div>
@@ -868,12 +854,9 @@ const handleEndSession = async () => {
             3A. SINGLE STAGE VIEW (1-on-1 Face-to-Face Living Tutor + Notepad!)
         ================================================================= */}
         {viewMode === "single" ? (
-          <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-6">
-            {/* Top / Center: Living Tutor Portrait + Active Speech Stage */}
+          <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-4 sm:p-6">
             <div className="my-auto flex flex-col items-center text-center">
-              {/* Reactive Tutor Portrait (Framer Motion Emote Engine) */}
-              <div className="relative mb-5">
-                {/* Ambient Mood Glow */}
+              <div className="relative mb-4 sm:mb-5">
                 <div
                   className={`pointer-events-none absolute -inset-4 rounded-[2.5rem] blur-xl transition-all duration-500 ${
                     agentState === "speaking"
@@ -888,7 +871,6 @@ const handleEndSession = async () => {
                   }`}
                 />
 
-                {/* Expanding Shockwave Ring whenever Mood Changes */}
                 <AnimatePresence>
                   <motion.div
                     key={`ring-${effectiveMood}`}
@@ -910,7 +892,6 @@ const handleEndSession = async () => {
                   />
                 </AnimatePresence>
 
-                {/* Animated Portrait Box (Bounces when Happy, Shakes + Red Tint when Mad, Droops when Sad) */}
                 <motion.div
                   key={`box-${effectiveMood}`}
                   animate={getMoodMotion(effectiveMood)}
@@ -919,7 +900,7 @@ const handleEndSession = async () => {
                       ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
                       : { duration: 0.45, ease: "easeOut" }
                   }
-                  className={`relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl ${
+                  className={`relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-[1.75rem] sm:rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl ${
                     effectiveMood === "happy"
                       ? "border-emerald-400 border-b-emerald-700"
                       : effectiveMood === "mad"
@@ -934,14 +915,11 @@ const handleEndSession = async () => {
                     alt={tutorName}
                     className="h-full w-full object-cover object-top"
                   />
-
-                  {/* Subtle Color Wash Overlay (Red flush for Mad, Warm glow for Happy, Cool dim for Sad) */}
                   <div
                     className={`pointer-events-none absolute inset-0 transition-colors duration-300 ${MOOD_OVERLAY[effectiveMood].tint}`}
                   />
                 </motion.div>
 
-                {/* Popping Top-Right Emoji Burst */}
                 <AnimatePresence mode="wait">
                   {MOOD_OVERLAY[effectiveMood].badge && (
                     <motion.div
@@ -954,14 +932,13 @@ const handleEndSession = async () => {
                         stiffness: 420,
                         damping: 18,
                       }}
-                      className="absolute -top-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-2xl border-2 border-white bg-transparent text-lg shadow-lg"
+                      className="absolute -top-2.5 -right-2.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl border-2 border-white bg-transparent text-base sm:text-lg shadow-lg"
                     >
                       {MOOD_OVERLAY[effectiveMood].badge}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* Animated Emote Status Pill */}
                 <motion.span
                   key={`pill-${effectiveMood}`}
                   initial={{ scale: 0.85, y: 4 }}
@@ -992,11 +969,11 @@ const handleEndSession = async () => {
               </div>
 
               {/* Tutor's Latest Spoken Line Card */}
-              <div className="mt-2 w-full max-w-2xl rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-6 py-5 shadow-md">
+              <div className="mt-2 w-full max-w-2xl rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-4 py-4 sm:px-6 sm:py-5 shadow-md">
                 {latestAiMessage ? (
                   <>
                     <div className="flex items-center justify-center gap-2">
-                      <p className="text-lg sm:text-2xl font-black leading-snug text-slate-900">
+                      <p className="text-base sm:text-2xl font-black leading-snug text-slate-900">
                         &ldquo;{latestAiMessage.text}&rdquo;
                       </p>
                       <button
@@ -1005,7 +982,7 @@ const handleEndSession = async () => {
                           handlePlayPhraseAudio(latestAiMessage.text)
                         }
                         title="Replay tutor audio"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
+                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
                       >
                         <Volume2 size={16} />
                       </button>
@@ -1017,7 +994,7 @@ const handleEndSession = async () => {
                     )}
                   </>
                 ) : (
-                  <p className="text-base font-extrabold text-slate-600">
+                  <p className="text-sm sm:text-base font-extrabold text-slate-600">
                     {agentState === "connecting"
                       ? `Connecting voice room with ${tutorName}...`
                       : `${tutorName} is listening! Greet ${tutorName} to begin.`}
@@ -1025,10 +1002,10 @@ const handleEndSession = async () => {
                 )}
               </div>
 
-          {/* User's Live Streaming OR Latest Spoken Turn Pill */}
+              {/* User's Live Streaming OR Latest Spoken Turn Pill */}
               {(streamingUserTurn || latestUserMessage) && (
-                <div className="mt-4 flex items-center justify-center gap-3 animate-in fade-in duration-200">
-                  <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm sm:text-base font-bold text-white shadow-md">
+                <div className="mt-3.5 sm:mt-4 flex items-center justify-center gap-2.5 sm:gap-3 animate-in fade-in duration-200">
+                  <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-base font-bold text-white shadow-md">
                     {streamingUserTurn ? (
                       <span className="inline-flex items-center gap-2">
                         <span>{streamingUserTurn.text}</span>
@@ -1041,7 +1018,7 @@ const handleEndSession = async () => {
                       )
                     )}
                   </div>
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                     <img
                       src={userAvatar}
                       alt="You"
@@ -1051,20 +1028,56 @@ const handleEndSession = async () => {
                 </div>
               )}
             </div>
-{/* Bottom of Single Stage: SOPHIE'S LIVE NOTEPAD (Taller & Easier to Read!) */}
-            <div className="mt-5 w-full">
-              <div className="min-h-[132px] overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-5 shadow-sm">
+
+            {/* Compact Mobile/Tablet Lifeline (hidden on desktop where right sidecar is visible) */}
+            {(suggestions?.starter ||
+              session?.starterHintTarget ||
+              currentGoalChunk) && (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-3.5 py-2 lg:hidden">
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[9px] font-black tracking-wider text-amber-700 uppercase">
+                    Suggested Reply
+                  </span>
+                  <p className="truncate text-xs font-black text-slate-900">
+                    &ldquo;
+                    {suggestions?.starter ||
+                      session?.starterHintTarget ||
+                      currentGoalChunk}
+                    &rdquo;
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePlayPhraseAudio(
+                      suggestions?.starter ||
+                        session?.starterHintTarget ||
+                        currentGoalChunk ||
+                        "",
+                    )
+                  }
+                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-blue-600"
+                >
+                  <Volume2 size={13} />
+                  <span>Hear</span>
+                </button>
+              </div>
+            )}
+
+            {/* Bottom of Single Stage: SOPHIE'S LIVE NOTEPAD */}
+            <div className="mt-3 sm:mt-5 w-full">
+              <div className="min-h-[112px] sm:min-h-[132px] overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-4 sm:p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
-                      <PenTool className="h-4 w-4" />
+                    <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
+                      <PenTool className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </span>
-                    <span className="text-xs font-black tracking-wider text-slate-900 uppercase">
+                    <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-900 uppercase">
                       {tutorName}&apos;s Live Notepad
                     </span>
                     {activeNote && (
                       <span
-                        className={`rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                        className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${
                           activeNote.hasCorrection
                             ? "border border-rose-200 bg-rose-100 text-rose-800"
                             : "border border-emerald-200 bg-emerald-100 text-emerald-800"
@@ -1116,9 +1129,9 @@ const handleEndSession = async () => {
                 </div>
 
                 {activeNote ? (
-                  <div className="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2.5 text-sm sm:text-base">
+                  <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-base">
                         {activeNote.hasCorrection && (
                           <>
                             <span className="font-bold text-rose-500 line-through">
@@ -1146,14 +1159,14 @@ const handleEndSession = async () => {
                       onClick={() =>
                         handlePlayPhraseAudio(activeNote.nativeWay)
                       }
-                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-2xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:brightness-105 sm:self-center"
+                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-2xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-sm transition hover:brightness-105 sm:self-center"
                     >
                       <Volume2 size={15} />
                       <span>Hear Native Way</span>
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs sm:text-sm font-semibold text-slate-500">
+                  <p className="mt-2.5 text-xs sm:text-sm font-semibold text-slate-500">
                     Speak a sentence and {tutorName} will jot down real-time
                     native phrasing tips and grammar upgrades right here!
                   </p>
@@ -1165,7 +1178,7 @@ const handleEndSession = async () => {
           /* =================================================================
              3B. MULTI-THREAD VIEW (Full Scrollable Transcript + Inline Notes)
           ================================================================= */
-          <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-6 scroll-smooth">
+          <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 scroll-smooth">
             {messages.map((message) => {
               const isUser = message.role === "user";
               const pron = message.pronunciationScore;
@@ -1186,9 +1199,9 @@ const handleEndSession = async () => {
                 return (
                   <div
                     key={message.id}
-                    className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    className="flex items-start gap-2.5 sm:gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
                   >
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
+                    <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
                       <img
                         src={currentTutorAvatar}
                         alt={tutorName}
@@ -1196,8 +1209,8 @@ const handleEndSession = async () => {
                       />
                     </div>
 
-                    <div className="max-w-[80%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 shadow-xs">
-                      <div className="flex items-start justify-between gap-3">
+                    <div className="max-w-[82%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-xs">
+                      <div className="flex items-start justify-between gap-2.5 sm:gap-3">
                         <p className="text-sm sm:text-base font-bold leading-relaxed text-slate-900">
                           {message.text}
                         </p>
@@ -1222,10 +1235,10 @@ const handleEndSession = async () => {
               return (
                 <div
                   key={message.id}
-                  className="flex items-start justify-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  className="flex items-start justify-end gap-2.5 sm:gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
                 >
                   <div className="flex max-w-md flex-col items-end gap-1.5">
-                    <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-3 text-sm sm:text-base font-bold leading-relaxed text-white shadow-md">
+                    <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-bold leading-relaxed text-white shadow-md">
                       {renderScoredWords(pron, message.text)}
                     </div>
 
@@ -1242,7 +1255,6 @@ const handleEndSession = async () => {
                       </div>
                     )}
 
-                    {/* Inline Notepad Correction attached to this turn */}
                     {turnNote && (
                       <div className="mt-1 w-full rounded-2xl border-2 border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-left text-xs shadow-2xs">
                         <div className="flex items-center justify-between gap-2">
@@ -1266,7 +1278,7 @@ const handleEndSession = async () => {
                     )}
                   </div>
 
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                     <img
                       src={userAvatar}
                       alt="You"
@@ -1276,15 +1288,16 @@ const handleEndSession = async () => {
                 </div>
               );
             })}
+
             {streamingUserTurn && (
-              <div className="flex items-start justify-end gap-3 animate-in fade-in duration-150">
+              <div className="flex items-start justify-end gap-2.5 sm:gap-3 animate-in fade-in duration-150">
                 <div className="flex max-w-md flex-col items-end gap-1.5">
-                  <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-3 text-sm sm:text-base font-bold leading-relaxed text-white opacity-95 shadow-md">
+                  <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-bold leading-relaxed text-white opacity-95 shadow-md">
                     <span>{streamingUserTurn.text}</span>
                     <span className="ml-2 inline-block h-2 w-2 animate-ping rounded-full bg-sky-200" />
                   </div>
                 </div>
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                   <img
                     src={userAvatar}
                     alt="You"
@@ -1293,15 +1306,16 @@ const handleEndSession = async () => {
                 </div>
               </div>
             )}
+
             <div ref={messagesEndRef} className="h-2" />
           </div>
         )}
 
         {/* 4. Bottom Control Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-white px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <span
-              className={`h-3 w-3 rounded-full ${
+              className={`h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0 rounded-full ${
                 agentState === "listening"
                   ? "animate-ping bg-emerald-500"
                   : agentState === "speaking"
@@ -1309,28 +1323,30 @@ const handleEndSession = async () => {
                     : "bg-amber-400"
               }`}
             />
-            <span className="text-sm font-extrabold text-slate-700">
-              {agentState === "listening"
-                ? "Listening (Speak anytime)..."
-                : agentState === "speaking"
-                  ? `${tutorName} Speaking (Interrupt anytime)`
-                  : "Connecting voice..."}
+            <span className="text-xs sm:text-sm font-extrabold text-slate-700">
+              {streamingUserTurn && !streamingUserTurn.isFinal
+                ? `Hearing: "${streamingUserTurn.text}"`
+                : agentState === "listening"
+                  ? "Listening (Speak anytime)..."
+                  : agentState === "speaking"
+                    ? `${tutorName} Speaking`
+                    : "Connecting voice..."}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2.5 sm:gap-3">
             <TrackToggle
               source={Track.Source.Microphone}
-              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 shadow-2xs hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-2 sm:px-4 text-xs font-black text-slate-700 shadow-2xs hover:bg-slate-50"
             >
               <Mic size={14} />
-              <span>Toggle Mic</span>
+              <span>Mic</span>
             </TrackToggle>
 
             <button
               onClick={handleEndSession}
               disabled={isEnding}
-              className={`inline-flex items-center gap-2 rounded-xl border-b-4 px-6 py-2.5 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
+              className={`inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl border-b-4 px-4 py-2.5 sm:px-6 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
                 allChunksCompleted
                   ? "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
                   : "border-slate-950 bg-slate-900 hover:bg-slate-800"
@@ -1340,8 +1356,8 @@ const handleEndSession = async () => {
                 {isEnding
                   ? "Validating..."
                   : allChunksCompleted
-                    ? "Mission Complete! Finish & Unlock"
-                    : "End & Validate Session"}
+                    ? "Mission Complete! Finish"
+                    : "End & Validate"}
               </span>
               <ArrowRight size={14} />
             </button>
@@ -1352,9 +1368,8 @@ const handleEndSession = async () => {
       {/* =========================================================
           RIGHT SIDECAR: DYNAMIC LIVE COACHING DECK + SPARKSFEED
       ========================================================= */}
-      <div className="relative z-10 flex w-full flex-col justify-between rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-2xl lg:w-88">
+      <div className="relative z-10 flex w-full shrink-0 flex-col justify-between rounded-2xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-2xl sm:rounded-[2rem] sm:p-6 lg:w-88 lg:overflow-y-auto">
         <div className="space-y-5">
-          {/* Deck Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-2xs">
@@ -1375,7 +1390,6 @@ const handleEndSession = async () => {
             )}
           </div>
 
-          {/* 1. Dynamic Coaching Direction */}
           <div className="rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 p-4 shadow-2xs">
             <div className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
               <Compass className="h-3.5 w-3.5" />
@@ -1412,7 +1426,6 @@ const handleEndSession = async () => {
             )}
           </div>
 
-          {/* 2. Example Reply Lifeline */}
           <div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-amber-600 uppercase">
@@ -1476,14 +1489,13 @@ const handleEndSession = async () => {
                     Need help phrasing your reply?
                   </span>
                   <span className="text-[11px] font-bold text-amber-600 underline">
-                    Tap to reveal suggested French sentence
+                    Tap to reveal suggested sentence
                   </span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* 3. Checklist of Target Phrases */}
           {requiredChunks.length > 0 && (
             <div>
               <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
@@ -1530,7 +1542,6 @@ const handleEndSession = async () => {
             </div>
           )}
 
-          {/* 4. #5 Live Micro-Wins / Speech Sparks Feed */}
           {sparks.length > 0 && (
             <div>
               <span className="flex items-center gap-1 text-[10px] font-black tracking-widest text-amber-600 uppercase">
