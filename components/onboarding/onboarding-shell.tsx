@@ -34,6 +34,7 @@ import { Gender } from "@prisma/client";
 import { SpriteStep } from "./steps/stripe-step";
 import { invokeTrialBuilder } from "@/app/actions/invoke-trial-builder";
 import { setUserGeneration } from "@/app/actions/set-user-generation";
+import { sendOnboardingWelcomeEmail } from "@/lib/actions/send-welcome-email";
 
 
 
@@ -254,6 +255,11 @@ const handleCompleteOnboarding = async () => {
           spriteSlug: sprite,
           nativeVoiceId: resolvedNativeVoiceId,
           targetVoiceId: resolvedTargetVoiceId,
+        }),
+        sendOnboardingWelcomeEmail({
+          firstName: firstName.trim(),
+          targetLanguage,
+          isPaid,
         }),
       ]);
 

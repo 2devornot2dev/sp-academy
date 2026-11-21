@@ -18,14 +18,14 @@ const STATS = [
     id: "founder",
     icon: Star,
     value: "Beta",
-    label: "Founder Pricing for Life",
+    label: "Founder Pricing",
     color: "secondary",
   },
   {
     id: "brain",
     icon: Brain,
     value: "Everyday",
-    label: "Learn Something New",
+    label: "New Chanllenges",
     color: "tertiary",
   },
   {

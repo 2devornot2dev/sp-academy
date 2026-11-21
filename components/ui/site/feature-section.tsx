@@ -15,6 +15,7 @@ type Feature = {
   id: string;
   icon: LucideIcon;
   title: string;
+  shortTitle: string;
   label: string;
   description: string;
   imageSrc: string;
@@ -26,6 +27,7 @@ const FEATURES: Feature[] = [
     id: "conversation",
     icon: Bot,
     title: "Conversational AI",
+    shortTitle: "AI Tutor",
     label: "Speak naturally",
     description:
       "Practice real conversations with a tutor that listens, responds, and adapts. Receive immediate pronunciation feedback without following a rigid script.",
@@ -36,6 +38,7 @@ const FEATURES: Feature[] = [
     id: "lessons",
     icon: BookOpen,
     title: "Lessons built around you",
+    shortTitle: "Your Lessons",
     label: "Learn your way",
     description:
       "Quizzes, challenges, and games are generated around your goals and current level, keeping every lesson relevant as your skills improve.",
@@ -46,6 +49,7 @@ const FEATURES: Feature[] = [
     id: "achievements",
     icon: Award,
     title: "Progress worth showing",
+    shortTitle: "Progress",
     label: "Prove your progress",
     description:
       "Track meaningful milestones, unlock achievements, and earn verified certificates that turn consistent practice into something tangible.",
@@ -132,7 +136,7 @@ export default function FeaturesSection() {
     <section
       id="features"
       aria-labelledby="features-heading"
-      className="relative isolate overflow-clip py-[clamp(4rem,7vh,5.5rem)] transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] lg:flex lg:min-h-[100svh] lg:items-center lg:py-0"
+      className="relative isolate overflow-clip py-12 sm:py-16 lg:flex lg:min-h-[100svh] lg:items-center lg:py-0 transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{ backgroundColor: currentTheme.bg }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -157,27 +161,28 @@ export default function FeaturesSection() {
 
       <div className="mx-auto w-full max-w-[72rem] px-4">
         <Reveal className="mx-auto max-w-[44rem] text-center" y={18}>
-          <span className="inline-flex min-h-8 items-center rounded-full border border-border/80 bg-background/60 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-foreground/72 backdrop-blur-md">
+          <span className="inline-flex min-h-7 items-center rounded-full border border-border/80 bg-background/60 px-3 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-[0.08em] text-foreground/72 backdrop-blur-md">
             See Spoon in action
           </span>
 
           <h2
             id="features-heading"
-            className="mt-4 text-balance text-[clamp(2.15rem,4vw,3.65rem)] font-[760] leading-[1.02] tracking-[-0.045em] text-foreground"
+            className="mt-3 sm:mt-4 text-balance text-[clamp(1.85rem,4vw,3.65rem)] font-[760] leading-[1.04] tracking-[-0.045em] text-foreground"
           >
             Everything you need to{" "}
             <span className="text-foreground/55">actually learn.</span>
           </h2>
 
-          <p className="mx-auto mt-3.5 max-w-[37rem] text-balance text-[clamp(1rem,1.5vw,1.1rem)] leading-relaxed text-muted-foreground">
+          <p className="mx-auto mt-2.5 sm:mt-3.5 max-w-[37rem] text-balance text-[0.94rem] sm:text-[clamp(1rem,1.5vw,1.1rem)] leading-relaxed text-muted-foreground">
             Conversation, adaptive lessons, and meaningful progress—working as
             one focused learning experience.
           </p>
         </Reveal>
 
         <Reveal delay={0.08} y={16}>
+          {/* 3-col grid on ALL screen sizes so all 3 tabs stay visible with zero horizontal clipping */}
           <div
-            className="mx-auto mt-[clamp(2rem,4vh,3rem)] flex max-w-[58rem] snap-x snap-mandatory overflow-x-auto rounded-[1.25rem] border border-border/75 bg-background/65 p-1.5 shadow-[0_1px_1px_hsl(var(--foreground)/0.03),0_18px_50px_hsl(var(--foreground)/0.04)] backdrop-blur-xl md:grid md:grid-cols-3 md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="mx-auto mt-6 md:mt-[clamp(2rem,4vh,3rem)] grid max-w-[58rem] grid-cols-3 gap-1 rounded-[1.15rem] md:rounded-[1.25rem] border border-border/75 bg-background/65 p-1 md:p-1.5 shadow-[0_1px_1px_hsl(var(--foreground)/0.03),0_18px_50px_hsl(var(--foreground)/0.04)] backdrop-blur-xl"
             role="tablist"
             aria-label="Product features"
           >
@@ -197,26 +202,29 @@ export default function FeaturesSection() {
                   tabIndex={isActive ? 0 : -1}
                   aria-selected={isActive}
                   aria-controls={`feature-panel-${feature.id}`}
-                  className={`relative flex min-w-[13rem] snap-start items-center gap-2.5 overflow-hidden rounded-xl px-4 py-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 md:min-w-0 ${
+                  className={`relative flex flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg md:rounded-xl px-2 py-2.5 text-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 md:flex-row md:justify-start md:gap-2.5 md:px-4 md:py-3.5 md:text-left ${
                     isActive
-                      ? "bg-card/90 text-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06),0_8px_24px_hsl(var(--foreground)/0.06)]"
+                      ? "bg-card/95 text-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06),0_8px_24px_hsl(var(--foreground)/0.06)]"
                       : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                   } ${theme.ring}`}
                   onClick={() => selectFeature(index)}
                   onKeyDown={(event) => handleTabKeyDown(event, index)}
                 >
-                  <span className={`text-[0.68rem] font-[750] tracking-[0.08em] ${theme.text}`}>
+                  <span className={`text-[0.65rem] md:text-[0.68rem] font-[750] tracking-[0.08em] ${theme.text}`}>
                     {String(index + 1).padStart(2, "0")}
                   </span>
 
-                  <span className="min-w-0 overflow-hidden text-[0.83rem] font-[650] text-ellipsis whitespace-nowrap">
+                  <span className="md:hidden text-[0.75rem] font-[680] leading-tight">
+                    {feature.shortTitle}
+                  </span>
+                  <span className="hidden md:inline min-w-0 overflow-hidden text-[0.83rem] font-[650] text-ellipsis whitespace-nowrap">
                     {feature.title}
                   </span>
 
                   {isActive && !reduceMotion && !isPaused && (
                     <motion.span
                       key={`${feature.id}-${activeIndex}`}
-                      className={`absolute bottom-0 left-2.5 right-2.5 h-[2px] origin-left rounded-full ${theme.progress}`}
+                      className={`absolute bottom-0 left-2 right-2 md:left-2.5 md:right-2.5 h-[2px] origin-left rounded-full ${theme.progress}`}
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: 1 }}
                       transition={{
@@ -231,7 +239,7 @@ export default function FeaturesSection() {
           </div>
         </Reveal>
 
-        <div className="relative mt-[clamp(1.75rem,4vh,3rem)] w-full">
+        <div className="relative mt-5 md:mt-[clamp(1.75rem,4vh,3rem)] w-full">
           {/* popLayout removes the exiting element from layout space immediately, solving height collapse jumps */}
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -243,9 +251,9 @@ export default function FeaturesSection() {
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="grid min-h-auto grid-cols-1 items-center gap-[clamp(2.5rem,6vw,5.5rem)] md:min-h-[min(31rem,46vh)] md:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)]"
+              className="grid grid-cols-1 items-center gap-5 md:min-h-[min(31rem,46vh)] md:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)] md:gap-[clamp(2.5rem,6vw,5.5rem)]"
             >
-              <div className="relative grid min-h-[18rem] place-items-center md:min-h-[clamp(20rem,43vh,31rem)]">
+              <div className="relative grid place-items-center md:min-h-[clamp(20rem,43vh,31rem)]">
                 <FeatureVectors
                   accent={activeFeature.accent}
                   reduceMotion={Boolean(reduceMotion)}
@@ -262,39 +270,39 @@ export default function FeaturesSection() {
                     alt={`${activeFeature.title} interface`}
                     width={760}
                     height={560}
-                    sizes="(min-width: 768px) 56vw, 100vw"
+                    sizes="(min-width: 768px) 56vw, 96vw"
                     className="block h-auto w-full object-contain"
                     priority
                   />
                 </motion.div>
               </div>
 
-              <div className="relative isolate flex min-h-[18rem] items-center py-4 md:min-h-[20rem] md:py-0">
+              <div className="relative isolate flex items-center py-1 md:min-h-[20rem] md:py-0">
                 <ActiveIcon
-                  className={`pointer-events-none absolute -right-12 top-1/2 -z-10 size-[clamp(12rem,24vw,20rem)] -translate-y-1/2 -rotate-[7deg] opacity-[0.055] md:-right-8 ${currentTheme.text}`}
+                  className={`pointer-events-none absolute right-0 top-0 -z-10 size-36 -rotate-[7deg] opacity-[0.055] md:top-1/2 md:-right-8 md:size-[clamp(12rem,24vw,20rem)] md:-translate-y-1/2 ${currentTheme.text}`}
                   strokeWidth={1.15}
                   aria-hidden="true"
                 />
 
-                <div className="relative z-10 max-w-[28rem]">
+                <div className="relative z-10 w-full max-w-[28rem] text-center md:text-left mx-auto md:mx-0">
                   <span
-                    className={`inline-flex items-center gap-[0.6rem] text-[0.75rem] font-[750] uppercase tracking-[0.1em] before:h-px before:w-7 before:bg-current before:content-[''] ${currentTheme.text}`}
+                    className={`inline-flex items-center gap-[0.6rem] text-[0.72rem] sm:text-[0.75rem] font-[750] uppercase tracking-[0.1em] md:before:h-px md:before:w-7 md:before:bg-current md:before:content-[''] ${currentTheme.text}`}
                   >
                     {activeFeature.label}
                   </span>
 
-                  <h3 className="mt-3.5 text-balance text-[clamp(2rem,3.2vw,3.25rem)] font-[740] leading-[1.03] tracking-[-0.04em] text-foreground">
+                  <h3 className="mt-2 sm:mt-3.5 text-balance text-[clamp(1.6rem,3.2vw,3.25rem)] font-[740] leading-[1.05] tracking-[-0.04em] text-foreground">
                     {activeFeature.title}
                   </h3>
 
-                  <p className="mt-[1.15rem] text-[clamp(1rem,1.35vw,1.08rem)] leading-[1.7] text-muted-foreground">
+                  <p className="mt-3 sm:mt-[1.15rem] text-[0.95rem] sm:text-[clamp(1rem,1.35vw,1.08rem)] leading-[1.65] text-muted-foreground">
                     {activeFeature.description}
                   </p>
 
                   <Button
                     nativeButton={false}
                     render={<Link href="/signup" />}
-                    className="mt-[1.6rem] h-[2.85rem] gap-[0.55rem] rounded-full border border-border bg-foreground px-5 font-[650] text-background shadow-none transition-all duration-180 hover:-translate-y-px hover:bg-foreground hover:opacity-90"
+                    className="mt-5 sm:mt-[1.6rem] h-[2.85rem] gap-[0.55rem] rounded-full border border-border bg-foreground px-6 font-[650] text-background shadow-none transition-all duration-180 hover:-translate-y-px hover:bg-foreground hover:opacity-90"
                   >
                     Start learning
                     <ArrowRight className="size-4" aria-hidden="true" />

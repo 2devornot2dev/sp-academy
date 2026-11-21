@@ -98,9 +98,35 @@ export default function NavigationBar() {
 
               <SheetContent
                 side="right"
-                className="flex w-[85%] max-w-[340px] flex-col justify-between border-l border-slate-100 bg-white p-6"
+                className="flex w-[85%] max-w-[340px] flex-col justify-between overflow-hidden border-l-0 bg-white py-6 pr-6 pl-7 shadow-2xl"
               >
-                <div>
+                {/* Slim 4-color SPOON gradient border along the left edge */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 z-20 w-[4px] overflow-hidden"
+                >
+                  <div className="-my-4 -ml-2.5 flex h-[calc(100%+32px)] w-6 flex-col blur-[10px]">
+                    <div className="flex-1 bg-primary" />
+                    <div className="flex-1 bg-secondary" />
+                    <div className="flex-1 bg-accent" />
+                    <div className="flex-1 bg-tertiary" />
+                  </div>
+                </div>
+
+                {/* Subtle ambient glow bleeding softly from the gradient edge */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 z-0 w-10 overflow-hidden opacity-[0.08]"
+                >
+                  <div className="-my-6 -ml-6 flex h-[calc(100%+48px)] w-12 flex-col blur-xl">
+                    <div className="flex-1 bg-primary" />
+                    <div className="flex-1 bg-secondary" />
+                    <div className="flex-1 bg-accent" />
+                    <div className="flex-1 bg-tertiary" />
+                  </div>
+                </div>
+
+                <div className="relative z-10">
                   {/* Drawer Header */}
                   <div className="border-b border-slate-100 pb-4 pr-8">
                     <Link href="/" onClick={() => setIsOpen(false)}>
@@ -161,12 +187,12 @@ export default function NavigationBar() {
                     delay: isOpen ? 0.32 : 0,
                     ease: [0.22, 1, 0.36, 1],
                   }}
-                  className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-5"
+                  className="relative z-10 mt-auto flex flex-col gap-3 border-t border-slate-100 pt-5"
                 >
                   <Button
                     className="h-12 w-full rounded-full bg-blue-500 text-base font-semibold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-600"
                     nativeButton={false}
-                    render={<Link href="#pricing" />}
+                    render={<Link href="/sign-up" />}
                     onClick={() => setIsOpen(false)}
                   >
                     Sign Up Free
