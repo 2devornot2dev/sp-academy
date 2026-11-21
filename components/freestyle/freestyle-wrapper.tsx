@@ -170,6 +170,8 @@ export default function FreestyleWrapper({
           nativeLanguage: config.nativeLanguage,
           targetLanguage: config.targetLanguage,
           voiceGender: config.voiceGender,
+          tutorName,
+          targetVoiceId: `${config.targetLanguage}-${isFemale ? "woman-01" : "man-01"}`,
           level,
           freestyleData: {
             mode: config.mode || "FOCUSED",
@@ -321,7 +323,7 @@ export default function FreestyleWrapper({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="flex h-screen w-full flex-col"
+            className="flex h-full min-h-0 w-full flex-1 flex-col"
           >
             <FreestyleChat
               session={activeSession}

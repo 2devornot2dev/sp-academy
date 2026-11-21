@@ -193,6 +193,10 @@ function LiveFreestyleChatInner({
   const [tutorMood, setTutorMood] = useState<TutorMood>("default");
 
   const [messages, setMessages] = useState<any[]>([]);
+  const [streamingUserTurn, setStreamingUserTurn] = useState<{
+    text: string;
+    isFinal: boolean;
+  } | null>(null);
   const [matchedChunks, setMatchedChunks] = useState<Set<string>>(new Set());
   const [showTranslations, setShowTranslations] = useState(true);
   const [isEnding, setIsEnding] = useState(false);
@@ -413,6 +417,32 @@ function LiveFreestyleChatInner({
     try {
       const payload = JSON.parse(new TextDecoder().decode(msg.payload));
 
+      // 0. Real-time streaming partial/final STT words while the user speaks
+      if (payload.type === "USER_TRANSCRIPT_STREAM" && payload.text) {
+        const liveText = String(payload.text).trim();
+        setStreamingUserTurn({
+          text: liveText,
+          isFinal: Boolean(payload.isFinal),
+        });
+
+        // Light up Phrase Goals immediately as soon as they say the words!
+        if (liveText && requiredChunks.length > 0) {
+          const next = new Set(matchedChunksRef.current);
+          let hitNew = false;
+          for (const chunk of requiredChunks) {
+            if (!next.has(chunk) && doesSpeechMatchPhrase(liveText, chunk)) {
+              next.add(chunk);
+              hitNew = true;
+            }
+          }
+          if (hitNew) {
+            matchedChunksRef.current = next;
+            setMatchedChunks(next);
+          }
+        }
+        return;
+      }
+
       // 1. Assistant message arrived
       if (payload.type === "AGENT_TURN") {
         const aiText = payload.text || "";
@@ -446,6 +476,7 @@ function LiveFreestyleChatInner({
 
       // 2. User spoke -> Azure Pronunciation + Micro-Wins (#5) + Notepad (#1)
       if (payload.type === "TURN_META" && payload.role === "user") {
+        setStreamingUserTurn(null);
         const text = (payload.originalText || payload.text || "").trim();
         const pron = payload.pronunciation;
         const turnId = `user-${Date.now()}`;
@@ -994,13 +1025,20 @@ const handleEndSession = async () => {
                 )}
               </div>
 
-              {/* User's Latest Spoken Turn Pill */}
-              {latestUserMessage && (
+          {/* User's Live Streaming OR Latest Spoken Turn Pill */}
+              {(streamingUserTurn || latestUserMessage) && (
                 <div className="mt-4 flex items-center justify-center gap-3 animate-in fade-in duration-200">
                   <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm sm:text-base font-bold text-white shadow-md">
-                    {renderScoredWords(
-                      latestUserMessage.pronunciationScore,
-                      latestUserMessage.text,
+                    {streamingUserTurn ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span>{streamingUserTurn.text}</span>
+                        <span className="inline-block h-2 w-2 animate-ping rounded-full bg-sky-200" />
+                      </span>
+                    ) : (
+                      renderScoredWords(
+                        latestUserMessage.pronunciationScore,
+                        latestUserMessage.text,
+                      )
                     )}
                   </div>
                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
@@ -1238,6 +1276,23 @@ const handleEndSession = async () => {
                 </div>
               );
             })}
+            {streamingUserTurn && (
+              <div className="flex items-start justify-end gap-3 animate-in fade-in duration-150">
+                <div className="flex max-w-md flex-col items-end gap-1.5">
+                  <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-3 text-sm sm:text-base font-bold leading-relaxed text-white opacity-95 shadow-md">
+                    <span>{streamingUserTurn.text}</span>
+                    <span className="ml-2 inline-block h-2 w-2 animate-ping rounded-full bg-sky-200" />
+                  </div>
+                </div>
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                  <img
+                    src={userAvatar}
+                    alt="You"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} className="h-2" />
           </div>
         )}

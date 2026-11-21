@@ -15,6 +15,7 @@ import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { useSpeak } from "@/hooks/use-speak";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
+import { playSfx } from "@/lib/sfx";
 
 export function GrammarStep({
   data,
@@ -34,6 +35,7 @@ export function GrammarStep({
 
   const { trackInteraction } = useMatrix();
   const hasTrackedSeen = useRef(false);
+  const unlockedRef = useRef(false);
 
   const [hasPlayedSentence, setHasPlayedSentence] = useState(false);
   const [heardWords, setHeardWords] = useState<Set<string>>(new Set());
@@ -66,9 +68,17 @@ export function GrammarStep({
     }
   };
 
-  const allWordsHeard = heardWords.size === uniqueWords.length;
+  const allWordsHeard =
+    uniqueWords.length > 0 && heardWords.size === uniqueWords.length;
   const isNextEnabled = hasPlayedSentence && allWordsHeard;
   const showScrollHint = !allWordsHeard && (data?.words?.length ?? 0) > 4;
+
+  useEffect(() => {
+    if (isNextEnabled && !unlockedRef.current) {
+      unlockedRef.current = true;
+      playSfx("spark");
+    }
+  }, [isNextEnabled]);
 
   return (
     <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">

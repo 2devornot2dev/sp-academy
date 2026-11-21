@@ -12,8 +12,10 @@ import {
   Target,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
+import { useSprite } from "@/context/sprite-context";
 import { FLAG_MAP } from "@/lib/types";
 import { useSpeakWord } from "@/components/foundation/word-tap";
+import { playSfx } from "@/lib/sfx";
 
 function getLangMeta(
   codeOrName: string | undefined,
@@ -40,6 +42,11 @@ export function IntroStep({
   spriteGender?: "male" | "female";
 }) {
   const speak = useSpeakWord();
+  const {
+    profile,
+    spriteName: ctxSpriteName,
+    avatarSrc: ctxAvatarSrc,
+  } = useSprite();
   const handoff = data.lessonHandoff || {};
 
   const chunks = handoff.chunks || [];
@@ -51,18 +58,22 @@ export function IntroStep({
   const introTargetAudio = handoff.introTargetAudio || "";
 
   const isVivi =
-    spriteGender === "female" || data?.user?.gender === "female";
-  const spriteName = isVivi ? "Vivi" : "Vox";
+    profile?.sprite?.slug === "vivi" ||
+    ctxSpriteName?.toLowerCase() === "vivi" ||
+    spriteGender === "female";
+  const spriteName = ctxSpriteName || (isVivi ? "Vivi" : "Vox");
   const spriteSrc =
-    data?.user?.spriteUrl || (isVivi ? "/sprite-f.png" : "/sprite-m.png");
+    ctxAvatarSrc ||
+    data?.user?.spriteUrl ||
+    (isVivi ? "/sprite-f.png" : "/sprite-m.png");
 
   const nativeMeta = getLangMeta(
-    data?.nativeLanguage || handoff?.nativeLanguage,
+    data?.nativeLanguage || data?.nativeLang || handoff?.nativeLanguage,
     "🇺🇸",
     "Native Briefing"
   );
   const targetMeta = getLangMeta(
-    data?.targetLanguage || handoff?.targetLanguage,
+    data?.targetLanguage || data?.targetLang || handoff?.targetLanguage,
     "🇫🇷",
     "Target Intro"
   );
@@ -89,6 +100,7 @@ export function IntroStep({
   }, []);
 
   const toggleAudio = (type: "native" | "target") => {
+    playSfx("tap");
     setDisplayedTranscript(type);
 
     if (activeAudio === type) {

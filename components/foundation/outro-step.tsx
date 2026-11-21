@@ -17,6 +17,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
+import { useSprite } from "@/context/sprite-context";
+import { playSfx } from "@/lib/sfx";
 import { WordMatrix } from "./matrix/word-matrix";
 
 type Feedback = "hard" | "ok" | "easy";
@@ -63,6 +65,11 @@ export function OutroStep({
   spriteGender?: "male" | "female";
   onFinish: (feedback: Feedback) => Promise<void>;
 }) {
+  const {
+    profile,
+    spriteName: ctxSpriteName,
+    avatarSrc: ctxAvatarSrc,
+  } = useSprite();
   const handoff = data.lessonHandoff || {};
   const { urls, isLoading } = useS3Media([
     handoff.outroNativeAudio,
@@ -71,18 +78,25 @@ export function OutroStep({
   const [nativeUrl, targetUrl] = urls;
 
   const isVivi =
-    spriteGender === "female" || data?.user?.gender === "female";
-  const spriteName = isVivi ? "Vivi" : "Vox";
+    profile?.sprite?.slug === "vivi" ||
+    ctxSpriteName?.toLowerCase() === "vivi" ||
+    spriteGender === "female";
+  const spriteName = ctxSpriteName || (isVivi ? "Vivi" : "Vox");
   const spriteSrc =
-    data?.user?.spriteUrl || (isVivi ? "/sprite-f.png" : "/sprite-m.png");
+    ctxAvatarSrc ||
+    data?.user?.spriteUrl ||
+    (isVivi ? "/sprite-f.png" : "/sprite-m.png");
 
   const nativeMeta = getLangMeta(
-    data?.nativeLanguage || handoff?.nativeLanguage,
+    data?.nativeLanguage || data?.nativeLang || handoff?.nativeLanguage,
     "🇺🇸",
     "Native Debrief"
   );
   const targetMeta = getLangMeta(
-    targetLang || data?.targetLanguage || handoff?.targetLanguage,
+    targetLang ||
+      data?.targetLanguage ||
+      data?.targetLang ||
+      handoff?.targetLanguage,
     "🇫🇷",
     "Target Debrief"
   );
@@ -148,6 +162,7 @@ export function OutroStep({
   }, []);
 
   const toggleAudio = (type: "native" | "target") => {
+    playSfx("tap");
     setDisplayedTranscript(type);
 
     if (activeAudio === type) {
@@ -166,8 +181,14 @@ export function OutroStep({
     setActiveAudio(type);
   };
 
+  const handleSelectFeedback = (val: Feedback) => {
+    playSfx("like");
+    setFeedback(val);
+  };
+
   const handleFinish = async () => {
     if (isFinishing || !feedback) return;
+    playSfx("victory");
     audioRef.current?.pause();
     setIsFinishing(true);
     setFinishError(null);
@@ -383,7 +404,10 @@ export function OutroStep({
 
               <button
                 type="button"
-                onClick={() => setIsDrawerOpen(true)}
+                onClick={() => {
+                  playSfx("tap");
+                  setIsDrawerOpen(true);
+                }}
                 disabled={isMatrixLoading}
                 className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-bold text-slate-900 transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-50 sm:w-auto"
               >
@@ -404,7 +428,8 @@ export function OutroStep({
 
           <div className="mb-6 flex justify-center gap-4 sm:gap-6">
             <button
-              onClick={() => setFeedback("hard")}
+              type="button"
+              onClick={() => handleSelectFeedback("hard")}
               disabled={isFinishing}
               className={`flex flex-col items-center gap-2 rounded-2xl p-3 transition-all ${
                 feedback === "hard"
@@ -419,7 +444,8 @@ export function OutroStep({
             </button>
 
             <button
-              onClick={() => setFeedback("ok")}
+              type="button"
+              onClick={() => handleSelectFeedback("ok")}
               disabled={isFinishing}
               className={`flex flex-col items-center gap-2 rounded-2xl p-3 transition-all ${
                 feedback === "ok"
@@ -434,7 +460,8 @@ export function OutroStep({
             </button>
 
             <button
-              onClick={() => setFeedback("easy")}
+              type="button"
+              onClick={() => handleSelectFeedback("easy")}
               disabled={isFinishing}
               className={`flex flex-col items-center gap-2 rounded-2xl p-3 transition-all ${
                 feedback === "easy"
@@ -489,7 +516,10 @@ export function OutroStep({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsDrawerOpen(false)}
+              onClick={() => {
+                playSfx("tap");
+                setIsDrawerOpen(false);
+              }}
             />
 
             <motion.div
@@ -506,7 +536,10 @@ export function OutroStep({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsDrawerOpen(false)}
+                  onClick={() => {
+                    playSfx("tap");
+                    setIsDrawerOpen(false);
+                  }}
                   className="rounded-full bg-slate-100 p-2 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800"
                 >
                   <X size={20} />

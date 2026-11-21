@@ -19,6 +19,7 @@ import { useS3Media } from "@/context/s3-context";
 import { useWordAudio } from "@/context/word-audio-context";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMatrix } from "@/context/matrix-context";
+import { playSfx } from "@/lib/sfx";
 
 type WordTile = {
   id: string;
@@ -191,6 +192,7 @@ export function ListeningStep({
   };
 
   const handlePrimaryPlay = () => {
+    playSfx("tap");
     if (isPlaying) {
       stopAllAudio();
       setHasCompletedFirstListen(true);
@@ -228,6 +230,7 @@ export function ListeningStep({
       nextSelected.length === expected.length &&
       nextSelected.every((t, i) => isSameWord(t.text, expected[i]))
     ) {
+      playSfx("correct");
       setHasCompletedFirstListen(true);
       nextSelected.forEach((t) =>
         trackInteraction(t.text, { tappedCorrect: 1 })
@@ -242,6 +245,7 @@ export function ListeningStep({
 
   const handleRemoveWord = (tile: WordTile) => {
     if (status === "correct") return;
+    playSfx("tap");
     setStatus("idle");
     setFeedbackMsg("");
     setSelectedWords((prev) => prev.filter((item) => item.id !== tile.id));
@@ -249,6 +253,7 @@ export function ListeningStep({
   };
 
   const handleReset = () => {
+    playSfx("tap");
     stopAllAudio();
     setStatus("idle");
     setFeedbackMsg("");
@@ -275,9 +280,11 @@ export function ListeningStep({
       selectedWords.every((tile, i) => isSameWord(tile.text, expected[i]));
 
     if (isPerfectMatch) {
+      playSfx("correct");
       setStatus("correct");
       setFeedbackMsg("Excellent ear! You nailed the exact word order.");
     } else {
+      playSfx("wrong");
       setStatus("incorrect");
       setFeedbackMsg(
         "Green tiles are in the right spot! Tap any red tile to adjust."
@@ -431,7 +438,10 @@ export function ListeningStep({
                   {hasCompletedFirstListen && (
                     <button
                       type="button"
-                      onClick={() => void playSlowWordByWord()}
+                      onClick={() => {
+                        playSfx("tap");
+                        void playSlowWordByWord();
+                      }}
                       disabled={isAudioLoading}
                       className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-sky-400 active:translate-y-0.5 active:border-b-2"
                       title="Play slow word-by-word breakdown"

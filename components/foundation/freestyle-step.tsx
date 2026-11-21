@@ -123,9 +123,7 @@ export function FreestyleStep({
         topic: freestyle?.topic || lessonHandoff?.theme || "Roleplay Mission",
         nativeLanguage,
         targetLanguage,
-        targetVoiceId:
-          profile?.targetVoiceId ||
-          `${targetLanguage}-${isVivi ? "girl-01" : "boy-01"}`,
+        targetVoiceId: `${targetLanguage}-${isVivi ? "girl-01" : "boy-01"}`,
         voiceGender,
         freestyleData,
       };

@@ -5,6 +5,7 @@ import { useSpeak } from "@/hooks/use-speak";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
 import { cleanWord } from "@/components/foundation/word-tap";
+import { playSfx } from "@/lib/sfx";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Mic,
@@ -232,9 +233,35 @@ export function PronunciationStep({
     ? "Put it all together!"
     : breakdown[currentIndex]?.hint;
 
-  const activeFocusSound = data.focusSounds?.find((fs: any) =>
-    fs.positions?.includes(currentIndex)
-  );
+  const activeFocusSound = useMemo(() => {
+    const list = data.focusSounds || [];
+    if (!list.length) return null;
+    if (isFullSentenceStep) return list[0];
+
+    const refText = (data.referenceText || "").toLowerCase();
+    const chunkText = (currentText || "").toLowerCase();
+    const chunkStart = chunkText ? refText.indexOf(chunkText) : -1;
+    const chunkEnd =
+      chunkStart !== -1 ? chunkStart + chunkText.length : -1;
+
+    return (
+      list.find(
+        (fs: any) =>
+          fs.positions?.includes(currentIndex) ||
+          (chunkStart !== -1 &&
+            fs.positions?.some(
+              (pos: number) => pos >= chunkStart && pos < chunkEnd
+            ))
+      ) || null
+    );
+  }, [
+    data.focusSounds,
+    data.referenceText,
+    isFullSentenceStep,
+    currentText,
+    currentIndex,
+  ]);
+
   const isAudioActive = isFullSentenceStep ? isPlayingTTS : isPlayingWord;
 
   const tokens: string[] = (currentText ?? "").split(/\s+/).filter(Boolean);
@@ -261,6 +288,7 @@ export function PronunciationStep({
     clearAutoAdvance();
     stopAllAudio();
     if (currentIndex < totalSteps - 1) {
+      playSfx("tap");
       setCurrentIndex((prev) => prev + 1);
     } else {
       onNext();
@@ -337,7 +365,7 @@ export function PronunciationStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
 
-  // Score tracking + AUTO-ADVANCE on pass (or max attempts)
+  // Score tracking + SFX + AUTO-ADVANCE on pass (or max attempts)
   useEffect(() => {
     if (!score || score === lastTrackedScore.current) return;
     if (assessedText !== currentText) return;
@@ -358,6 +386,12 @@ export function PronunciationStep({
 
     const overall = Math.round(score.pronunciationScore);
     const passed = overall >= PASSING_SCORE;
+
+    if (passed) {
+      playSfx(overall >= 85 ? "spark" : "correct");
+    } else {
+      playSfx("wrong");
+    }
 
     // Auto-advance to the next chunk seamlessly when passed (on non-final chunks)
     if (passed && !isFullSentenceStep) {
@@ -380,6 +414,7 @@ export function PronunciationStep({
 
   const handleStartRecording = async () => {
     if (isBusy) return;
+    playSfx("tap");
     clearAutoAdvance();
     stopAllAudio();
 
@@ -393,6 +428,7 @@ export function PronunciationStep({
 
   const handlePlayAudio = async () => {
     if (isBusy) return;
+    playSfx("tap");
     clearAutoAdvance();
 
     if (isAudioActive) {
@@ -480,6 +516,7 @@ export function PronunciationStep({
                 disabled={!isSelectable}
                 onClick={() => {
                   if (isSelectable) {
+                    playSfx("tap");
                     clearAutoAdvance();
                     setCurrentIndex(idx);
                   }

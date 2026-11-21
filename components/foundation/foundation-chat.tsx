@@ -65,6 +65,12 @@ function LiveKitChatInner({
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
 
   const [messages, setMessages] = useState<any[]>([]);
+  // Live streaming user utterance while speaking / waiting on Azure score
+  const [streamingUserTurn, setStreamingUserTurn] = useState<{
+    text: string;
+    isFinal: boolean;
+  } | null>(null);
+
   const [completedChunks, setCompletedChunks] = useState<Set<string>>(
     new Set(),
   );
@@ -98,10 +104,7 @@ function LiveKitChatInner({
     translation?: string;
     coachingTip?: string;
   }>({
-    starter:
-      starterHintTarget ||
-      requiredChunks[0] ||
-      "",
+    starter: starterHintTarget || requiredChunks[0] || "",
     translation: nativeSentence || "",
     coachingTip: `Roleplay with ${partnerName} and weave in your target phrases!`,
   });
@@ -115,6 +118,29 @@ function LiveKitChatInner({
   useEffect(() => {
     completedChunksRef.current = completedChunks;
   }, [completedChunks]);
+
+  const checkAndMarkChunks = useCallback(
+    (spokenText: string) => {
+      if (!spokenText || requiredChunks.length === 0) return;
+      setCompletedChunks((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        requiredChunks.forEach((chunk) => {
+          if (!next.has(chunk) && doesSpeechMatchChunk(spokenText, chunk)) {
+            next.add(chunk);
+            changed = true;
+          }
+        });
+        if (changed) {
+          playSfx("spark");
+          completedChunksRef.current = next;
+          return next;
+        }
+        return prev;
+      });
+    },
+    [requiredChunks],
+  );
 
   const userTurnCount = useMemo(
     () => messages.filter((m) => m.role === "user").length,
@@ -148,7 +174,6 @@ function LiveKitChatInner({
       const nextChunk =
         requiredChunks.find((c) => !completedChunksRef.current.has(c)) || "";
 
-      // Fallback update immediately if userId isn't on session
       if (!session?.userId) {
         if (nextChunk) {
           setLiveHint((prev) => ({
@@ -296,6 +321,15 @@ function LiveKitChatInner({
         return;
       }
 
+      // Live streaming partial/final STT words as the user speaks
+      if (payload.type === "USER_TRANSCRIPT_STREAM" && payload.text) {
+        const text = String(payload.text).trim();
+        const isFinal = Boolean(payload.isFinal);
+        setStreamingUserTurn({ text, isFinal });
+        checkAndMarkChunks(text);
+        return;
+      }
+
       if (payload.type === "AGENT_TURN") {
         const aiText = payload.text || "";
         const aiTrans =
@@ -330,24 +364,8 @@ function LiveKitChatInner({
         const spokenText = payload.originalText || "";
         const pron = payload.pronunciation;
 
-        if (spokenText && requiredChunks.length > 0) {
-          setCompletedChunks((prev) => {
-            const next = new Set(prev);
-            let changed = false;
-            requiredChunks.forEach((chunk) => {
-              if (!next.has(chunk) && doesSpeechMatchChunk(spokenText, chunk)) {
-                next.add(chunk);
-                changed = true;
-              }
-            });
-           if (changed) {
-              playSfx("spark");
-              completedChunksRef.current = next;
-              return next;
-            }
-            return prev;
-          });
-        }
+        setStreamingUserTurn(null);
+        checkAndMarkChunks(spokenText);
 
         if (pron?.words?.length) {
           pron.words.forEach((w: any) => {
@@ -386,7 +404,7 @@ function LiveKitChatInner({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, agentState, activeReaction]);
+  }, [messages, streamingUserTurn, agentState, activeReaction]);
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = String(secondsLeft % 60).padStart(2, "0");
@@ -520,7 +538,7 @@ function LiveKitChatInner({
 
         <ScrollArea className="h-full">
           <div className="space-y-5 p-5 sm:p-7">
-            {messages.length === 0 && (
+            {messages.length === 0 && !streamingUserTurn && (
               <div className="flex min-h-[200px] flex-col items-center justify-center text-center">
                 <p className="text-sm font-bold text-slate-400">
                   {agentState === "connecting"
@@ -538,6 +556,21 @@ function LiveKitChatInner({
                 ttsStatus="idle"
               />
             ))}
+
+            {/* Real-time streaming user bubble while speaking / scoring */}
+            {streamingUserTurn && (
+              <FoundationFreestyleChatBubble
+                key="streaming-user-turn"
+                message={{
+                  id: "streaming-user-turn",
+                  role: "user",
+                  text: streamingUserTurn.text,
+                  isAnalyzingPronunciation: streamingUserTurn.isFinal,
+                }}
+                aiAvatarUrl={partnerAvatarUrl}
+                ttsStatus="idle"
+              />
+            )}
 
             {agentState === "thinking" && (
               <FoundationFreestyleChatBubble
@@ -566,11 +599,13 @@ function LiveKitChatInner({
               }`}
             />
             <span className="text-xs font-black text-slate-800 sm:text-sm">
-              {agentState === "listening"
-                ? `Listening (Reply to ${partnerName})...`
-                : agentState === "speaking"
-                  ? `${partnerName} Speaking...`
-                  : "Connecting voice..."}
+              {streamingUserTurn && !streamingUserTurn.isFinal
+                ? `Hearing: "${streamingUserTurn.text}"`
+                : agentState === "listening"
+                  ? `Listening (Reply to ${partnerName})...`
+                  : agentState === "speaking"
+                    ? `${partnerName} Speaking...`
+                    : "Connecting voice..."}
             </span>
           </div>
 

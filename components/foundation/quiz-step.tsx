@@ -17,6 +17,14 @@ import {
 import { useSpeech } from "@/context/speech-context";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
+import { playSfx } from "@/lib/sfx";
+
+const foldAccents = (s: string) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 // --------------------------------------------------------
 // 1. VERBAL CLOZE COMPONENT (3D Stage Card + 3D Mic Dock)
@@ -56,13 +64,14 @@ function VerbalClozeQuestion({
   useEffect(() => {
     if (!isRecording || !transcript) return;
 
-    const spokenText = transcript.toLowerCase();
+    const spokenFolded = foldAccents(transcript);
     const isMatch = item.acceptableAnswers.some((ans: string) =>
-      spokenText.includes(ans.toLowerCase())
+      spokenFolded.includes(foldAccents(ans))
     );
 
     if (isMatch) {
       stopRecording();
+      playSfx("correct");
       setLocalStatus("correct");
 
       trackInteraction(targetWord, {
@@ -94,6 +103,7 @@ function VerbalClozeQuestion({
 
       // Safety valve: after 2 mic tries, reveal & allow advancing so a noisy mic never soft-locks
       if (nextAttempts >= 2) {
+        playSfx("tap");
         setLocalStatus("correct");
         onResolve(
           "correct",
@@ -102,6 +112,7 @@ function VerbalClozeQuestion({
         return;
       }
 
+      playSfx("wrong");
       setLocalStatus("incorrect");
       trackInteraction(targetWord, {
         tappedWrong: 1,
@@ -116,6 +127,7 @@ function VerbalClozeQuestion({
         }". Try saying "${targetWord}" once more!`
       );
     } else {
+      playSfx("tap");
       resetSpeechState();
       setLocalStatus("idle");
       onResolve("idle", "");
@@ -261,9 +273,11 @@ function TrueFalseQuestion({
   const handleGuess = (guess: boolean) => {
     setGuessed(guess);
     if (guess === isTrueAnswer) {
+      playSfx("correct");
       if (targetWord) trackInteraction(targetWord, { tappedCorrect: 1 });
       onResolve("correct", "Spot on! You caught the grammar nuance.");
     } else {
+      playSfx("wrong");
       if (targetWord) trackInteraction(targetWord, { tappedWrong: 1 });
       onResolve(
         "incorrect",
@@ -409,6 +423,7 @@ function ReorderQuestion({
 
   const handleRemoveWord = (word: string, idx: number) => {
     if (localStatus === "correct") return;
+    playSfx("tap");
     setLocalStatus("idle");
     onResolve("idle", "");
     const newSelected = [...selectedWords];
@@ -418,6 +433,7 @@ function ReorderQuestion({
   };
 
   const handleReset = () => {
+    playSfx("tap");
     setLocalStatus("idle");
     onResolve("idle", "");
     setSelectedWords([]);
@@ -438,9 +454,11 @@ function ReorderQuestion({
         (word, i) => word === item.expectedWords[i]
       );
       if (isPerfectMatch) {
+        playSfx("correct");
         setLocalStatus("correct");
         onResolve("correct", "Spot on! Perfect sentence order.");
       } else {
+        playSfx("wrong");
         setLocalStatus("incorrect");
         onResolve(
           "incorrect",
@@ -582,6 +600,7 @@ export function QuizStep({
   const handleNextQuestion = () => {
     stopAudio();
     if (currentIndex < totalQuestions - 1) {
+      playSfx("tap");
       setCurrentIndex(currentIndex + 1);
       setStatus("idle");
       setFeedback("");

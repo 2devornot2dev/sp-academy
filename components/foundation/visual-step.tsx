@@ -15,6 +15,7 @@ import {
 import { useS3Media } from "@/context/s3-context";
 import { useMatrix } from "@/context/matrix-context";
 import { useSpeakWord } from "@/components/foundation/word-tap";
+import { playSfx } from "@/lib/sfx";
 
 export function VisualStep({
   data,
@@ -61,6 +62,7 @@ export function VisualStep({
   }, []);
 
   const toggleAudio = () => {
+    playSfx("tap");
     if (isPlaying) {
       audioRef.current?.pause();
       setIsPlaying(false);
@@ -84,6 +86,7 @@ export function VisualStep({
   };
 
   const handleSelectReply = (reply: string) => {
+    playSfx("correct");
     setSelectedReply(reply);
     speak(reply, { each: true });
   };
@@ -192,7 +195,10 @@ export function VisualStep({
             {npcNativeLine && (
               <button
                 type="button"
-                onClick={() => setShowTranslation((prev) => !prev)}
+                onClick={() => {
+                  playSfx("tap");
+                  setShowTranslation((prev) => !prev);
+                }}
                 className="shrink-0 rounded-xl border-b-2 border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-600 hover:bg-slate-200"
               >
                 {showTranslation ? "Hide EN" : "Show EN"}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -31,6 +31,7 @@ import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { completeLesson } from "@/app/actions/complete-lesson";
 import type { UserFoundation } from "@/app/(dashboard)/foundation/actions/get-foundation-user";
 import { triggerMilestoneBossAndNextSpoon } from "@/lib/foundation/trigger-milestone-boss";
+import { playSfx, preloadSfx } from "@/lib/sfx";
 
 const STEPS_CONFIG = [
   { id: 1, title: "Mission Briefing", subtitle: "Coach intro", icon: Flag },
@@ -123,7 +124,12 @@ function FoundationContent({ foundation }: FoundationContentProps) {
     isOnboarding: false,
   };
 
+  useEffect(() => {
+    preloadSfx();
+  }, []);
+
   const handleNext = (nextStepIndex: number) => {
+    playSfx(nextStepIndex === 8 ? "victory" : "round-clear");
     syncCart(userId, targetLang);
     setStep(nextStepIndex);
   };
@@ -216,8 +222,8 @@ function FoundationContent({ foundation }: FoundationContentProps) {
                   }).catch((err) =>
                     console.error(
                       "Failed to trigger milestone boss & next spoon:",
-                      err
-                    )
+                      err,
+                    ),
                   );
                 }
 
@@ -238,7 +244,7 @@ function FoundationContent({ foundation }: FoundationContentProps) {
   };
 
   const progressPct = Math.round(
-    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100
+    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100,
   );
 
   return (
