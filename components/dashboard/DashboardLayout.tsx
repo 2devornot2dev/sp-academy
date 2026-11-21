@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -62,12 +63,20 @@ export default function DashboardLayout({
       />
 
       <div className="flex h-dvh w-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
-        {/* Top bar only shows on small phones (<768px) when sidebar is in Sheet mode */}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 md:hidden">
-          <SidebarTrigger className="-ml-1" />
-          <span className="text-sm font-black tracking-tight text-slate-800">
-            Spoon Academy
-          </span>
+        {/* Branded mobile-only header (hidden on iPad/Desktop where the 3D rail shows) */}
+        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-3.5 backdrop-blur-md md:hidden">
+          <SidebarTrigger className="h-8 w-8 rounded-xl border border-b-2 border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" />
+
+          <Image
+            src="/logo1-up.png"
+            alt="Spoon Academy"
+            width={120}
+            height={36}
+            priority
+            className="pointer-events-none absolute left-1/2 h-6 w-auto -translate-x-1/2 object-contain"
+          />
+
+          <div className="w-8" aria-hidden="true" />
         </header>
 
         <ScrollArea className="h-full w-full flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block [&>[data-radix-scroll-area-viewport]>div]:h-full">
