@@ -1,14 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-// Make sure to adjust this import path to wherever you saved your Reveal component!
 import { Reveal } from "../misc/reveal";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Sparkles, ArrowRight, Globe2, Zap, Users, Star } from "lucide-react";
-
-// The right-side visual (image, vector blobs, floating widgets) lives in its own component.
-// Adjust this import path to wherever you saved it.
 import HeroRightSide from "./hero-right-side";
 
 const BOTTOM_FEATURES = [
@@ -84,25 +80,28 @@ export default function HeroSection() {
       id="home"
       className="relative flex min-h-screen flex-col overflow-hidden bg-white selection:bg-blue-100"
     >
-      <div className="relative mx-auto flex w-full max-w-[1600px] flex-col px-5 sm:px-8 md:px-12 lg:px-16 xl:px-24 pt-4 sm:pt-8 lg:pt-14 pb-10 lg:pb-16">
+      <div className="relative mx-auto flex w-full max-w-[1600px] flex-col px-5 sm:px-8 md:px-12 lg:px-16 xl:px-24 pt-2 sm:pt-8 lg:pt-14 pb-10 lg:pb-16">
         {/* Main Content Split: flex-col-reverse puts HeroRightSide first on mobile */}
-        <div className="flex w-full flex-col-reverse gap-8 sm:gap-10 lg:flex-row lg:items-center xl:gap-16">
+        <div className="flex w-full flex-col-reverse gap-6 sm:gap-10 lg:flex-row lg:items-center xl:gap-16">
+          
           {/* ========================================= */}
           {/* LEFT SIDE CONTENT (2nd on mobile, 1st on desktop) */}
           {/* ========================================= */}
-          <div className="relative z-20 flex min-w-0 flex-1 flex-col items-center text-center lg:items-start lg:text-left">
-            <Reveal delay={0.2} scale={0.9}>
+          <div className="relative z-20 flex min-w-0 flex-1 flex-col items-start text-left">
+            
+            {/* "Learn a new language, your way" badge — hidden on mobile, visible on sm+ */}
+            <Reveal delay={0.2} scale={0.9} className="hidden sm:block">
               <div className="mb-4 lg:mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100/50 bg-blue-50 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-blue-600">
                 <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Learn a new language, your way
               </div>
             </Reveal>
 
-            <h1 className="text-[28px] min-[400px]:text-[32px] font-extrabold leading-[1.12] tracking-tight text-[#0B192C] sm:text-4xl md:text-5xl lg:text-6xl xl:text-[68px]">
+            <h1 className="text-[32px] min-[400px]:text-[36px] font-extrabold leading-[1.12] tracking-tight text-[#0B192C] sm:text-4xl md:text-5xl lg:text-6xl xl:text-[68px]">
               <Reveal
                 as="span"
                 delay={0.3}
-                className="mb-1 sm:mb-2 block sm:whitespace-nowrap"
+                className="mb-1 sm:mb-2 block whitespace-nowrap"
               >
                 Real Conversations.
               </Reveal>
@@ -132,7 +131,7 @@ export default function HeroSection() {
 
             <Reveal
               delay={0.7}
-              className="mt-6 lg:mt-8 flex w-full flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start"
+              className="mt-6 lg:mt-8 flex w-full flex-col gap-3 sm:flex-row sm:justify-start"
             >
               <Link href="#pricing" className="w-full sm:w-auto">
                 <Button className="h-12 sm:h-14 w-full rounded-full bg-blue-500 px-7 sm:px-8 text-base sm:text-lg font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 hover:bg-blue-600 sm:w-auto">

@@ -1,27 +1,32 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion, type TargetAndTransition } from "motion/react";
 import type { ReactNode } from "react";
 
 type RevealProps = {
   children: ReactNode;
   delay?: number;
+  duration?: number;
   x?: number;
   y?: number;
   scale?: number;
   className?: string;
-  // Added standard text tags so you don't get TS errors anymore!
   as?: "div" | "section" | "li" | "article" | "span" | "p" | "h1" | "h2" | "h3";
+  viewportMargin?: string;
+  whileHover?: TargetAndTransition;
 };
 
 export function Reveal({
   children,
   delay = 0,
+  duration = 0.8,
   x = 0,
   y = 24,
   scale = 1,
   className,
   as = "div",
+  viewportMargin = "0px",
+  whileHover,
 }: RevealProps) {
   const reduceMotion = useReducedMotion();
 
@@ -47,12 +52,13 @@ export function Reveal({
         y: 0,
         scale: 1,
       }}
+      whileHover={reduceMotion ? undefined : whileHover}
       viewport={{
         once: true,
-        margin: "-80px",
+        margin: viewportMargin,
       }}
       transition={{
-        duration: 0.8,
+        duration,
         delay,
         ease: [0.22, 1, 0.36, 1],
       }}

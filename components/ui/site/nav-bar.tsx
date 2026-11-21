@@ -1,111 +1,186 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { motion } from "motion/react";
+import {
+  Menu,
+  Home,
+  Sparkles,
+  Compass,
+  Star,
+  ChevronRight,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { SpoonLogo } from "../misc/logo";
 
-// Adjust this import path to wherever you saved the SpoonLogo component!
+const NAV_LINKS = [
+  {
+    label: "Home",
+    href: "#home",
+    icon: Home,
+    iconBg: "bg-blue-50 text-blue-500",
+  },
+  {
+    label: "Features",
+    href: "#features",
+    icon: Sparkles,
+    iconBg: "bg-emerald-50 text-emerald-500",
+  },
+  {
+    label: "Possibilities",
+    href: "#possibilities",
+    icon: Compass,
+    iconBg: "bg-purple-50 text-purple-500",
+  },
+  {
+    label: "Testimonials",
+    href: "#stats",
+    icon: Star,
+    iconBg: "bg-amber-50 text-amber-500",
+  },
+];
 
 export default function NavigationBar() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="border-b bg-white">
+    <nav className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-all">
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          
-          {/* Logo (Now scalable with standard text utilities!) */}
+          {/* Logo */}
           <div className="shrink-0 transition-transform hover:scale-105 active:scale-95">
             <Link href="/" onClick={() => setIsOpen(false)}>
-              <SpoonLogo className="text-3xl md:text-4xl" />
+              <SpoonLogo className="text-xl md:text-2xl" />
             </Link>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden items-center space-x-8 md:flex">
-            <Link href="#home" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
-              Home
-            </Link>
-            <Link href="#features" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
-              Features
-            </Link>
-            <Link href="#possibilities" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
-              Possibilities
-            </Link>
-            <Link href="#stats" className="text-gray-700 hover:text-gray-900 font-medium transition-colors">
-              Testimonials
-            </Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="font-medium text-gray-700 transition-colors hover:text-blue-600"
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
 
           {/* Desktop Auth Buttons */}
           <div className="hidden items-center space-x-4 md:flex">
-            <Button variant="ghost" nativeButton={false} render={<Link href="/sign-in" />}>
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<Link href="/sign-in" />}
+            >
               Sign In
             </Button>
-          
           </div>
 
           {/* Mobile Menu */}
           <div className="md:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              {/* Base UI: SheetTrigger takes the Button via the render prop, not asChild + child Button */}
-              <SheetTrigger render={<Button variant="ghost" size="icon" />}>
+              <SheetTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-xl hover:bg-slate-100"
+                    aria-label="Open menu"
+                  />
+                }
+              >
                 <Menu className="h-6 w-6 text-slate-800" />
               </SheetTrigger>
-              <SheetContent side="right" className="bg-white">
-                <div className="mt-8 flex flex-col space-y-4">
-                  <Link
-                    href="#home"
-                    className="text-lg font-medium text-slate-800"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Home
-                  </Link>
-                  <Link
-                    href="#features"
-                    className="text-lg font-medium text-slate-800"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Features
-                  </Link>
-                  <Link
-                    href="#possibilities"
-                    className="text-lg font-medium text-slate-800"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Possibilities
-                  </Link>
-                  <Link
-                    href="#stats"
-                    className="text-lg font-medium text-slate-800"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Testimonials
-                  </Link>
-                  
-                  <div className="space-y-3 pt-6 border-t">
-                    <Button
-                      variant="ghost"
-                      className="w-full text-base h-12"
-                      nativeButton={false}
-                      render={<Link href="/sign-in" />}
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Sign In
-                    </Button>
-                    <Button
-                      className="w-full text-base h-12"
-                      nativeButton={false}
-                      render={<Link href="/sign-up" />}
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Sign Up
-                    </Button>
+
+              <SheetContent
+                side="right"
+                className="flex w-[85%] max-w-[340px] flex-col justify-between border-l border-slate-100 bg-white p-6"
+              >
+                <div>
+                  {/* Drawer Header */}
+                  <div className="border-b border-slate-100 pb-4 pr-8">
+                    <Link href="/" onClick={() => setIsOpen(false)}>
+                      <SpoonLogo className="text-2xl" />
+                    </Link>
+                  </div>
+
+                  {/* Staggered Nav Items */}
+                  <div className="mt-6 flex flex-col gap-1.5">
+                    {NAV_LINKS.map((link, index) => {
+                      const Icon = link.icon;
+                      return (
+                        <motion.div
+                          key={link.href}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={
+                            isOpen
+                              ? { opacity: 1, x: 0 }
+                              : { opacity: 0, x: 20 }
+                          }
+                          transition={{
+                            duration: 0.45,
+                            delay: isOpen ? 0.08 + index * 0.06 : 0,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          <Link
+                            href={link.href}
+                            onClick={() => setIsOpen(false)}
+                            className="group flex items-center justify-between rounded-2xl p-2.5 transition-colors hover:bg-slate-50 active:bg-slate-100"
+                          >
+                            <div className="flex items-center gap-3.5">
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${link.iconBg}`}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <span className="text-[16px] font-semibold text-[#0B192C] transition-colors group-hover:text-blue-600">
+                                {link.label}
+                              </span>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-500" />
+                          </Link>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* Bottom Auth Actions */}
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={
+                    isOpen ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }
+                  }
+                  transition={{
+                    duration: 0.45,
+                    delay: isOpen ? 0.32 : 0,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-5"
+                >
+                  <Button
+                    className="h-12 w-full rounded-full bg-blue-500 text-base font-semibold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-600"
+                    nativeButton={false}
+                    render={<Link href="#pricing" />}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Sign Up Free
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-full border-slate-200 text-base font-semibold text-slate-700 hover:bg-slate-50"
+                    nativeButton={false}
+                    render={<Link href="/sign-in" />}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Sign In
+                  </Button>
+                </motion.div>
               </SheetContent>
             </Sheet>
           </div>
