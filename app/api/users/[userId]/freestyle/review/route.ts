@@ -2,13 +2,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { lambda, createCommand } from "@/lib/aws/lambda";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { groq } from "@/lib/groq";
 import { recordValidFreestyleInRedis } from "@/lib/upstash";
 
 const BASE_WEBHOOK = `${
-  process.env.NEXT_PUBLIC_APP_URL2 ??
-  process.env.NEXT_PUBLIC_APP_URL ??
-  "https://spoonacademy.com"
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://spoonacademy.com"
 }/api/webhooks/system-tasks`;
 
 export async function POST(
@@ -54,7 +53,6 @@ export async function POST(
     );
 
     if (userMessages.length < 3 || totalUserWords < 6) {
-      // Delete the incomplete session so it doesn't unlock the Boss or eat a daily slot
       await prisma.freestyleSession
         .delete({ where: { id: sessionId } })
         .catch(() => {});
@@ -66,7 +64,6 @@ export async function POST(
       });
     }
 
-    // Format the full transcript
     const fullTranscript = messages
       .map((m: any) => `[${(m.role || "user").toUpperCase()}]: ${m.text || ""}`)
       .join("\n");
@@ -141,7 +138,8 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
       (m: any) => m.category?.toUpperCase() === "PRONUNCIATION",
     );
 
-    const [updatedSession, redisRecord] = await Promise.all([
+    const [entitlements, updatedSession, redisRecord] = await Promise.all([
+      getUserEntitlements(userId),
       prisma.freestyleSession.update({
         where: { id: sessionId },
         data: {
@@ -231,14 +229,22 @@ Return ONLY JSON: { "isValid": boolean, "reason": "1 short friendly sentence exp
 
     await lambda.send(command);
 
+    const effectiveCooldownSeconds =
+      entitlements.freestyleCooldownSeconds > 0
+        ? redisRecord.cooldownSeconds
+        : 0;
+
     return NextResponse.json({
       valid: true,
       success: true,
       sessionId,
       taskId: task.id,
       dailyUsed: redisRecord.dailyUsed,
-      cooldownSeconds: redisRecord.cooldownSeconds,
-      cooldownUntil: Date.now() + redisRecord.cooldownSeconds * 1000,
+      cooldownSeconds: effectiveCooldownSeconds,
+      cooldownUntil:
+        effectiveCooldownSeconds > 0
+          ? Date.now() + effectiveCooldownSeconds * 1000
+          : null,
     });
   } catch (error) {
     console.error("Review Route Error:", error);

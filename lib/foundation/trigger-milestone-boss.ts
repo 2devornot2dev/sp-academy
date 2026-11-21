@@ -9,12 +9,13 @@ import { buildBossPayload } from "@/lib/boss/build-boss-payload";
 import { SpoonBossTaskMetadataSchema } from "@/lib/boss/schemas";
 import { getBossSpriteOrderIndex } from "@/lib/foundation/tools";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { SystemTaskType } from "@prisma/client";
 
 const BOSS_LAMBDA =
   process.env.BOSS_BUILDER_LAMBDA_NAME ?? "spoon-boss-builder";
 const EVENT_PAYLOAD_LIMIT_BYTES = 256 * 1024;
-const BASE_WEBHOOK = `${process.env.NEXT_PUBLIC_APP_URL2 ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://spoonacademy.com"}/api/webhooks/system-tasks`;
+const BASE_WEBHOOK =  "https://spoonacademy.com/api/webhooks/system-tasks";
 
 export async function triggerMilestoneBossAndNextSpoon({
   userId,
@@ -31,37 +32,44 @@ export async function triggerMilestoneBossAndNextSpoon({
   const endIndex = milestoneIndex * 3;             // e.g. 3
   const nextSpoonNumber = endIndex + 1;            // e.g. 4
 
-  // 1. Check existing Boss Stage (Idempotency guard so webhook + completeVocabBridge never double-fire)
-  const [course, existingBossStage, spriteProfile] = await Promise.all([
-    prisma.foundationCourse.findUnique({
-      where: { id: courseId },
-      include: { user: { select: { firstName: true, gender: true } } },
-    }),
-    prisma.foundationBossStage.findUnique({
-      where: {
-        foundationCourseId_milestoneIndex: {
-          foundationCourseId: courseId,
-          milestoneIndex,
+  // 1. Check existing Boss Stage + User Entitlements
+  const [course, existingBossStage, spriteProfile, entitlements] =
+    await Promise.all([
+      prisma.foundationCourse.findUnique({
+        where: { id: courseId },
+        include: { user: { select: { firstName: true, gender: true } } },
+      }),
+      prisma.foundationBossStage.findUnique({
+        where: {
+          foundationCourseId_milestoneIndex: {
+            foundationCourseId: courseId,
+            milestoneIndex,
+          },
         },
-      },
-    }),
-    prisma.spriteProfile.findUnique({
-      where: { userId },
-      include: { sprite: true },
-    }),
-  ]);
+      }),
+      prisma.spriteProfile.findUnique({
+        where: { userId },
+        include: { sprite: true },
+      }),
+      getUserEntitlements(userId),
+    ]);
 
   if (!course) throw new Error(`Course ${courseId} not found`);
+
+  // Free trial covers Milestone 1 Boss only
+  if (entitlements.isTrial && milestoneIndex > 1) {
+    console.log(
+      `🔒 [TRIAL] Skipping Boss Stage ${milestoneIndex} for trial user ${userId}`,
+    );
+    return;
+  }
 
   const targetLanguage = toLanguageCode(course.targetLanguage);
   const nativeLanguage = toLanguageCode(course.nativeLanguage);
 
   // 2. Build Boss Stage + Boss Sprite if not already BUILDING / READY / COMPLETED
-  if (
-    !existingBossStage ||
-    existingBossStage.status === "FAILED"
-  ) {
-const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
+  if (!existingBossStage || existingBossStage.status === "FAILED") {
+    const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
       await Promise.all([
         prisma.foundationLesson.findMany({
           where: {
@@ -180,7 +188,7 @@ const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
 
       if (sizeBytes > EVENT_PAYLOAD_LIMIT_BYTES) {
         throw new Error(
-          `Boss payload is ${(sizeBytes / 1024).toFixed(1)} KB, exceeding 256 KB limit.`
+          `Boss payload is ${(sizeBytes / 1024).toFixed(1)} KB, exceeding 256 KB limit.`,
         );
       }
 
@@ -190,7 +198,7 @@ const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
             functionName: BOSS_LAMBDA,
             invocationType: "Event",
             payload: body,
-          })
+          }),
         ),
       ];
 
@@ -251,21 +259,22 @@ const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
                     webhookUrl: `${BASE_WEBHOOK}/${bossSpriteTask.id}`,
                   }),
                 },
-              })
-            )
+              }),
+            ),
           );
         }
       }
 
       await Promise.all(lambdaPromises);
       console.log(
-        `🚀 Triggered Boss Stage ${milestoneIndex} + Boss Sprite for course ${courseId}`
+        `🚀 Triggered Boss Stage ${milestoneIndex} + Boss Sprite for course ${courseId}`,
       );
     }
   }
 
-  // 3. PRE-BAKE NEXT SPOON (e.g. Spoon 4, 7, 10) + ITS VOCAB BRIDGE & SPRITE
-  if (prebakeNextSpoon) {
+  // 3. PRE-BAKE NEXT SPOON (e.g. Spoon 4, 7, 10) — ONLY for paid tiers!
+  const shouldPrebake = prebakeNextSpoon && entitlements.canPrebakeNextMilestone;
+  if (shouldPrebake) {
     const existingNextSpoon = await prisma.foundationLesson.findUnique({
       where: {
         foundationCourseId_orderIndex: {
@@ -285,15 +294,19 @@ const [targetLessons, targetBridges, wordMatrix, completedLadderRows] =
         spoon: nextSpoonNumber,
         nativeLanguage,
         targetLanguage,
-        levelBand: "unspecified", // Automatically recovered inside invokeEduBuilder from Spoon 1
+        levelBand: "unspecified",
         goal: "unspecified",
         scriptComfort: "unspecified",
         type: "lang",
         isOnboarding: false,
       });
       console.log(
-        `🔥 Pre-baking Spoon ${nextSpoonNumber} while user is on Boss ${milestoneIndex}!`
+        `🔥 Pre-baking Spoon ${nextSpoonNumber} while user is on Boss ${milestoneIndex}!`,
       );
     }
+  } else if (prebakeNextSpoon && entitlements.isTrial) {
+    console.log(
+      `🔒 [TRIAL] Skipping pre-bake for Spoon ${nextSpoonNumber} (Milestone 1 cap reached).`,
+    );
   }
 }

@@ -2,67 +2,76 @@
 import { getUserLanguage } from "@/app/actions/get-user-language";
 import FreestyleWrapper from "@/components/freestyle/freestyle-wrapper";
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { prisma } from "@/lib/prisma";
 import { getFreestyleRedisState, getStartOfToday } from "@/lib/upstash";
 
 export const dynamic = "force-dynamic";
 
-const COOLDOWN_MS = 5 * 60 * 1000;
-
 export default async function ConversationPage() {
   const user = await requireUser();
   const startOfToday = getStartOfToday();
 
-  const [{ lang }, redisState, todaySessions, totalReviewsCount] =
-    await Promise.all([
-      getUserLanguage(user.id),
-      getFreestyleRedisState(user.id),
-      prisma.freestyleSession.findMany({
-        where: {
-          userId: user.id,
-          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-          createdAt: { gte: startOfToday }, // today only, not rolling 24h
-        },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.freestyleSession.count({
-        where: {
-          userId: user.id,
-          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-        },
-      }),
-    ]);
+  const [
+    { lang },
+    entitlements,
+    redisState,
+    todaySessions,
+    totalReviewsCount,
+  ] = await Promise.all([
+    getUserLanguage(user.id),
+    getUserEntitlements(user.id),
+    getFreestyleRedisState(user.id),
+    prisma.freestyleSession.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+        createdAt: { gte: startOfToday },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.freestyleSession.count({
+      where: {
+        userId: user.id,
+        status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+      },
+    }),
+  ]);
 
   const defaultNative = lang?.nativeLanguage ?? "ENGLISH";
   const defaultTarget = lang?.targetLanguage ?? "fr-FR";
+
+  const cooldownMs = entitlements.freestyleCooldownSeconds * 1000;
 
   let initialCooldown: {
     sessionId: string;
     remainingSeconds: number;
   } | null = null;
 
-  if (redisState.cooldownSessionId && redisState.cooldownSecondsLeft > 0) {
-    initialCooldown = {
-      sessionId: redisState.cooldownSessionId,
-      remainingSeconds: redisState.cooldownSecondsLeft,
-    };
-  } else if (todaySessions[0]) {
-    const latest = todaySessions[0];
-    const endedMs = new Date(latest.updatedAt ?? latest.createdAt).getTime();
-    const elapsedMs = Date.now() - endedMs;
-    if (elapsedMs < COOLDOWN_MS) {
+  if (cooldownMs > 0) {
+    if (redisState.cooldownSessionId && redisState.cooldownSecondsLeft > 0) {
       initialCooldown = {
-        sessionId: latest.id,
-        remainingSeconds: Math.max(
-          1,
-          Math.ceil((COOLDOWN_MS - elapsedMs) / 1000),
-        ),
+        sessionId: redisState.cooldownSessionId,
+        remainingSeconds: redisState.cooldownSecondsLeft,
       };
+    } else if (todaySessions[0]) {
+      const latest = todaySessions[0];
+      const endedMs = new Date(latest.updatedAt ?? latest.createdAt).getTime();
+      const elapsedMs = Date.now() - endedMs;
+      if (elapsedMs < cooldownMs) {
+        initialCooldown = {
+          sessionId: latest.id,
+          remainingSeconds: Math.max(
+            1,
+            Math.ceil((cooldownMs - elapsedMs) / 1000),
+          ),
+        };
+      }
     }
   }
 
@@ -80,7 +89,9 @@ export default async function ConversationPage() {
         defaultTarget={defaultTarget}
         initialCooldown={initialCooldown}
         dailySessionsUsed={dailySessionsUsed}
-        dailySessionsMax={redisState.dailyMax}
+        dailySessionsMax={entitlements.dailyFreestyleMax}
+        cooldownSeconds={entitlements.freestyleCooldownSeconds}
+        isTrial={entitlements.isTrial}
         reviewsCount={totalReviewsCount}
       />
     </div>

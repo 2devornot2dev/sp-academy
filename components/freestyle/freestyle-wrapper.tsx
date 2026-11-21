@@ -2,9 +2,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Lock, Sparkles, ArrowRight, Bot } from "lucide-react";
 
 import FreestyleSetup from "./freestyle-setup";
 import FreestyleChat from "./freestyle-chat";
@@ -52,6 +53,8 @@ interface FreestyleWrapperProps {
   } | null;
   dailySessionsUsed?: number;
   dailySessionsMax?: number;
+  cooldownSeconds?: number;
+  isTrial?: boolean;
   reviewsCount?: number;
 }
 
@@ -62,6 +65,8 @@ export default function FreestyleWrapper({
   initialCooldown = null,
   dailySessionsUsed = 0,
   dailySessionsMax = 5,
+  cooldownSeconds = 300,
+  isTrial = false,
   reviewsCount = 0,
 }: FreestyleWrapperProps) {
   const router = useRouter();
@@ -119,6 +124,50 @@ export default function FreestyleWrapper({
       clearInterval(interval);
     };
   }, [cooldownSessionId, isReviewReady]);
+
+  if (isTrial || dailySessionsMax <= 0) {
+    return (
+      <div className="flex min-h-full w-full flex-1 items-center justify-center bg-slate-50 p-4 sm:p-8">
+        <div className="w-full max-w-xl rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 text-center shadow-xl sm:p-10">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-md">
+            <Bot className="h-8 w-8" />
+          </div>
+
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black tracking-wider text-amber-800 uppercase">
+            <Lock className="h-3 w-3" />
+            Beta Founder Feature
+          </span>
+
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+            Unlock Daily AI Conversations
+          </h2>
+
+          <p className="mx-auto mt-2.5 max-w-md text-sm font-semibold leading-relaxed text-slate-500">
+            Your Free Trial includes Milestone 1 (Spoons 1–3, Vocab Bridges, and
+            Boss Stage 1). Upgrade to Beta Founder ($35/mo) for 5 daily 3-min
+            live AI voice sprints, full reviews, and Repair Arcades.
+          </p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href="/pricing"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-4 text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:text-base"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Unlock Beta Founder</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/learning-hub"
+              className="inline-flex items-center justify-center rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-6 py-3.5 text-sm font-black text-slate-700 hover:bg-slate-50"
+            >
+              Back to Learning Hub
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleStartSession = async (
     config: Omit<FreestyleSessionConfig, "id" | "aiAvatarUrl">,
@@ -222,7 +271,7 @@ export default function FreestyleWrapper({
     valid: boolean;
     sessionId?: string;
     reason?: string;
-    cooldownUntil?: number;
+    cooldownUntil?: number | null;
   }) => {
     const fallbackId = activeSession?.id;
     setActiveSession(null);
@@ -239,14 +288,20 @@ export default function FreestyleWrapper({
     const finalSessionId = result?.sessionId || fallbackId || null;
     if (finalSessionId) {
       setCooldownSessionId(finalSessionId);
-      setCooldownSecondsLeft(300);
+      const nextSecs =
+        cooldownSeconds <= 0
+          ? 0
+          : result?.cooldownUntil
+            ? Math.max(0, Math.round((result.cooldownUntil - Date.now()) / 1000))
+            : cooldownSeconds;
+      setCooldownSecondsLeft(nextSecs);
       setDailyUsed((prev) => Math.min(dailySessionsMax, prev + 1));
       setIsReviewReady(false);
     }
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-1 flex-col bg-slate-100">
+    <div className="relative flex min-h-full w-full flex-1 flex-col bg-slate-100">
       <AnimatePresence mode="wait">
         {/* 1. COOLDOWN HUB */}
         {!activeSession && cooldownSessionId && (
@@ -256,7 +311,7 @@ export default function FreestyleWrapper({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="min-h-screen w-full"
+            className="min-h-full w-full"
           >
             <FreestyleCooldownHub
               cooldownSecondsLeft={cooldownSecondsLeft}
@@ -279,7 +334,7 @@ export default function FreestyleWrapper({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="min-h-screen w-full"
+            className="min-h-full w-full"
           >
             {incompleteReason && (
               <div className="mx-auto max-w-7xl px-6 pt-4 lg:px-8">

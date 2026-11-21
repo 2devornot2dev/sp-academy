@@ -2,8 +2,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { groq } from "@/lib/groq";
 import { getFreestyleTutor, getTutorVoiceId } from "@/lib/freestyle/tutors";
+import { getStartOfToday } from "@/lib/upstash";
 
 const PERSONA_STYLES: Record<string, string> = {
   FRIENDLY: "warm, patient, and encouraging",
@@ -175,9 +177,42 @@ Output ONLY a JSON object with 4 keys:
         });
       }
     }
+
     // ========================================================================
-    // BRANCH C: CREATE NEW 3-MIN FREESTYLE SESSION
+    // BRANCH C: CREATE NEW 3-MIN FREESTYLE SESSION (Tier & Daily Cap Guard)
     // ========================================================================
+    const entitlements = await getUserEntitlements(userId);
+
+    if (entitlements.isTrial || entitlements.dailyFreestyleMax <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            "AI Conversation Arena requires Beta Founder or Unlimited+. Upgrade to unlock daily live sprints!",
+          requiresUpgrade: true,
+        },
+        { status: 403 },
+      );
+    }
+
+    const startOfToday = getStartOfToday();
+    const todayUsedCount = await prisma.freestyleSession.count({
+      where: {
+        userId,
+        status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+        createdAt: { gte: startOfToday },
+      },
+    });
+
+    if (todayUsedCount >= entitlements.dailyFreestyleMax) {
+      return NextResponse.json(
+        {
+          error: `You've reached today's limit of ${entitlements.dailyFreestyleMax} AI conversations. Come back tomorrow!`,
+          requiresUpgrade: entitlements.plan === "FOUNDER",
+        },
+        { status: 429 },
+      );
+    }
+
     const {
       mode = "FOCUSED",
       level = "EASY",

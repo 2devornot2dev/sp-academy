@@ -3,6 +3,7 @@
 
 import { lambda, createCommand } from "@/lib/aws/lambda";
 import { prisma } from "@/lib/prisma";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { JsonValue } from "@prisma/client/runtime/library";
 import { setupFirstLesson } from "@/lib/foundation/setup-first-lesson";
 import { setupNextLesson } from "@/lib/foundation/setup-next-lesson";
@@ -46,7 +47,7 @@ export interface InvokeEduBuilderPayload {
 
 export type InvokeEduBuilderResult =
   | { ok: true; lessonId: string; taskId: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; requiresUpgrade?: boolean };
 
 export interface LessonDbContext {
   courseId: string;
@@ -132,10 +133,15 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
       let interval = BillingInterval.MONTHLY;
       let nextBillingDate: Date | null = null;
       let cancelAtPeriodEnd = false;
+      let resolvedPlan: Billing = Billing.PRO_MONTHLY;
 
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
         const subItem = sub.items.data[0];
+
+        if (subItem?.price?.id === process.env.STRIPE_FOUNDER_MONTHLY_PRICE_ID) {
+          resolvedPlan = Billing.FOUNDER_MONTHLY;
+        }
 
         const periodEnd =
           (sub as any).current_period_end ??
@@ -153,7 +159,7 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
           userId,
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
-          currentPlan: Billing.PRO_MONTHLY,
+          currentPlan: resolvedPlan,
           billingInterval: interval,
           isActive: true,
           cancelAtPeriodEnd,
@@ -164,6 +170,7 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
         update: {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
+          currentPlan: resolvedPlan,
           isActive: true,
         },
       });
@@ -192,68 +199,69 @@ async function resolveHistoricalContext(
   let resolvedGender = normalizeGender(payload.gender);
   let resolvedFirstName = payload.firstName;
 
-  // If we are building a Hard Mode lesson, we need to pass the corresponding Standard Mode lessons 
-  // for that unit so the LLM mirrors the topic and upgrades it to Part IV, V, VI
-  const standardCourse = isHardModeCourse 
+  const standardCourse = isHardModeCourse
     ? await prisma.foundationCourse.findFirst({
-        where: { 
-          userId: payload.userId, 
-          targetLanguage: payload.targetLanguage, 
-          isHardMode: false 
+        where: {
+          userId: payload.userId,
+          targetLanguage: payload.targetLanguage,
+          isHardMode: false,
         },
-        select: { id: true }
+        select: { id: true },
       })
     : null;
 
-  const standardUnitLessonsPromise = isHardModeCourse && standardCourse
-    ? prisma.foundationLesson.findMany({
-        where: {
-          foundationCourseId: standardCourse.id,
-          orderIndex: {
-            gte: (Math.ceil(payload.spoon / 3) - 1) * 3 + 1,
-            lte: Math.ceil(payload.spoon / 3) * 3,
+  const standardUnitLessonsPromise =
+    isHardModeCourse && standardCourse
+      ? prisma.foundationLesson.findMany({
+          where: {
+            foundationCourseId: standardCourse.id,
+            orderIndex: {
+              gte: (Math.ceil(payload.spoon / 3) - 1) * 3 + 1,
+              lte: Math.ceil(payload.spoon / 3) * 3,
+            },
+            NOT: { lessonHandoff: { equals: Prisma.DbNull } },
           },
+          orderBy: { orderIndex: "asc" },
+          select: { orderIndex: true, title: true, lessonHandoff: true },
+        })
+      : Promise.resolve([]);
+
+  const [pastLessonsInThisCourse, standardUnitLessons, firstTask, langProfile] =
+    await Promise.all([
+      prisma.foundationLesson.findMany({
+        where: {
+          foundationCourseId: courseId,
+          id: { not: currentLessonId },
+          orderIndex: { lt: payload.spoon },
           NOT: { lessonHandoff: { equals: Prisma.DbNull } },
         },
         orderBy: { orderIndex: "asc" },
         select: { orderIndex: true, title: true, lessonHandoff: true },
-      })
-    : Promise.resolve([]);
-
-  const [pastLessonsInThisCourse, standardUnitLessons, firstTask, langProfile] = await Promise.all([
-    prisma.foundationLesson.findMany({
-      where: {
-        foundationCourseId: courseId,
-        id: { not: currentLessonId },
-        orderIndex: { lt: payload.spoon },
-        NOT: { lessonHandoff: { equals: Prisma.DbNull } },
-      },
-      orderBy: { orderIndex: "asc" },
-      select: { orderIndex: true, title: true, lessonHandoff: true },
-    }),
-    standardUnitLessonsPromise,
-    prisma.systemTask.findFirst({
-      where: {
-        type: "SPOON_GENERATION",
-        metadata: {
-          path: ["foundationCourseId"],
-          equals: standardCourse?.id || courseId,
+      }),
+      standardUnitLessonsPromise,
+      prisma.systemTask.findFirst({
+        where: {
+          type: "SPOON_GENERATION",
+          metadata: {
+            path: ["foundationCourseId"],
+            equals: standardCourse?.id || courseId,
+          },
         },
-      },
-      orderBy: { createdAt: "asc" },
-      select: { payload: true },
-    }),
-    prisma.languageProfile.findUnique({
-      where: {
-        userId_languageCode: {
-          userId: payload.userId,
-          languageCode: payload.targetLanguage,
-        },
-      },
-    }).catch(() => null),
-  ]);
+        orderBy: { createdAt: "asc" },
+        select: { payload: true },
+      }),
+      prisma.languageProfile
+        .findUnique({
+          where: {
+            userId_languageCode: {
+              userId: payload.userId,
+              languageCode: payload.targetLanguage,
+            },
+          },
+        })
+        .catch(() => null),
+    ]);
 
-  // Combine standard unit lessons (so LLM sees Parts I, II, III) + past hard mode lessons
   const combinedRawLessons = [...standardUnitLessons, ...pastLessonsInThisCourse];
 
   previous_lessons = combinedRawLessons.map((l) => {
@@ -343,7 +351,7 @@ async function resolveHistoricalContext(
 // HELPER 3: Construct Standardized Sprite Lambda Payload
 // ---------------------------------------------------------------------------
 function buildSpritePayload(
-  stepType: "SPOON" | "BRIDGE", 
+  stepType: "SPOON" | "BRIDGE",
   orderIndex: number,
   nodeId: string,
   webhookUrl: string,
@@ -403,7 +411,6 @@ async function dispatchEduAndSpriteLambdas(
     ),
   ];
 
-  // 1. Spoon Sprite Task
   if (spriteSpoonPayload && dbContext.spriteTaskId) {
     await prisma.systemTask
       .update({
@@ -423,7 +430,6 @@ async function dispatchEduAndSpriteLambdas(
     );
   }
 
-  // 2. Vocab Bridge Sprite Task
   if (spriteBridgePayload && dbContext.bridgeTaskId) {
     await prisma.systemTask
       .update({
@@ -486,6 +492,35 @@ export async function invokeEduBuilder(
     await claimSubscriptionForUser(payload.userId, payload.sessionId);
   }
 
+  // Tier & Monthly Quota Guardrails
+  const entitlements = await getUserEntitlements(payload.userId);
+
+  if (entitlements.isTrial && Number(payload.spoon) > 3) {
+    return {
+      ok: false,
+      requiresUpgrade: true,
+      error:
+        "Free trial includes Milestone 1 (Spoons 1–3). Upgrade to unlock Milestone 2!",
+    };
+  }
+
+  if (!entitlements.isTrial && entitlements.plan !== "ADMIN") {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const usedThisMonth = await prisma.foundationLesson.count({
+      where: {
+        userId: payload.userId,
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+    if (usedThisMonth >= entitlements.monthlySpoonLimit) {
+      return {
+        ok: false,
+        requiresUpgrade: true,
+        error: `You've reached your monthly limit of ${entitlements.monthlySpoonLimit} Spoons.`,
+      };
+    }
+  }
+
   const normalizedPayload: InvokeEduBuilderPayload = {
     ...payload,
     gender: normalizeGender(payload.gender),
@@ -494,8 +529,6 @@ export async function invokeEduBuilder(
   };
 
   if (normalizedPayload.isOnboarding && normalizedPayload.targetLanguage) {
-
-    if (normalizedPayload.isOnboarding) {
     await prisma.accountSettings
       .upsert({
         where: { userId: normalizedPayload.userId },
@@ -503,9 +536,9 @@ export async function invokeEduBuilder(
         update: {},
       })
       .catch((e) =>
-        console.warn("AccountSettings default upsert skipped:", e),
+        console.warn("AccountSettings default upsert skipped:", e)
       );
-  }
+
     await prisma.languageProfile
       .upsert({
         where: {
@@ -543,10 +576,9 @@ export async function invokeEduBuilder(
     };
   }
 
-  // 🔴 Check if this course is Hard Mode
   const courseMeta = await prisma.foundationCourse.findUnique({
     where: { id: dbContext.courseId },
-    select: { isHardMode: true }
+    select: { isHardMode: true },
   });
   const isHardModeCourse = courseMeta?.isHardMode ?? false;
 
@@ -584,7 +616,6 @@ export async function invokeEduBuilder(
   const resolvedTargetVoiceId =
     dbContext.targetVoiceId || normalizedPayload.targetVoiceId;
 
-  // 🔴 Pass isHardMode to Python
   const lambdaPayload = {
     ...normalizedPayload,
     type: "lang",
