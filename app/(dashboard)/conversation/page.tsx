@@ -81,7 +81,7 @@ export default async function ConversationPage() {
   );
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-100">
+    <div className="flex h-full min-h-0 flex-1 w-full flex-col bg-slate-100">
       <FreestyleWrapper
         userId={user.id}
         userName={user.firstName}

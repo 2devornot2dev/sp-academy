@@ -545,7 +545,7 @@ export default function BossFoundationFreestyle({
                         ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
                         : { duration: 0.45, ease: "easeOut" }
                     }
-                    className={`relative h-18 w-18 overflow-hidden rounded-[1.5rem] border-2 border-b-[5px] bg-slate-900 shadow-xl sm:h-24 sm:w-24 sm:rounded-[1.75rem] ${
+                    className={`relative h-14 w-14 sm:h-24 sm:w-24 overflow-hidden rounded-[1.5rem] border-2 border-b-[5px] bg-slate-900 shadow-xl sm:h-24 sm:w-24 sm:rounded-[1.75rem] ${
                       effectiveMood === "happy"
                         ? "border-emerald-400 border-b-emerald-700"
                         : effectiveMood === "angry"

@@ -2,6 +2,7 @@
 "use client";
 
 import type { ImageOption } from "@/context/boss-context";
+import { playSfx } from "@/lib/sfx";
 
 interface PictureSelectorProps {
   options: ImageOption[];
@@ -19,13 +20,14 @@ export function PictureSelector({
   stopWordAudio,
 }: PictureSelectorProps) {
   const handleClick = (label: string) => {
+    playSfx("tap");
     stopWordAudio?.();
     playWord?.(label, "m");
     onSubmit(label);
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
       {options.map((option, index) => (
         <button
           key={`${option.label}-${index}`}
@@ -33,7 +35,7 @@ export function PictureSelector({
           onClick={() => handleClick(option.label)}
           className="group relative flex flex-col overflow-hidden rounded-2xl border-2 border-b-[4px] border-slate-200 border-b-slate-300 bg-white text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
         >
-          <div className="h-28 w-full overflow-hidden bg-slate-100 sm:h-32">
+          <div className="h-24 w-full overflow-hidden bg-slate-100 sm:h-32">
             <img
               src={resolveAssetUrl(option.imageKey)}
               alt={option.label}
@@ -41,7 +43,7 @@ export function PictureSelector({
             />
           </div>
 
-          <div className="border-t border-slate-100 px-3 py-2 text-center">
+          <div className="border-t border-slate-100 px-2.5 py-1.5 sm:px-3 sm:py-2 text-center">
             <span className="text-xs font-black text-slate-800 transition-colors group-hover:text-blue-600 sm:text-sm">
               {option.label}
             </span>

@@ -59,7 +59,7 @@ export function LadderWorksheetArcade({
     } catch {}
   };
 
-  // ================= STAGE 1: CONTRAST PAIRS (2 waves of 2 pairs = 4 cards/screen) =================
+  // ================= STAGE 1: CONTRAST PAIRS =================
   const [pairWave, setPairWave] = useState<0 | 1>(0);
   const [heardIds, setHeardIds] = useState<Set<string>>(new Set());
 
@@ -85,7 +85,7 @@ export function LadderWorksheetArcade({
     });
   };
 
-  // ================= STAGE 2: 3-RUNG SENTENCE STACK (1 showcase per pair = 4 items) =================
+  // ================= STAGE 2: 3-RUNG SENTENCE STACK =================
   const stackItems = useMemo(() => {
     const picked: typeof rung.items = [];
     for (const g of [1, 2, 3, 4]) {
@@ -114,7 +114,7 @@ export function LadderWorksheetArcade({
     }
   };
 
-  // ================= STAGE 3: THE FLIP CHALLENGE (Speak OR Tap) =================
+  // ================= STAGE 3: THE FLIP CHALLENGE =================
   const flips = rung.flips;
   const [flipIdx, setFlipIdx] = useState(0);
   const [flipSolved, setFlipSolved] = useState(false);
@@ -129,6 +129,7 @@ export function LadderWorksheetArcade({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startMsRef = useRef<number>(0);
+  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentFlip = flips[flipIdx];
 
@@ -153,13 +154,25 @@ export function LadderWorksheetArcade({
   }, [stageIdx, flipIdx, currentFlip?.promptAudioUrl]);
 
   const cleanupMic = () => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
   };
 
-  useEffect(() => () => cleanupMic(), []);
+  useEffect(() => {
+    return () => {
+      cleanupMic();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const handleFlipTapChoice = (choice: string) => {
     if (!currentFlip || flipSolved) return;
@@ -186,6 +199,10 @@ export function LadderWorksheetArcade({
   };
 
   const stopFlipMic = () => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -286,7 +303,7 @@ export function LadderWorksheetArcade({
       };
 
       rec.start();
-      setTimeout(() => stopFlipMic(), 5000);
+      autoStopTimerRef.current = setTimeout(() => stopFlipMic(), 5000);
     } catch {
       playSfx("wrong");
       setIsRecording(false);
@@ -326,39 +343,39 @@ export function LadderWorksheetArcade({
         : `Read the cue, then speak (or tap) the flipped transformation!`;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden animate-bg p-4 font-sans text-slate-900 sm:p-5">
-      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3.5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden animate-bg p-2.5 font-sans text-slate-900 sm:p-5">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-2.5 sm:gap-3.5">
         {/* 1. HORIZONTAL VOX/VIVI COACH BAR */}
-        <div className="flex shrink-0 items-center justify-between gap-4 rounded-[1.75rem] bg-white px-5 py-3.5 shadow-sm ring-1 ring-slate-200/70">
-          <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        <div className="flex shrink-0 items-center justify-between gap-2.5 sm:gap-4 rounded-2xl sm:rounded-[1.75rem] bg-white px-3.5 py-2.5 sm:px-5 sm:py-3.5 shadow-sm ring-1 ring-slate-200/70">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3.5">
             <div className="relative shrink-0">
               <img
                 src={avatarSrc}
                 alt={spriteName}
-                className="h-12 w-12 rounded-2xl border-2 border-sky-200 object-cover object-top shadow-xs sm:h-14 sm:w-14"
+                className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl border-2 border-sky-200 object-cover object-top shadow-xs"
               />
-              <span className="absolute -right-1 -bottom-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
+              <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full border-2 border-white bg-emerald-500" />
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-black text-slate-900">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="truncate text-xs sm:text-sm font-black text-slate-900">
                   {rung.icon} Rung {rung.rungOrder}: {rung.title}
                 </span>
-                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-amber-800 uppercase">
+                <span className="hidden sm:inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-amber-800 uppercase">
                   {spriteName} Coach
                 </span>
               </div>
-              <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-bold text-slate-600 sm:text-sm">
-                <Quote className="h-3.5 w-3.5 shrink-0 rotate-180 text-blue-500" />
+              <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] sm:text-sm font-bold text-slate-600">
+                <Quote className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 rotate-180 text-blue-500" />
                 <span className="truncate">{coachMessage}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
-            <div className="hidden items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 sm:flex">
-              <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-200">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 sm:px-3 sm:py-1.5">
+              <div className="hidden sm:block h-2 w-16 overflow-hidden rounded-full bg-slate-200">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-sky-400 via-amber-400 to-emerald-400 transition-all duration-500"
                   style={{
@@ -368,14 +385,14 @@ export function LadderWorksheetArcade({
                   }}
                 />
               </div>
-              <span className="text-[11px] font-black text-slate-600">
+              <span className="text-[11px] font-black text-slate-700">
                 {completed ? "3/3" : `${stageIdx + 1}/3`}
               </span>
             </div>
 
             <Link
               href="/learning-hub/ladder"
-              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
               <span className="hidden sm:inline">Ladder</span>
@@ -383,23 +400,23 @@ export function LadderWorksheetArcade({
           </div>
         </div>
 
-        {/* 2. ZERO-SCROLL EXERCISE CARD */}
-        <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 sm:p-6">
+        {/* 2. EXERCISE CARD (scrolls cleanly on short phones, zero-scroll on desktop) */}
+        <section className="flex min-h-0 flex-1 flex-col overflow-y-auto md:overflow-hidden rounded-2xl sm:rounded-[2rem] bg-white p-3.5 shadow-sm ring-1 ring-slate-200/70 sm:p-6">
           {completed ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="m-auto flex max-w-md flex-col items-center space-y-5 text-center"
+              className="m-auto flex max-w-md flex-col items-center space-y-5 py-4 text-center"
             >
-              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border-b-[5px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg">
-                <Trophy className="h-10 w-10" />
+              <div className="flex h-18 w-18 sm:h-20 sm:w-20 items-center justify-center rounded-3xl border-b-[5px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg">
+                <Trophy className="h-9 w-9 sm:h-10 sm:w-10" />
               </div>
 
               <div className="space-y-1.5">
-                <h3 className="text-2xl font-black text-slate-900">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
                   Rung {rung.rungOrder} Cleared!
                 </h3>
-                <p className="text-sm font-semibold text-slate-500">
+                <p className="text-xs sm:text-sm font-semibold text-slate-500">
                   You mastered {rung.title} and banked all 8 items in your Word
                   Matrix.
                 </p>
@@ -423,22 +440,22 @@ export function LadderWorksheetArcade({
             </motion.div>
           ) : stageIdx === 0 ? (
             /* ================= STAGE 1: CONTRAST PAIRS ================= */
-            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3.5">
-              <div className="flex shrink-0 items-center justify-between">
-                <span className="text-xs font-black tracking-wider text-blue-600 uppercase">
-                  Stage 1 • Contrast Pairs (Set {pairWave + 1} of 2)
+            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
+              <div className="flex shrink-0 items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-xs font-black tracking-wider text-blue-600 uppercase">
+                  Stage 1 • Contrast Pairs (Set {pairWave + 1}/2)
                 </span>
-                <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black text-blue-700">
-                  {waveItems.filter((i) => heardIds.has(i.id)).length} /{" "}
+                <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-black text-blue-700">
+                  {waveItems.filter((i) => heardIds.has(i.id)).length}/
                   {waveItems.length} Heard
                 </span>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 gap-3">
+              <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-rows-2 sm:gap-3">
                 {wavePairs.map((pair, pIdx) => (
                   <div
                     key={pIdx}
-                    className="grid min-h-0 grid-cols-2 gap-3 rounded-3xl bg-slate-50/90 p-3 ring-1 ring-slate-200/80"
+                    className="grid min-h-0 grid-cols-2 gap-2 sm:gap-3 rounded-2xl sm:rounded-3xl bg-slate-50/90 p-2 sm:p-3 ring-1 ring-slate-200/80"
                   >
                     {pair.map((item) => {
                       const heard = heardIds.has(item.id);
@@ -449,14 +466,14 @@ export function LadderWorksheetArcade({
                           onClick={() =>
                             handleTapPairCard(item.id, item.wordAudioUrl)
                           }
-                          className={`group flex min-h-0 items-center gap-3.5 rounded-2xl border-2 border-b-[4px] p-3 text-left transition-all ${
+                          className={`group relative flex min-h-0 flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3.5 rounded-xl sm:rounded-2xl border-2 border-b-[4px] p-2.5 sm:p-3 text-left transition-all ${
                             heard
                               ? "border-emerald-400 border-b-emerald-500 bg-white shadow-sm"
                               : "border-slate-200 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-400"
                           }`}
                         >
                           {item.imageUrl && (
-                            <div className="h-full max-h-28 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:w-32">
+                            <div className="h-20 w-full sm:h-full sm:max-h-28 sm:w-32 shrink-0 overflow-hidden rounded-lg sm:rounded-xl bg-slate-100">
                               <img
                                 src={item.imageUrl}
                                 alt={item.gloss}
@@ -465,24 +482,24 @@ export function LadderWorksheetArcade({
                             </div>
                           )}
 
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <span className="inline-block rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-black text-blue-700 uppercase">
+                          <div className="min-w-0 w-full flex-1 space-y-0.5 sm:space-y-1">
+                            <span className="inline-block rounded-md bg-sky-100 px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] font-black text-blue-700 uppercase">
                               {item.tag}
                             </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate text-base font-black text-slate-900 sm:text-xl">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate text-sm sm:text-xl font-black text-slate-900">
                                 {item.word}
                               </span>
-                              <Volume2 className="h-4 w-4 shrink-0 text-blue-600" />
+                              <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-blue-600" />
                             </div>
-                            <p className="truncate text-xs font-bold text-slate-500">
+                            <p className="truncate text-[11px] sm:text-xs font-bold text-slate-500">
                               &ldquo;{item.gloss}&rdquo;
                             </p>
                           </div>
 
                           {heard && (
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                              <Check className="h-3.5 w-3.5 stroke-[3.5]" />
+                            <span className="absolute top-2 right-2 sm:static flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                              <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3.5]" />
                             </span>
                           )}
                         </button>
@@ -504,7 +521,7 @@ export function LadderWorksheetArcade({
                     setStageIdx(1);
                   }
                 }}
-                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black transition ${
+                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-xs sm:text-sm font-black transition ${
                   allWaveHeard
                     ? "border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md hover:brightness-105"
                     : "cursor-not-allowed bg-slate-200 text-slate-400"
@@ -520,18 +537,16 @@ export function LadderWorksheetArcade({
             </div>
           ) : stageIdx === 1 ? (
             /* ================= STAGE 2: 3-RUNG SENTENCE STACK ================= */
-            <div className="flex min-h-0 flex-1 flex-col justify-between gap-4">
+            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 sm:gap-4">
               <div className="flex shrink-0 items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-xs font-black tracking-wider text-amber-700 uppercase">
-                  <Layers className="h-4 w-4" />
-                  Stage 2 • Climb the 3-Rung Stack ({stackIdx + 1} of{" "}
-                  {stackItems.length})
+                <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-amber-700 uppercase">
+                  <Layers className="h-4 w-4 shrink-0" />
+                  Stage 2 • 3-Rung Stack ({stackIdx + 1}/{stackItems.length})
                 </span>
               </div>
 
               {currentStack && (
-                <div className="my-auto flex flex-col-reverse gap-3">
-                  {/* RUNG 1 -> RUNG 2 -> RUNG 3 (Rendered bottom-to-top like a ladder!) */}
+                <div className="my-auto flex flex-col-reverse gap-2.5 sm:gap-3">
                   {[
                     {
                       num: 1 as const,
@@ -559,7 +574,7 @@ export function LadderWorksheetArcade({
                         type="button"
                         disabled={!isAvailable}
                         onClick={() => handleClimbStackRung(stepObj.num)}
-                        className={`flex items-center justify-between gap-4 rounded-2xl border-2 border-b-[4px] p-4 text-left transition-all ${
+                        className={`flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border-2 border-b-[4px] p-3 sm:p-4 text-left transition-all ${
                           isAvailable
                             ? stepObj.num === 3
                               ? "border-emerald-500 border-b-emerald-700 bg-emerald-50/70 hover:-translate-y-0.5"
@@ -567,19 +582,19 @@ export function LadderWorksheetArcade({
                             : "cursor-not-allowed border-slate-200 bg-slate-50 opacity-45"
                         }`}
                       >
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
                             {stepObj.label}
                           </span>
-                          <p className="mt-0.5 text-base font-black text-slate-900 sm:text-xl">
+                          <p className="mt-0.5 text-sm sm:text-xl font-black text-slate-900">
                             {stepObj.text}
                           </p>
-                          <p className="text-xs font-semibold text-slate-500">
+                          <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
                             &ldquo;{stepObj.gloss}&rdquo;
                           </p>
                         </div>
 
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white">
+                        <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white">
                           <Volume2 className="h-4 w-4" />
                         </div>
                       </button>
@@ -601,7 +616,7 @@ export function LadderWorksheetArcade({
                     setStageIdx(2);
                   }
                 }}
-                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black transition ${
+                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-xs sm:text-sm font-black transition ${
                   unlockedRungStep >= 3
                     ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md hover:brightness-105"
                     : "cursor-not-allowed bg-slate-200 text-slate-400"
@@ -619,33 +634,36 @@ export function LadderWorksheetArcade({
             /* ================= STAGE 3: THE FLIP CHALLENGE ================= */
             <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
               <div className="flex shrink-0 items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-xs font-black tracking-wider text-purple-700 uppercase">
+                <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-purple-700 uppercase">
                   <Zap className="h-4 w-4 fill-current" />
-                  Stage 3 • Flip Challenge ({flipIdx + 1} of {flips.length})
+                  Stage 3 • Flip Challenge ({flipIdx + 1}/{flips.length})
                 </span>
               </div>
 
               {currentFlip && (
-                <div className="my-auto space-y-4 text-center">
+                <div className="my-auto space-y-3 sm:space-y-4 text-center">
                   <div className="space-y-1">
-                    <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
+                    <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-[11px] sm:text-xs font-black text-amber-900">
                       {currentFlip.cueNative}
                     </span>
-                    <div className="mt-2 flex items-center justify-center gap-2">
-                      <h3 className="text-xl font-black text-slate-900 sm:text-2xl">
+                    <div className="mt-1.5 flex items-center justify-center gap-2">
+                      <h3 className="text-lg sm:text-2xl font-black text-slate-900">
                         &ldquo;{currentFlip.promptTarget}&rdquo;
                       </h3>
                       {currentFlip.promptAudioUrl && (
                         <button
                           type="button"
-                          onClick={() => playAudio(currentFlip.promptAudioUrl)}
-                          className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-blue-600 hover:bg-sky-100"
+                          onClick={() => {
+                            playSfx("tap");
+                            playAudio(currentFlip.promptAudioUrl);
+                          }}
+                          className="rounded-xl border border-sky-200 bg-sky-50 p-1.5 sm:p-2 text-blue-600 hover:bg-sky-100"
                         >
                           <Volume2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>
-                    <p className="text-xs font-semibold text-slate-400">
+                    <p className="text-[11px] sm:text-xs font-semibold text-slate-400">
                       ({currentFlip.promptNative})
                     </p>
                   </div>
@@ -656,7 +674,7 @@ export function LadderWorksheetArcade({
                       <button
                         type="button"
                         onClick={stopFlipMic}
-                        className="flex w-full animate-pulse items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 py-3 text-sm font-black text-slate-950"
+                        className="flex w-full animate-pulse items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 py-2.5 sm:py-3 text-xs sm:text-sm font-black text-slate-950"
                       >
                         <Square className="h-4 w-4 fill-current" />
                         <span>Listening... Tap Done</span>
@@ -666,7 +684,7 @@ export function LadderWorksheetArcade({
                         type="button"
                         disabled={flipSolved || isGrading}
                         onClick={startFlipMic}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3 text-sm font-black text-white shadow-sm disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-2.5 sm:py-3 text-xs sm:text-sm font-black text-white shadow-sm disabled:opacity-50"
                       >
                         {isGrading ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -683,14 +701,14 @@ export function LadderWorksheetArcade({
                   </div>
 
                   {/* Or Quick-Tap 2x2 Choices */}
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                     {flipChoices.map((opt, idx) => (
                       <button
                         key={idx}
                         type="button"
                         disabled={flipSolved}
                         onClick={() => handleFlipTapChoice(opt)}
-                        className={`rounded-2xl border-2 border-b-[4px] px-4 py-3 text-sm font-black transition ${
+                        className={`rounded-2xl border-2 border-b-[4px] px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm font-black transition ${
                           flipSolved && opt === currentFlip.targetAnswer
                             ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
                             : "border-slate-200 border-b-slate-300 bg-white text-slate-800 hover:border-sky-300"
@@ -703,7 +721,7 @@ export function LadderWorksheetArcade({
 
                   {flipFeedback && (
                     <div
-                      className={`mx-auto flex max-w-md items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-xs font-bold ${
+                      className={`mx-auto flex max-w-md items-center justify-center gap-2 rounded-2xl border px-3.5 py-2 text-[11px] sm:text-xs font-bold ${
                         flipFeedback.ok
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                           : "border-rose-200 bg-rose-50 text-rose-700"
@@ -733,7 +751,7 @@ export function LadderWorksheetArcade({
                     void handleFinishRung();
                   }
                 }}
-                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black transition ${
+                className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-xs sm:text-sm font-black transition ${
                   flipSolved
                     ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md hover:brightness-105"
                     : "cursor-not-allowed bg-slate-200 text-slate-400"

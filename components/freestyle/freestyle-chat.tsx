@@ -1,3 +1,4 @@
+// components/freestyle/freestyle-chat.tsx
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -6,6 +7,8 @@ import {
   RoomAudioRenderer,
   useVoiceAssistant,
   useDataChannel,
+  useLocalParticipant,
+  useRoomContext,
   TrackToggle,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
@@ -184,6 +187,8 @@ function LiveFreestyleChatInner({
   session: any;
   onEnd: FreestyleChatProps["onEnd"];
 }) {
+  const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
   const { state: agentState } = useVoiceAssistant();
   const { trackInteraction } = useMatrix();
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
@@ -196,6 +201,9 @@ function LiveFreestyleChatInner({
     text: string;
     isFinal: boolean;
   } | null>(null);
+  const [streamingAgentTurn, setStreamingAgentTurn] = useState<string | null>(
+    null,
+  );
   const [matchedChunks, setMatchedChunks] = useState<Set<string>>(new Set());
   const [showTranslations, setShowTranslations] = useState(true);
   const [isEnding, setIsEnding] = useState(false);
@@ -272,6 +280,25 @@ function LiveFreestyleChatInner({
       setActiveSparkToast((cur) => (cur?.id === fullSpark.id ? null : cur));
     }, 3800);
   }, []);
+
+  const checkLiveGoals = useCallback(
+    (liveText: string) => {
+      if (!liveText || requiredChunks.length === 0) return;
+      const next = new Set(matchedChunksRef.current);
+      let hitNew = false;
+      for (const chunk of requiredChunks) {
+        if (!next.has(chunk) && doesSpeechMatchPhrase(liveText, chunk)) {
+          next.add(chunk);
+          hitNew = true;
+        }
+      }
+      if (hitNew) {
+        matchedChunksRef.current = next;
+        setMatchedChunks(next);
+      }
+    },
+    [requiredChunks],
+  );
 
   const analyzeUserTurnForNotepad = useCallback(
     async (userText: string, turnId: string) => {
@@ -403,7 +430,62 @@ function LiveFreestyleChatInner({
     if (viewMode === "multi") {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, streamingUserTurn, agentState, viewMode]);
+  }, [
+    messages,
+    streamingUserTurn,
+    streamingAgentTurn,
+    agentState,
+    viewMode,
+  ]);
+
+  // Subscribe to LiveKit's built-in lk.transcription text stream for real-time user + AI text
+  useEffect(() => {
+    if (!room || typeof (room as any).registerTextStreamHandler !== "function") {
+      return;
+    }
+
+    const topic = "lk.transcription";
+    try {
+      (room as any).registerTextStreamHandler(
+        topic,
+        async (reader: any, participantInfo: any) => {
+          const isLocalUser =
+            participantInfo?.identity &&
+            participantInfo.identity === localParticipant?.identity;
+          const isFinal =
+            reader?.info?.attributes?.["lk.transcription_final"] === "true";
+
+          const parts: string[] = [];
+          try {
+            for await (const chunk of reader) {
+              parts.push(chunk);
+              const liveText = parts.join("").trim();
+              if (!liveText) continue;
+
+              if (isLocalUser) {
+                setStreamingUserTurn({ text: liveText, isFinal });
+                checkLiveGoals(liveText);
+              } else {
+                setStreamingAgentTurn(liveText);
+              }
+            }
+          } catch {
+            // Stream closed safely
+          }
+        },
+      );
+    } catch {
+      // Already registered
+    }
+
+    return () => {
+      try {
+        (room as any).unregisterTextStreamHandler?.(topic);
+      } catch {
+        // Ignore cleanup errors
+      }
+    };
+  }, [room, localParticipant?.identity, checkLiveGoals]);
 
   useDataChannel("spoon-meta", (msg) => {
     try {
@@ -416,26 +498,13 @@ function LiveFreestyleChatInner({
           text: liveText,
           isFinal: Boolean(payload.isFinal),
         });
-
-        if (liveText && requiredChunks.length > 0) {
-          const next = new Set(matchedChunksRef.current);
-          let hitNew = false;
-          for (const chunk of requiredChunks) {
-            if (!next.has(chunk) && doesSpeechMatchPhrase(liveText, chunk)) {
-              next.add(chunk);
-              hitNew = true;
-            }
-          }
-          if (hitNew) {
-            matchedChunksRef.current = next;
-            setMatchedChunks(next);
-          }
-        }
+        checkLiveGoals(liveText);
         return;
       }
 
       // 1. Assistant message arrived
       if (payload.type === "AGENT_TURN") {
+        setStreamingAgentTurn(null);
         const aiText = payload.text || "";
         const aiTrans =
           payload.translation ||
@@ -685,54 +754,56 @@ function LiveFreestyleChatInner({
     void handleEndSessionRef.current();
   }, []);
 
+  const displayedAiText = streamingAgentTurn || latestAiMessage?.text;
+
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-y-auto animate-bg p-3 sm:p-5 lg:flex-row lg:gap-5 lg:overflow-hidden lg:p-6">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden animate-bg p-2 sm:p-5 lg:flex-row lg:gap-5 lg:p-6">
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       <RoomAudioRenderer />
 
       {/* =========================================================
-          LEFT / MAIN STAGE (SINGLE 1-ON-1 STAGE vs MULTI THREAD)
+          LEFT / MAIN STAGE (Zero-scroll single-screen fit on mobile!)
       ========================================================= */}
-      <div className="relative z-10 flex min-h-[540px] shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl sm:rounded-[2rem] lg:min-h-0 lg:flex-1">
-        {/* 1. Vibrant Arena Header + Single/Multi View Switcher */}
-        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-4 py-3 text-white sm:px-6 sm:py-3.5">
+      <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-2xl sm:rounded-[2rem]">
+        {/* 1. Compact Dark Arena Header */}
+        <div className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-3.5 py-2.5 text-white sm:px-6 sm:py-3.5">
           <div className="pointer-events-none absolute -top-12 right-10 h-32 w-32 rounded-full bg-sky-500/20 blur-2xl" />
 
-          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
-            <div className="flex items-center gap-2.5 sm:gap-3.5">
+          <div className="relative z-10 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2.5 sm:gap-3.5">
               <div className="relative h-9 w-9 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-4 border-sky-400 bg-slate-900 shadow-md">
                 <img
                   src={currentTutorAvatar}
                   alt={tutorName}
                   className="h-full w-full object-cover object-top transition-all duration-300"
                 />
-                <span className="absolute right-0.5 bottom-0.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+                <span className="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
               </div>
 
-              <div>
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <h2 className="text-sm sm:text-lg font-black tracking-tight text-white">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <h2 className="truncate text-xs sm:text-lg font-black tracking-tight text-white">
                     {session?.topic || "Live Conversation Arena"}
                   </h2>
-                  <span className="rounded-lg border border-sky-400/40 bg-sky-500/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-black tracking-wider text-sky-300 uppercase">
+                  <span className="hidden sm:inline-block shrink-0 rounded-lg border border-sky-400/40 bg-sky-500/20 px-2 py-0.5 text-[10px] font-black tracking-wider text-sky-300 uppercase">
                     {session?.level || "ZERO"}
                   </span>
                 </div>
-                <p className="text-[11px] sm:text-xs font-semibold text-slate-300">
-                  Partner: <strong className="text-white">{tutorName}</strong> •{" "}
+                <p className="truncate text-[10px] sm:text-xs font-semibold text-slate-300">
+                  <strong className="text-white">{tutorName}</strong> •{" "}
                   <span className="text-amber-300">{sparks.length} Sparks</span>{" "}
                   • {notepadNotes.length} Notes
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <div className="flex items-center gap-1 rounded-xl border border-white/15 bg-slate-900/90 p-1">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-0.5 rounded-xl border border-white/15 bg-slate-900/90 p-0.5 sm:p-1">
                 <button
                   type="button"
                   onClick={() => setViewMode("single")}
-                  className={`flex items-center gap-1 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-black transition ${
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black transition ${
                     viewMode === "single"
                       ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
                       : "text-slate-400 hover:text-white"
@@ -745,7 +816,7 @@ function LiveFreestyleChatInner({
                 <button
                   type="button"
                   onClick={() => setViewMode("multi")}
-                  className={`flex items-center gap-1 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-black transition ${
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black transition ${
                     viewMode === "multi"
                       ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
                       : "text-slate-400 hover:text-white"
@@ -757,10 +828,11 @@ function LiveFreestyleChatInner({
                   </span>
                 </button>
               </div>
+
               <button
                 type="button"
                 onClick={() => setShowTranslations((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-extrabold transition ${
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-2 py-1.5 sm:px-2.5 text-xs font-extrabold transition ${
                   showTranslations
                     ? "border-sky-400/40 bg-sky-500/20 text-sky-200"
                     : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
@@ -776,70 +848,68 @@ function LiveFreestyleChatInner({
           </div>
         </div>
 
-        {/* 2. Interactive Target Phrases Strip */}
+        {/* 2. Single-Line Horizontal-Scroll Target Phrases Strip on Mobile */}
         {requiredChunks.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-4 py-2 sm:px-6 sm:py-2.5">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black tracking-wider text-indigo-900 uppercase">
-                <Target className="h-3.5 w-3.5 text-indigo-600" />
-                Goals ({matchedChunks.size}/{requiredChunks.length}):
-              </span>
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-emerald-50/50 px-3 py-1.5 sm:flex-wrap sm:px-6 sm:py-2.5 [&::-webkit-scrollbar]:hidden">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[10px] sm:text-[11px] font-black tracking-wider text-indigo-900 uppercase">
+              <Target className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-indigo-600" />
+              ({matchedChunks.size}/{requiredChunks.length}):
+            </span>
 
-              {requiredChunks.map((chunk, idx) => {
-                const isHit = matchedChunks.has(chunk);
-                const isNextGoal = !isHit && chunk === currentGoalChunk;
-                const meaning = chunkTranslations[idx];
+            {requiredChunks.map((chunk, idx) => {
+              const isHit = matchedChunks.has(chunk);
+              const isNextGoal = !isHit && chunk === currentGoalChunk;
+              const meaning = chunkTranslations[idx];
 
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handlePlayPhraseAudio(chunk)}
-                    title={
-                      meaning
-                        ? `${meaning} (Click to hear pronunciation)`
-                        : "Click to hear pronunciation"
-                    }
-                    className={`group inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] px-2.5 py-1 sm:px-3 text-[11px] sm:text-xs font-black transition-all active:translate-y-0.5 ${
-                      isHit
-                        ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
-                        : isNextGoal
-                          ? "border-blue-700 bg-white text-blue-700 ring-2 ring-sky-300/60 shadow-2xs"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-sky-300"
-                    }`}
-                  >
-                    {isHit ? (
-                      <Check size={12} strokeWidth={3.5} />
-                    ) : (
-                      <Volume2
-                        size={12}
-                        className="text-blue-500 transition-transform group-hover:scale-110"
-                      />
-                    )}
-                    <span>{chunk}</span>
-                    {showTranslations && meaning && (
-                      <span
-                        className={`hidden xl:inline text-[10px] font-semibold ${
-                          isHit ? "text-emerald-100" : "text-slate-400"
-                        }`}
-                      >
-                        • {meaning}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handlePlayPhraseAudio(chunk)}
+                  title={
+                    meaning
+                      ? `${meaning} (Click to hear pronunciation)`
+                      : "Click to hear pronunciation"
+                  }
+                  className={`group inline-flex shrink-0 items-center gap-1 rounded-xl border-2 border-b-[3px] px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-black whitespace-nowrap transition-all active:translate-y-0.5 ${
+                    isHit
+                      ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs"
+                      : isNextGoal
+                        ? "border-blue-700 bg-white text-blue-700 ring-2 ring-sky-300/60 shadow-2xs"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-sky-300"
+                  }`}
+                >
+                  {isHit ? (
+                    <Check size={11} strokeWidth={3.5} />
+                  ) : (
+                    <Volume2
+                      size={11}
+                      className="text-blue-500 transition-transform group-hover:scale-110"
+                    />
+                  )}
+                  <span>{chunk}</span>
+                  {showTranslations && meaning && (
+                    <span
+                      className={`hidden xl:inline text-[10px] font-semibold ${
+                        isHit ? "text-emerald-100" : "text-slate-400"
+                      }`}
+                    >
+                      • {meaning}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Floating Micro-Win Spark Celebration Banner */}
         {activeSparkToast && (
-          <div className="pointer-events-none absolute top-24 sm:top-28 left-1/2 z-30 -translate-x-1/2 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200">
-            <div className="inline-flex items-center gap-2.5 rounded-2xl border-2 border-b-4 border-amber-600 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-400 px-4 py-2 sm:px-5 text-slate-950 shadow-xl">
-              <Award className="h-5 w-5 fill-amber-600 text-slate-950" />
+          <div className="pointer-events-none absolute top-24 left-1/2 z-30 -translate-x-1/2 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200">
+            <div className="inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 border-amber-600 bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-400 px-4 py-1.5 sm:px-5 sm:py-2 text-slate-950 shadow-xl">
+              <Award className="h-4 w-4 sm:h-5 sm:w-5 fill-amber-600 text-slate-950" />
               <div>
-                <span className="block text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                <span className="block text-[10px] sm:text-xs font-black uppercase tracking-wider">
                   ⚡ {activeSparkToast.label}
                 </span>
                 <span className="block text-[10px] sm:text-[11px] font-extrabold text-slate-800">
@@ -851,14 +921,15 @@ function LiveFreestyleChatInner({
         )}
 
         {/* =================================================================
-            3A. SINGLE STAGE VIEW (1-on-1 Face-to-Face Living Tutor + Notepad!)
+            3A. SINGLE STAGE VIEW
         ================================================================= */}
         {viewMode === "single" ? (
-          <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-4 sm:p-6">
+          <div className="relative flex min-h-0 flex-1 flex-col justify-between overflow-y-auto bg-slate-50/60 p-3 sm:p-6">
             <div className="my-auto flex flex-col items-center text-center">
-              <div className="relative mb-4 sm:mb-5">
+              {/* Living Tutor Portrait (Compact on mobile so Mic bar stays visible!) */}
+              <div className="relative mb-2.5 sm:mb-5">
                 <div
-                  className={`pointer-events-none absolute -inset-4 rounded-[2.5rem] blur-xl transition-all duration-500 ${
+                  className={`pointer-events-none absolute -inset-3 sm:-inset-4 rounded-[2rem] sm:rounded-[2.5rem] blur-xl transition-all duration-500 ${
                     agentState === "speaking"
                       ? "animate-pulse bg-sky-400/45"
                       : effectiveMood === "happy"
@@ -878,7 +949,7 @@ function LiveFreestyleChatInner({
                     animate={{ scale: 1.4, opacity: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.55, ease: "easeOut" }}
-                    className={`pointer-events-none absolute inset-0 rounded-[2rem] border-4 ${
+                    className={`pointer-events-none absolute inset-0 rounded-[1.5rem] sm:rounded-[2rem] border-4 ${
                       effectiveMood === "happy"
                         ? "border-emerald-400"
                         : effectiveMood === "mad"
@@ -900,7 +971,7 @@ function LiveFreestyleChatInner({
                       ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
                       : { duration: 0.45, ease: "easeOut" }
                   }
-                  className={`relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-[1.75rem] sm:rounded-[2rem] border-2 border-b-[6px] bg-slate-900 shadow-xl ${
+                  className={`relative h-16 w-16 sm:h-32 sm:w-32 overflow-hidden rounded-[1.25rem] sm:rounded-[2rem] border-2 border-b-[5px] sm:border-b-[6px] bg-slate-900 shadow-xl ${
                     effectiveMood === "happy"
                       ? "border-emerald-400 border-b-emerald-700"
                       : effectiveMood === "mad"
@@ -932,7 +1003,7 @@ function LiveFreestyleChatInner({
                         stiffness: 420,
                         damping: 18,
                       }}
-                      className="absolute -top-2.5 -right-2.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl border-2 border-white bg-transparent text-base sm:text-lg shadow-lg"
+                      className="absolute -top-2 -right-2 flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-xl border-2 border-white bg-transparent text-sm sm:text-lg shadow-lg"
                     >
                       {MOOD_OVERLAY[effectiveMood].badge}
                     </motion.div>
@@ -944,7 +1015,7 @@ function LiveFreestyleChatInner({
                   initial={{ scale: 0.85, y: 4 }}
                   animate={{ scale: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 380, damping: 20 }}
-                  className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-md ${
+                  className={`absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 px-2.5 py-0.5 text-[9px] sm:px-3 sm:text-[10px] font-black uppercase tracking-wider shadow-md ${
                     effectiveMood === "happy"
                       ? "border-emerald-800 bg-emerald-400 text-slate-950"
                       : effectiveMood === "thinking"
@@ -968,33 +1039,37 @@ function LiveFreestyleChatInner({
                 </motion.span>
               </div>
 
-              {/* Tutor's Latest Spoken Line Card */}
-              <div className="mt-2 w-full max-w-2xl rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-4 py-4 sm:px-6 sm:py-5 shadow-md">
-                {latestAiMessage ? (
+              {/* Tutor's Live or Latest Spoken Line Card */}
+              <div className="mt-1.5 w-full max-w-2xl rounded-2xl sm:rounded-3xl border-2 border-b-[5px] sm:border-b-[6px] border-slate-200 border-b-slate-300 bg-white px-3.5 py-2.5 sm:px-6 sm:py-5 shadow-md">
+                {displayedAiText ? (
                   <>
                     <div className="flex items-center justify-center gap-2">
-                      <p className="text-base sm:text-2xl font-black leading-snug text-slate-900">
-                        &ldquo;{latestAiMessage.text}&rdquo;
+                      <p className="text-sm sm:text-2xl font-black leading-snug text-slate-900">
+                        &ldquo;{displayedAiText}&rdquo;
                       </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handlePlayPhraseAudio(latestAiMessage.text)
-                        }
-                        title="Replay tutor audio"
-                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
-                      >
-                        <Volume2 size={16} />
-                      </button>
+                      {!streamingAgentTurn && latestAiMessage?.text && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handlePlayPhraseAudio(latestAiMessage.text)
+                          }
+                          title="Replay tutor audio"
+                          className="inline-flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl border-2 border-b-[3px] border-sky-200 bg-sky-50 text-blue-600 transition hover:bg-sky-100"
+                        >
+                          <Volume2 size={15} />
+                        </button>
+                      )}
                     </div>
-                    {showTranslations && latestAiMessage.translation && (
-                      <p className="mt-2 text-xs sm:text-sm font-bold text-slate-500">
-                        {latestAiMessage.translation}
-                      </p>
-                    )}
+                    {showTranslations &&
+                      !streamingAgentTurn &&
+                      latestAiMessage?.translation && (
+                        <p className="mt-1 sm:mt-2 text-[11px] sm:text-sm font-bold text-slate-500">
+                          {latestAiMessage.translation}
+                        </p>
+                      )}
                   </>
                 ) : (
-                  <p className="text-sm sm:text-base font-extrabold text-slate-600">
+                  <p className="text-xs sm:text-base font-extrabold text-slate-600">
                     {agentState === "connecting"
                       ? `Connecting voice room with ${tutorName}...`
                       : `${tutorName} is listening! Greet ${tutorName} to begin.`}
@@ -1004,8 +1079,8 @@ function LiveFreestyleChatInner({
 
               {/* User's Live Streaming OR Latest Spoken Turn Pill */}
               {(streamingUserTurn || latestUserMessage) && (
-                <div className="mt-3.5 sm:mt-4 flex items-center justify-center gap-2.5 sm:gap-3 animate-in fade-in duration-200">
-                  <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-base font-bold text-white shadow-md">
+                <div className="mt-2 sm:mt-4 flex items-center justify-center gap-2 sm:gap-3 animate-in fade-in duration-200">
+                  <div className="rounded-2xl border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-base font-bold text-white shadow-md">
                     {streamingUserTurn ? (
                       <span className="inline-flex items-center gap-2">
                         <span>{streamingUserTurn.text}</span>
@@ -1018,7 +1093,7 @@ function LiveFreestyleChatInner({
                       )
                     )}
                   </div>
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                     <img
                       src={userAvatar}
                       alt="You"
@@ -1029,55 +1104,55 @@ function LiveFreestyleChatInner({
               )}
             </div>
 
-            {/* Compact Mobile/Tablet Lifeline (hidden on desktop where right sidecar is visible) */}
-            {(suggestions?.starter ||
-              session?.starterHintTarget ||
-              currentGoalChunk) && (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-3.5 py-2 lg:hidden">
-                <div className="min-w-0 flex-1">
-                  <span className="block text-[9px] font-black tracking-wider text-amber-700 uppercase">
-                    Suggested Reply
-                  </span>
-                  <p className="truncate text-xs font-black text-slate-900">
-                    &ldquo;
-                    {suggestions?.starter ||
-                      session?.starterHintTarget ||
-                      currentGoalChunk}
-                    &rdquo;
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePlayPhraseAudio(
-                      suggestions?.starter ||
+            {/* Bottom Group: Compact Suggested Reply + Live Notepad */}
+            <div className="mt-2.5 sm:mt-4 space-y-2 sm:space-y-3 shrink-0">
+              {(suggestions?.starter ||
+                session?.starterHintTarget ||
+                currentGoalChunk) && (
+                <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/85 px-3 py-1.5 lg:hidden">
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[9px] font-black tracking-wider text-amber-700 uppercase">
+                      Suggested Reply
+                    </span>
+                    <p className="truncate text-xs font-black text-slate-900">
+                      &ldquo;
+                      {suggestions?.starter ||
                         session?.starterHintTarget ||
-                        currentGoalChunk ||
-                        "",
-                    )
-                  }
-                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-blue-600"
-                >
-                  <Volume2 size={13} />
-                  <span>Hear</span>
-                </button>
-              </div>
-            )}
+                        currentGoalChunk}
+                      &rdquo;
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handlePlayPhraseAudio(
+                        suggestions?.starter ||
+                          session?.starterHintTarget ||
+                          currentGoalChunk ||
+                          "",
+                      )
+                    }
+                    className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-black text-blue-600"
+                  >
+                    <Volume2 size={12} />
+                    <span>Hear</span>
+                  </button>
+                </div>
+              )}
 
-            {/* Bottom of Single Stage: SOPHIE'S LIVE NOTEPAD */}
-            <div className="mt-3 sm:mt-5 w-full">
-              <div className="min-h-[112px] sm:min-h-[132px] overflow-hidden rounded-3xl border-2 border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-4 sm:p-5 shadow-sm">
+              {/* Compact Mobile / Full Desktop Live Notepad */}
+              <div className="overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[4px] sm:border-b-[5px] border-amber-200 border-b-amber-300 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/50 p-3 sm:p-5 sm:min-h-[124px] shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
-                      <PenTool className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-lg sm:rounded-xl border-b-2 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
+                      <PenTool className="h-3 w-3 sm:h-4 sm:w-4" />
                     </span>
-                    <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-900 uppercase">
+                    <span className="text-[10px] sm:text-xs font-black tracking-wider text-slate-900 uppercase">
                       {tutorName}&apos;s Live Notepad
                     </span>
                     {activeNote && (
                       <span
-                        className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${
+                        className={`rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase ${
                           activeNote.hasCorrection
                             ? "border border-rose-200 bg-rose-100 text-rose-800"
                             : "border border-emerald-200 bg-emerald-100 text-emerald-800"
@@ -1092,14 +1167,14 @@ function LiveFreestyleChatInner({
 
                   <div className="flex items-center gap-2">
                     {isAnalyzingNote && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Jotting note...
+                      <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-amber-700">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Jotting...
                       </span>
                     )}
 
                     {notepadNotes.length > 1 && (
-                      <div className="flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-black text-slate-700">
+                      <div className="flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-2 py-0.5 text-[10px] sm:text-[11px] font-black text-slate-700">
                         <button
                           type="button"
                           disabled={noteIdx === 0}
@@ -1129,9 +1204,9 @@ function LiveFreestyleChatInner({
                 </div>
 
                 {activeNote ? (
-                  <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-base">
+                  <div className="mt-2 sm:mt-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
+                    <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs sm:text-base">
                         {activeNote.hasCorrection && (
                           <>
                             <span className="font-bold text-rose-500 line-through">
@@ -1144,10 +1219,10 @@ function LiveFreestyleChatInner({
                           &ldquo;{activeNote.nativeWay}&rdquo;
                         </span>
                       </div>
-                      <p className="text-xs sm:text-sm font-semibold leading-relaxed text-slate-600">
+                      <p className="line-clamp-2 text-[11px] sm:text-sm font-semibold leading-snug text-slate-600">
                         💡 {activeNote.quickWhy}
                         {activeNote.nativeTranslation && (
-                          <span className="ml-1.5 font-medium text-slate-400">
+                          <span className="ml-1 font-medium text-slate-400">
                             ({activeNote.nativeTranslation})
                           </span>
                         )}
@@ -1159,16 +1234,16 @@ function LiveFreestyleChatInner({
                       onClick={() =>
                         handlePlayPhraseAudio(activeNote.nativeWay)
                       }
-                      className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-2xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-sm transition hover:brightness-105 sm:self-center"
+                      className="inline-flex shrink-0 items-center gap-1 self-start rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3 py-1.5 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs font-black text-white shadow-sm transition hover:brightness-105 sm:self-center"
                     >
-                      <Volume2 size={15} />
+                      <Volume2 size={13} />
                       <span>Hear Native Way</span>
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-2.5 text-xs sm:text-sm font-semibold text-slate-500">
-                    Speak a sentence and {tutorName} will jot down real-time
-                    native phrasing tips and grammar upgrades right here!
+                  <p className="mt-1.5 sm:mt-2.5 text-[11px] sm:text-sm font-semibold text-slate-500">
+                    Speak a sentence and {tutorName} will jot live phrasing tips
+                    here!
                   </p>
                 )}
               </div>
@@ -1178,7 +1253,7 @@ function LiveFreestyleChatInner({
           /* =================================================================
              3B. MULTI-THREAD VIEW (Full Scrollable Transcript + Inline Notes)
           ================================================================= */
-          <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 scroll-smooth">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50/50 p-3.5 sm:p-6 scroll-smooth">
             {messages.map((message) => {
               const isUser = message.role === "user";
               const pron = message.pronunciationScore;
@@ -1201,7 +1276,7 @@ function LiveFreestyleChatInner({
                     key={message.id}
                     className="flex items-start gap-2.5 sm:gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
                   >
-                    <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
                       <img
                         src={currentTutorAvatar}
                         alt={tutorName}
@@ -1211,7 +1286,7 @@ function LiveFreestyleChatInner({
 
                     <div className="max-w-[82%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-xs">
                       <div className="flex items-start justify-between gap-2.5 sm:gap-3">
-                        <p className="text-sm sm:text-base font-bold leading-relaxed text-slate-900">
+                        <p className="text-xs sm:text-base font-bold leading-relaxed text-slate-900">
                           {message.text}
                         </p>
                         <button
@@ -1219,11 +1294,11 @@ function LiveFreestyleChatInner({
                           onClick={() => handlePlayPhraseAudio(message.text)}
                           className="mt-0.5 shrink-0 rounded-lg p-1 text-slate-400 hover:bg-sky-50 hover:text-blue-600"
                         >
-                          <Volume2 size={15} />
+                          <Volume2 size={14} />
                         </button>
                       </div>
                       {showTranslations && message.translation && (
-                        <p className="mt-1.5 border-t border-slate-100 pt-1.5 text-xs font-semibold text-slate-500">
+                        <p className="mt-1 border-t border-slate-100 pt-1 text-[11px] sm:text-xs font-semibold text-slate-500">
                           {message.translation}
                         </p>
                       )}
@@ -1238,25 +1313,25 @@ function LiveFreestyleChatInner({
                   className="flex items-start justify-end gap-2.5 sm:gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
                 >
                   <div className="flex max-w-md flex-col items-end gap-1.5">
-                    <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-bold leading-relaxed text-white shadow-md">
+                    <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-base font-bold leading-relaxed text-white shadow-md">
                       {renderScoredWords(pron, message.text)}
                     </div>
 
                     {overall !== null && (
                       <div
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-0.5 text-[11px] font-black ${
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] sm:text-[11px] font-black ${
                           isHighPass
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                             : "border-amber-200 bg-amber-50 text-amber-800"
                         }`}
                       >
-                        <Flame size={12} />
+                        <Flame size={11} />
                         <span>{overall}% Flow</span>
                       </div>
                     )}
 
                     {turnNote && (
-                      <div className="mt-1 w-full rounded-2xl border-2 border-amber-200 bg-amber-50/90 px-3.5 py-2.5 text-left text-xs shadow-2xs">
+                      <div className="mt-1 w-full rounded-2xl border-2 border-amber-200 bg-amber-50/90 px-3 py-2 text-left text-xs shadow-2xs">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-black text-amber-900">
                             ✏️ Native Way: « {turnNote.nativeWay} »
@@ -1278,7 +1353,7 @@ function LiveFreestyleChatInner({
                     )}
                   </div>
 
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                     <img
                       src={userAvatar}
                       alt="You"
@@ -1289,15 +1364,33 @@ function LiveFreestyleChatInner({
               );
             })}
 
+            {streamingAgentTurn && (
+              <div className="flex items-start gap-2.5 sm:gap-3 animate-in fade-in duration-150">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-xs">
+                  <img
+                    src={currentTutorAvatar}
+                    alt={tutorName}
+                    className="h-full w-full object-cover object-top"
+                  />
+                </div>
+                <div className="max-w-[82%] rounded-2xl rounded-tl-sm border-2 border-b-4 border-sky-200 bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-xs">
+                  <p className="text-xs sm:text-base font-bold leading-relaxed text-slate-900">
+                    {streamingAgentTurn}
+                    <span className="ml-1.5 inline-block h-2 w-2 animate-ping rounded-full bg-sky-400" />
+                  </p>
+                </div>
+              </div>
+            )}
+
             {streamingUserTurn && (
               <div className="flex items-start justify-end gap-2.5 sm:gap-3 animate-in fade-in duration-150">
                 <div className="flex max-w-md flex-col items-end gap-1.5">
-                  <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base font-bold leading-relaxed text-white opacity-95 shadow-md">
+                  <div className="rounded-2xl rounded-tr-sm border-b-4 border-indigo-800 bg-gradient-to-b from-indigo-500 to-indigo-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-base font-bold leading-relaxed text-white opacity-95 shadow-md">
                     <span>{streamingUserTurn.text}</span>
                     <span className="ml-2 inline-block h-2 w-2 animate-ping rounded-full bg-sky-200" />
                   </div>
                 </div>
-                <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-xl sm:rounded-2xl border-2 border-b-[3px] border-indigo-400 bg-indigo-100 shadow-xs">
                   <img
                     src={userAvatar}
                     alt="You"
@@ -1311,11 +1404,11 @@ function LiveFreestyleChatInner({
           </div>
         )}
 
-        {/* 4. Bottom Control Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex items-center gap-2.5 sm:gap-3">
+        {/* 4. Single-Row Bottom Control Bar (Always pinned on screen!) */}
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2.5 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span
-              className={`h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0 rounded-full ${
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                 agentState === "listening"
                   ? "animate-ping bg-emerald-500"
                   : agentState === "speaking"
@@ -1323,21 +1416,21 @@ function LiveFreestyleChatInner({
                     : "bg-amber-400"
               }`}
             />
-            <span className="text-xs sm:text-sm font-extrabold text-slate-700">
+            <span className="truncate text-[11px] sm:text-sm font-extrabold text-slate-700">
               {streamingUserTurn && !streamingUserTurn.isFinal
                 ? `Hearing: "${streamingUserTurn.text}"`
                 : agentState === "listening"
-                  ? "Listening (Speak anytime)..."
+                  ? "Listening..."
                   : agentState === "speaking"
                     ? `${tutorName} Speaking`
-                    : "Connecting voice..."}
+                    : "Connecting..."}
             </span>
           </div>
 
-          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2.5 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <TrackToggle
               source={Track.Source.Microphone}
-              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-2 sm:px-4 text-xs font-black text-slate-700 shadow-2xs hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-2.5 py-2 sm:px-4 text-xs font-black text-slate-700 shadow-2xs hover:bg-slate-50"
             >
               <Mic size={14} />
               <span>Mic</span>
@@ -1346,7 +1439,7 @@ function LiveFreestyleChatInner({
             <button
               onClick={handleEndSession}
               disabled={isEnding}
-              className={`inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl border-b-4 px-4 py-2.5 sm:px-6 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border-b-4 px-3.5 py-2 sm:px-6 sm:py-2.5 text-xs font-black text-white shadow-md transition hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
                 allChunksCompleted
                   ? "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
                   : "border-slate-950 bg-slate-900 hover:bg-slate-800"
@@ -1354,9 +1447,9 @@ function LiveFreestyleChatInner({
             >
               <span>
                 {isEnding
-                  ? "Validating..."
+                  ? "Saving..."
                   : allChunksCompleted
-                    ? "Mission Complete! Finish"
+                    ? "Complete!"
                     : "End & Validate"}
               </span>
               <ArrowRight size={14} />
@@ -1366,9 +1459,9 @@ function LiveFreestyleChatInner({
       </div>
 
       {/* =========================================================
-          RIGHT SIDECAR: DYNAMIC LIVE COACHING DECK + SPARKSFEED
+          RIGHT SIDECAR: DYNAMIC LIVE COACHING DECK (Desktop lg+ only)
       ========================================================= */}
-      <div className="relative z-10 flex w-full shrink-0 flex-col justify-between rounded-2xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-2xl sm:rounded-[2rem] sm:p-6 lg:w-88 lg:overflow-y-auto">
+      <div className="relative z-10 hidden lg:flex w-88 shrink-0 flex-col justify-between overflow-y-auto rounded-[2rem] border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-2xl">
         <div className="space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div className="flex items-center gap-2">
@@ -1395,7 +1488,7 @@ function LiveFreestyleChatInner({
               <Compass className="h-3.5 w-3.5" />
               <span>Your Next Move</span>
             </div>
-            <p className="mt-1.5 text-xs sm:text-sm font-extrabold leading-relaxed text-slate-800">
+            <p className="mt-1.5 text-sm font-extrabold leading-relaxed text-slate-800">
               {coachingTip}
             </p>
 
@@ -1588,7 +1681,7 @@ export default function FreestyleChat({
       connect={true}
       audio={true}
       video={false}
-      className="h-full w-full"
+      className="flex h-full min-h-0 w-full flex-1 flex-col"
     >
       <LiveFreestyleChatInner session={session} onEnd={onEnd} />
     </LiveKitRoom>

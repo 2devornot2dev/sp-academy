@@ -128,14 +128,16 @@ export default function BossFoundationClient({
   };
 
   return (
-    <div className="relative flex min-h-full w-full flex-col justify-center overflow-x-hidden animate-bg p-3 sm:p-6">
+    <div
+      className={`relative flex w-full flex-col justify-center overflow-x-hidden animate-bg ${
+        hasStarted ? "h-full min-h-0 p-2 sm:p-5" : "min-h-full p-3 sm:p-6"
+      }`}
+    >
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
 
       {!hasStarted ? (
         <div className="relative z-10 flex w-full flex-col items-center justify-center py-2 sm:py-6">
-          {/* 3D Tactile Pre-Boss Arena Card */}
           <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white text-center shadow-2xl sm:rounded-[2rem]">
-            {/* Widescreen Cover Banner */}
             <div className="relative h-44 w-full bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 sm:h-64 md:h-72">
               {resolvedCoverUrl ? (
                 <img
@@ -152,13 +154,11 @@ export default function BossFoundationClient({
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-slate-950/30" />
 
-              {/* Top-left Milestone Badge */}
               <div className="absolute top-3.5 left-3.5 sm:top-5 sm:left-5 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-slate-950/60 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-xs font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
                 <Sparkles size={13} className="text-amber-300" />
                 Milestone {milestoneIndex} Boss Arena
               </div>
 
-              {/* Top-right Attempts / Best Score pill */}
               {attempts > 0 && (
                 <div className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/60 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[10px] sm:text-xs font-black text-white shadow-sm backdrop-blur-md">
                   <RotateCcw size={12} className="text-sky-300" />
@@ -169,9 +169,7 @@ export default function BossFoundationClient({
               )}
             </div>
 
-            {/* Card Body */}
             <div className="relative px-4 pt-14 pb-6 sm:px-10 sm:pt-16 sm:pb-8">
-              {/* Overlapping 3D Squircle Boss Avatar */}
               <div className="absolute -top-12 left-1/2 flex h-24 w-24 -translate-x-1/2 items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl sm:-top-14 sm:h-28 sm:w-28 sm:rounded-[2rem]">
                 {isLoading && !resolvedDefaultAvatarUrl ? (
                   <Loader2 className="animate-spin text-sky-300" size={32} />
@@ -188,7 +186,6 @@ export default function BossFoundationClient({
                 {boss?.name || "Milestone Boss"}
               </h1>
 
-              {/* Persona Bio Card */}
               <div className="mb-5 sm:mb-6 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50/40 px-4 py-3 sm:px-6 sm:py-4 text-center shadow-2xs">
                 <p className="text-xs sm:text-[15px] font-bold leading-relaxed text-slate-700">
                   {boss?.persona ||
@@ -196,7 +193,6 @@ export default function BossFoundationClient({
                 </p>
               </div>
 
-              {/* 3-Column 3D Tactile Stats Row */}
               <div className="mb-6 sm:mb-7 grid w-full grid-cols-3 gap-2.5 sm:gap-4">
                 <div className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/60 py-3 sm:py-3.5">
                   <div className="mb-0.5 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">

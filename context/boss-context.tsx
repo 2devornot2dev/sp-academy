@@ -17,6 +17,7 @@ import {
   useVoiceAssistant,
   useDataChannel,
   useLocalParticipant,
+  useRoomContext,
 } from "@livekit/components-react";
 import { useSpeak } from "@/hooks/use-speak";
 import { toast } from "sonner";
@@ -270,6 +271,7 @@ function BossLiveKitInnerProvider({
   preloadedUrls: string[];
   children: ReactNode;
 }) {
+  const room = useRoomContext();
   const { state: agentState } = useVoiceAssistant();
   const { localParticipant } = useLocalParticipant();
   const { send: sendBossCmd } = useDataChannel("spoon-boss-cmd");
@@ -302,7 +304,6 @@ function BossLiveKitInnerProvider({
   const scoreRef = useRef(0);
   const stageStatusRef = useRef<StageStatus>("PLAYING");
 
-  // Refs to avoid stale closures inside useDataChannel
   const bossMoodRef = useRef<BossMood>("default");
   const lastGradeStatusRef = useRef<"correct" | "incorrect" | undefined>(
     undefined,
@@ -365,25 +366,59 @@ function BossLiveKitInnerProvider({
     session?.introMessage ||
     "Let's begin your milestone challenge.";
 
-  // Global DataChannel logger to catch any topic mismatches or unexpected payloads
-  useDataChannel((msg) => {
-    try {
-      const rawText = new TextDecoder().decode(msg.payload);
-      console.log("[BOSS-PRON] Raw DataChannel msg received:", {
-        topic: msg.topic,
-        from: msg.from?.identity,
-        payload: JSON.parse(rawText),
-      });
-    } catch {
-      console.log("[BOSS-PRON] Non-JSON DataChannel msg on topic:", msg.topic);
+  // Subscribe to LiveKit's native real-time lk.transcription stream for immediate word-by-word text
+  useEffect(() => {
+    if (!room || typeof (room as any).registerTextStreamHandler !== "function") {
+      return;
     }
-  });
+
+    const topic = "lk.transcription";
+    try {
+      (room as any).registerTextStreamHandler(
+        topic,
+        async (reader: any, participantInfo: any) => {
+          const isLocalUser =
+            participantInfo?.identity &&
+            participantInfo.identity === localParticipant?.identity;
+          if (!isLocalUser) return;
+
+          const parts: string[] = [];
+          try {
+            for await (const chunk of reader) {
+              parts.push(chunk);
+              const liveText = parts.join("").trim();
+              if (liveText) {
+                updateTranscript(liveText);
+              }
+            }
+          } catch {
+            // Stream closed/aborted safely
+          }
+        },
+      );
+    } catch {
+      // Already registered
+    }
+
+    return () => {
+      try {
+        (room as any).unregisterTextStreamHandler?.(topic);
+      } catch {
+        // Ignore cleanup errors
+      }
+    };
+  }, [room, localParticipant?.identity, updateTranscript]);
 
   // Listen for LiveKit Agent events over "spoon-meta"
   useDataChannel("spoon-meta", (msg) => {
     try {
       const payload = JSON.parse(new TextDecoder().decode(msg.payload));
-      console.log("[BOSS-PRON] spoon-meta event:", payload);
+
+      // 0. Real-time streaming partial/final STT words from Agent
+      if (payload.type === "USER_TRANSCRIPT_STREAM" && payload.text) {
+        updateTranscript(String(payload.text).trim());
+        return;
+      }
 
       // 1. LiveKit Agent sent the controlled exercise grade reaction
       if (payload.type === "BOSS_REACTION" && startExercisesRef.current) {
@@ -413,10 +448,6 @@ function BossLiveKitInnerProvider({
         const text =
           payload.originalText || payload.text || payload.transcript || "";
         const pron = payload.pronunciation || payload.pronunciationScore;
-        console.log("[BOSS-PRON] User TURN_META received:", {
-          text,
-          pronunciation: pron,
-        });
 
         if (text) updateTranscript(text);
         if (pron) {
@@ -502,11 +533,6 @@ function BossLiveKitInnerProvider({
 
   const handleStartRecording = useCallback(async () => {
     if (resultPipelineRef.current || stageStatusRef.current !== "PLAYING") {
-      console.warn(
-        "[BOSS-PRON] handleStartRecording blocked:",
-        resultPipelineRef.current,
-        stageStatusRef.current,
-      );
       return;
     }
 
@@ -519,19 +545,10 @@ function BossLiveKitInnerProvider({
       currentItem?.question ||
       "";
 
-    console.log("[BOSS-PRON] Starting recording for item:", {
-      index: currentIndexRef.current,
-      type: currentItem?.type,
-      targetText: currentItem?.targetText,
-      resolvedTargetPhrase: targetPhrase,
-      localParticipantIdentity: localParticipant?.identity,
-    });
-
     updateTranscript("");
     latestPronunciationRef.current = null;
     setIsRecording(true);
 
-    // Inform LiveKit Agent of the expected pronunciation target phrase
     if (targetPhrase) {
       sendBossCmd(
         new TextEncoder().encode(
@@ -543,17 +560,11 @@ function BossLiveKitInnerProvider({
           }),
         ),
         { reliable: true },
-      ).catch((err) =>
-        console.warn("[BOSS-PRON] Failed to send pronunciation target:", err),
-      );
+      ).catch(() => {});
     }
 
     try {
       await localParticipant?.setMicrophoneEnabled(true);
-      console.log(
-        "[BOSS-PRON] Microphone enabled successfully:",
-        localParticipant?.isMicrophoneEnabled,
-      );
     } catch (err) {
       console.error("[BOSS-PRON] Failed to enable microphone:", err);
       toast.error("Could not access microphone. Please check permissions.");
@@ -565,14 +576,12 @@ function BossLiveKitInnerProvider({
     setIsRecording(false);
     try {
       await localParticipant?.setMicrophoneEnabled(false);
-      console.log("[BOSS-PRON] Microphone disabled.");
     } catch (err) {
       console.warn("[BOSS-PRON] Error disabling microphone:", err);
     }
   }, [localParticipant]);
 
   const handleResetRecording = useCallback(() => {
-    console.log("[BOSS-PRON] Resetting recording state.");
     updateTranscript("");
     latestPronunciationRef.current = null;
     setIsRecording(false);
@@ -722,15 +731,6 @@ function BossLiveKitInnerProvider({
       }
 
       const currentItem = playlist[index];
-      console.log("[BOSS-PRON] Presenting playlist item:", {
-        index,
-        id: currentItem.id,
-        type: currentItem.type,
-        targetText: currentItem.targetText,
-        question: currentItem.question,
-        correctAnswer: currentItem.correctAnswer,
-      });
-
       const exerciseMessage: BossMessage = {
         id: `exercise-${currentItem.id}-${index}`,
         role: "assistant",
@@ -741,7 +741,6 @@ function BossLiveKitInnerProvider({
 
       setMessages((previous) => [...previous, exerciseMessage]);
 
-      // Pre-notify LiveKit Agent of pronunciation reference text when exercise loads
       if (
         currentItem.type === "PRONUNCIATION" ||
         currentItem.type === "CONVERSATION"
@@ -765,12 +764,7 @@ function BossLiveKitInnerProvider({
               }),
             ),
             { reliable: true },
-          ).catch((err) =>
-            console.warn(
-              "[BOSS-PRON] Failed to pre-send pronunciation target:",
-              err,
-            ),
-          );
+          ).catch(() => {});
         }
       }
 
@@ -786,7 +780,6 @@ function BossLiveKitInnerProvider({
     [handleEndSession, playExerciseAudio, playlist, sendBossCmd],
   );
 
-  // Initial Intro Message
   useEffect(() => {
     mountedRef.current = true;
     const welcomeMessage: BossMessage = {
@@ -862,7 +855,6 @@ function BossLiveKitInnerProvider({
           ),
         );
 
-        // Trigger LiveKit Boss Agent reaction over WebRTC data channel
         await new Promise<void>((resolve) => {
           reactionResolverRef.current = resolve;
           const timeout = setTimeout(() => {
@@ -892,7 +884,6 @@ function BossLiveKitInnerProvider({
           });
         });
 
-        // Fallback reaction card if network/LLM timed out
         if (!reactionAppendedRef.current) {
           reactionAppendedRef.current = true;
           setMessages((prev) => [
@@ -987,24 +978,15 @@ function BossLiveKitInnerProvider({
 
   const submitTurn = useCallback(async () => {
     if (resultPipelineRef.current || stageStatusRef.current !== "PLAYING") {
-      console.warn(
-        "[BOSS-PRON] submitTurn ignored: resultPipeline busy or stage not PLAYING",
-      );
       return;
     }
 
     const currentItem = playlist[currentIndexRef.current];
     if (!currentItem) return;
 
-    console.log(
-      "[BOSS-PRON] submitTurn called. Flushing trailing audio for 450ms before disabling mic...",
-    );
-
-    // Allow trailing audio packets to reach LiveKit VAD before muting the microphone track
     await wait(450);
     await handleStopRecording();
 
-    // Signal agent that user finished speaking in case server VAD is waiting
     sendBossCmd(
       new TextEncoder().encode(
         JSON.stringify({
@@ -1041,13 +1023,6 @@ function BossLiveKitInnerProvider({
         : "") ||
       "";
 
-    console.log("[BOSS-PRON] submitTurn settled after", attempts * 100, "ms:", {
-      userText,
-      pronData,
-      rawTarget,
-      exerciseType: currentItem.type,
-    });
-
     setMessages((previous) => [
       ...previous,
       {
@@ -1081,14 +1056,6 @@ function BossLiveKitInnerProvider({
     const finalIsCorrect = cleanTarget
       ? azurePassed || textPassed
       : cleanUser.length > 1;
-
-    console.log("[BOSS-PRON] Grading decision:", {
-      cleanTarget,
-      cleanUser,
-      azurePassed,
-      textPassed,
-      finalIsCorrect,
-    });
 
     await processResult(
       finalIsCorrect,
@@ -1227,14 +1194,6 @@ export function BossFoundationProvider({
         const targetVoiceId = `${targetLanguage}-${
           bossVoiceGender === "male" ? "man-01" : "girl-01"
         }`;
-
-        console.log("[BOSS-PRON] Minting LiveKit token with languages:", {
-          targetLanguage,
-          nativeLanguage,
-          voiceGender: bossVoiceGender,
-          targetVoiceId,
-          sessionId: session?.id,
-        });
 
         const res = await fetch("/api/livekit/token", {
           method: "POST",
