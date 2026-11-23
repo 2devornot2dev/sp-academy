@@ -1,6 +1,7 @@
 // app/(dashboard)/learning-hub/ladder/[slug]/page.tsx
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { getUserLanguage } from "@/app/actions/get-user-language";
 import { getLadderRung } from "@/app/actions/ladder-actions";
 import { toLanguageCode } from "@/lib/languages";
@@ -15,6 +16,12 @@ interface Params {
 export default async function LadderRungPage({ params }: Params) {
   const { slug } = await params;
   const user = await requireUser();
+  const entitlements = await getUserEntitlements(user.id);
+
+  if (entitlements.isTrial) {
+    redirect("/learning-hub/ladder");
+  }
+
   const { lang } = await getUserLanguage(user.id);
   const targetLang = toLanguageCode(lang?.targetLanguage || "FRENCH");
 

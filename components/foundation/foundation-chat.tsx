@@ -1,4 +1,3 @@
-// components/foundation/foundation-chat.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +20,6 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { FoundationFreestyleChatBubble } from "./foundation-freestye-chat-bubble";
 import { useMatrix } from "@/context/matrix-context";
 import { useSprite } from "@/context/sprite-context";
@@ -65,7 +63,6 @@ function LiveKitChatInner({
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
 
   const [messages, setMessages] = useState<any[]>([]);
-  // Live streaming user utterance while speaking / waiting on Azure score
   const [streamingUserTurn, setStreamingUserTurn] = useState<{
     text: string;
     isFinal: boolean;
@@ -81,7 +78,6 @@ function LiveKitChatInner({
     label?: string;
   } | null>(null);
 
-  // 2.5 Minute Sprint Timer (150s)
   const [secondsLeft, setSecondsLeft] = useState(150);
   const [isEnding, setIsEnding] = useState(false);
 
@@ -94,11 +90,9 @@ function LiveKitChatInner({
     [freestyleData?.requiredChunks, freestyleData?.targetPhrases],
   );
 
-  // Use Vox/Vivi as the Roleplay Partner
   const partnerName = spriteName || "Vox";
   const partnerAvatarUrl = avatarSrc || session?.aiAvatarUrl;
 
-  // Dynamic Reply Lifeline state (updates after every AI turn so user is never stuck)
   const [liveHint, setLiveHint] = useState<{
     starter: string;
     translation?: string;
@@ -168,7 +162,6 @@ function LiveKitChatInner({
     );
   };
 
-  // Refresh dynamic reply suggestion after each AI turn
   const refreshReplyLifeline = useCallback(
     async (aiText: string, aiTranslation?: string | null) => {
       const nextChunk =
@@ -275,7 +268,6 @@ function LiveKitChatInner({
   const handleFinishRef = useRef(handleFinishSession);
   handleFinishRef.current = handleFinishSession;
 
-  // 2.5m Countdown Timer
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
@@ -290,7 +282,6 @@ function LiveKitChatInner({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-complete once all target phrases are hit AND >= 3 user turns spoken!
   useEffect(() => {
     if (
       !autoEndedRef.current &&
@@ -321,7 +312,6 @@ function LiveKitChatInner({
         return;
       }
 
-      // Live streaming partial/final STT words as the user speaks
       if (payload.type === "USER_TRANSCRIPT_STREAM" && payload.text) {
         const text = String(payload.text).trim();
         const isFinal = Boolean(payload.isFinal);
@@ -404,7 +394,7 @@ function LiveKitChatInner({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingUserTurn, agentState, activeReaction]);
+  }, [messages, streamingUserTurn, agentState, activeReaction, liveHint]);
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = String(secondsLeft % 60).padStart(2, "0");
@@ -413,83 +403,12 @@ function LiveKitChatInner({
     liveHint.starter || nextUnmatchedChunk || starterHintTarget || "";
 
   return (
-    <div className="flex flex-1 flex-col justify-between gap-3.5">
+    <div className="flex min-h-0 flex-1 flex-col justify-between gap-2.5 sm:gap-3">
       <RoomAudioRenderer />
 
-      {/* 1. TOP BAR: Live Reply Lifeline with Vox/Vivi + 2.5m Sprint Timer */}
-      <div className="flex shrink-0 flex-col justify-between gap-3 rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-gradient-to-r from-sky-50/90 via-white to-indigo-50/40 p-3.5 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border-2 border-b-[3px] border-sky-400 bg-slate-900 shadow-2xs">
-            <img
-              src={partnerAvatarUrl}
-              alt={partnerName}
-              className="h-full w-full object-cover object-top"
-            />
-            <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-widest text-blue-600 uppercase">
-                <Lightbulb size={12} className="text-amber-500" />
-                {liveHint.coachingTip || `Roleplay with ${partnerName}`}
-              </span>
-              {isHintLoading && (
-                <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-              )}
-            </div>
-
-            {displaySuggestion ? (
-              <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold text-slate-700 sm:text-sm">
-                  Try saying:{" "}
-                  <span className="font-black text-slate-900">
-                    &ldquo;{displaySuggestion}&rdquo;
-                  </span>
-                </p>
-                {liveHint.translation && (
-                  <span className="text-xs font-semibold text-slate-400">
-                    ({liveHint.translation})
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handlePlayPhraseAudio(displaySuggestion)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black text-blue-600 transition hover:bg-sky-100"
-                >
-                  <Volume2 size={11} />
-                  <span>Hear</span>
-                </button>
-              </div>
-            ) : (
-              <p className="text-xs font-bold text-slate-600">
-                Speak naturally in {session?.targetLanguage || "your target language"}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
-          <div className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700">
-            <Sparkles size={13} className="text-indigo-500" />
-            <span>Turns: {Math.min(userTurnCount, 3)}/3</span>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-800 shadow-2xs">
-            <Timer size={14} className="text-blue-600" />
-            <span>
-              {mins}:{secs}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. 3D TARGET PHRASES CHECKLIST (Clickable to hear pronunciation!) */}
-      {requiredChunks.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 ring-1 ring-slate-200/80">
-          <span className="mr-1 text-[10px] font-black tracking-wider text-slate-400 uppercase">
-            Mission Phrases ({completedChunks.size}/{requiredChunks.length}):
-          </span>
+      {/* 1. COMPACT SINGLE-LINE GOAL + TIMER STRIP */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 sm:px-4 sm:py-2.5 ring-1 ring-slate-200/80">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {requiredChunks.map((chunk) => {
             const hit = completedChunks.has(chunk);
             return (
@@ -498,49 +417,63 @@ function LiveKitChatInner({
                 type="button"
                 onClick={() => handlePlayPhraseAudio(chunk)}
                 title="Tap to hear pronunciation"
-                className={`inline-flex items-center gap-1.5 rounded-xl border-b-2 px-3 py-1 text-xs font-black transition-all duration-300 active:translate-y-0.5 ${
+                className={`inline-flex items-center gap-1 rounded-lg border-b-2 px-2.5 py-1 text-[11px] font-black transition-all active:translate-y-0.5 ${
                   hit
-                    ? "scale-105 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-xs"
-                    : "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100/70"
+                    ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-xs"
+                    : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100/70"
                 }`}
               >
                 {hit ? (
-                  <Check size={12} strokeWidth={3.5} />
+                  <Check size={11} strokeWidth={3.5} />
                 ) : (
-                  <Target size={12} className="text-amber-600" />
+                  <Target size={11} className="text-amber-600" />
                 )}
                 <span>{chunk}</span>
                 <Volume2
-                  size={11}
+                  size={10}
                   className={hit ? "text-emerald-100" : "text-amber-600"}
                 />
               </button>
             );
           })}
         </div>
-      )}
 
-      {/* 3. CLEAN LIGHT CHAT STREAM */}
-      <div className="relative h-[380px] overflow-hidden rounded-3xl border-2 border-slate-200/80 bg-slate-50/60 shadow-inner">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-black text-indigo-700">
+            <Sparkles size={11} className="text-indigo-500" />
+            <span>{Math.min(userTurnCount, 3)}/3</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-800 shadow-2xs">
+            <Timer size={12} className="text-blue-600" />
+            <span>
+              {mins}:{secs}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. EXPANSIVE CHAT STREAM (Suggestion lives INSIDE the thread!) */}
+      <div className="relative min-h-[270px] flex-1 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-slate-200/80 bg-slate-50/60 shadow-inner">
         {activeReaction && (
           <div
             key={activeReaction.id}
-            className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full border-2 border-b-4 border-indigo-300 bg-white px-5 py-2 shadow-xl animate-in zoom-in-75 fade-in slide-in-from-top-4 duration-300"
+            className="absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border-2 border-b-4 border-indigo-300 bg-white px-4 py-1.5 shadow-xl animate-in zoom-in-75 fade-in slide-in-from-top-4 duration-300"
           >
-            <span className="animate-bounce text-2xl">
+            <span className="animate-bounce text-xl">
               {activeReaction.emoji}
             </span>
-            <span className="text-xs font-black tracking-wider text-indigo-700 uppercase">
+            <span className="text-[11px] font-black tracking-wider text-indigo-700 uppercase">
               {activeReaction.label || activeReaction.mood}
             </span>
           </div>
         )}
 
-        <ScrollArea className="h-full">
-          <div className="space-y-5 p-5 sm:p-7">
+        <div className="h-full overflow-y-auto p-3.5 sm:p-6">
+          <div className="space-y-4">
             {messages.length === 0 && !streamingUserTurn && (
-              <div className="flex min-h-[200px] flex-col items-center justify-center text-center">
-                <p className="text-sm font-bold text-slate-400">
+              <div className="flex min-h-[120px] flex-col items-center justify-center text-center">
+                <p className="text-xs sm:text-sm font-bold text-slate-400">
                   {agentState === "connecting"
                     ? `Connecting voice roleplay with ${partnerName}...`
                     : `${partnerName} is listening! Start speaking naturally.`}
@@ -557,7 +490,6 @@ function LiveKitChatInner({
               />
             ))}
 
-            {/* Real-time streaming user bubble while speaking / scoring */}
             {streamingUserTurn && (
               <FoundationFreestyleChatBubble
                 key="streaming-user-turn"
@@ -580,17 +512,53 @@ function LiveKitChatInner({
               />
             )}
 
-            <div ref={messagesEndRef} className="h-4" />
+            {/* Inline Reply Suggestion right inside the chat thread */}
+            {displaySuggestion && !streamingUserTurn && (
+              <div className="flex items-start gap-2.5 rounded-2xl border border-sky-200/90 bg-white/95 px-3.5 py-2.5 shadow-2xs">
+                <Lightbulb
+                  size={15}
+                  className="mt-0.5 shrink-0 text-amber-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
+                      {liveHint.coachingTip || "Try saying"}
+                    </span>
+                    {isHintLoading && (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs sm:text-sm font-black text-slate-900">
+                    &ldquo;{displaySuggestion}&rdquo;
+                  </p>
+                  {liveHint.translation && (
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      ({liveHint.translation})
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handlePlayPhraseAudio(displaySuggestion)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-black text-blue-600 hover:bg-sky-100"
+                >
+                  <Volume2 size={12} />
+                  <span>Hear</span>
+                </button>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} className="h-2" />
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
-      {/* 4. BOTTOM LIVE STATUS & 3D ACTION BAR */}
-      <div className="flex shrink-0 flex-col gap-3 md:flex-row">
-        <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-slate-50 px-5 py-3.5 ring-1 ring-slate-200/80">
-          <div className="flex items-center gap-3">
+      {/* 3. BOTTOM LIVE STATUS & 3D ACTION BAR */}
+      <div className="flex shrink-0 flex-col gap-2.5 sm:flex-row">
+        <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-2.5 sm:px-5 sm:py-3.5 ring-1 ring-slate-200/80">
+          <div className="flex items-center gap-2.5 min-w-0">
             <span
-              className={`h-3 w-3 rounded-full ${
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                 agentState === "listening"
                   ? "animate-ping bg-emerald-500"
                   : agentState === "speaking"
@@ -598,11 +566,11 @@ function LiveKitChatInner({
                     : "bg-amber-400"
               }`}
             />
-            <span className="text-xs font-black text-slate-800 sm:text-sm">
+            <span className="truncate text-xs font-black text-slate-800 sm:text-sm">
               {streamingUserTurn && !streamingUserTurn.isFinal
                 ? `Hearing: "${streamingUserTurn.text}"`
                 : agentState === "listening"
-                  ? `Listening (Reply to ${partnerName})...`
+                  ? `Listening (${partnerName})...`
                   : agentState === "speaking"
                     ? `${partnerName} Speaking...`
                     : "Connecting voice..."}
@@ -611,10 +579,10 @@ function LiveKitChatInner({
 
           <TrackToggle
             source={Track.Source.Microphone}
-            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-100"
           >
-            <Mic size={14} className="text-blue-600" />
-            Toggle Mic
+            <Mic size={13} className="text-blue-600" />
+            <span>Mic</span>
           </TrackToggle>
         </div>
 
@@ -622,7 +590,7 @@ function LiveKitChatInner({
           type="button"
           onClick={handleFinishSession}
           disabled={isEnding}
-          className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-8 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 md:w-auto ${
+          className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-6 py-3 sm:px-8 sm:py-4 text-sm sm:text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:w-auto ${
             allChunksCompleted
               ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
               : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25"
@@ -635,7 +603,7 @@ function LiveKitChatInner({
                 ? "Mission Complete!"
                 : "Finish Mission"}
           </span>
-          <ArrowRight size={18} />
+          <ArrowRight size={17} />
         </button>
       </div>
     </div>
@@ -656,6 +624,7 @@ export default function FoundationChat({
       connect={true}
       audio={true}
       video={false}
+      className="flex min-h-0 flex-1 flex-col"
     >
       <LiveKitChatInner session={session} onEnd={onEnd} />
     </LiveKitRoom>

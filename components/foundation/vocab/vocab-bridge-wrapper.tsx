@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -16,7 +16,7 @@ import type { UserVocabBridge } from "@/app/actions/get-vocab-bridge";
 import { completeVocabBridge } from "@/app/actions/complete-vocab-bridge";
 
 import { MatrixProvider, useMatrix } from "@/context/matrix-context";
-import { WordAudioProvider } from "@/context/word-audio-context";
+import { WordAudioProvider, useWordAudio } from "@/context/word-audio-context";
 
 import { BridgeSceneStep } from "./bridge-scene-step";
 import { VocabMomentStep } from "./vocab-moment-step";
@@ -53,6 +53,16 @@ const BRIDGE_STEPS = [
   },
 ];
 
+function AudioStepGuard({ step }: { step: number }) {
+  const { stopAudio } = useWordAudio();
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [step, stopAudio]);
+  return null;
+}
+
 interface VocabBridgeWrapperProps {
   bridge: UserVocabBridge | null;
 }
@@ -68,6 +78,10 @@ function VocabBridgeContent({
 
   const { syncCart } = useMatrix();
 
+  useEffect(() => {
+    preloadSfx();
+  }, []);
+
   const userId = bridge.userId;
   const targetLang = bridge.course?.targetLanguage || "fr-FR";
 
@@ -76,7 +90,6 @@ function VocabBridgeContent({
     (bridge.handoffFragment as any)?.wordAudio ||
     {};
 
-  // Inside VocabBridgeContent (5 steps):
   const handleNext = (nextStepIndex: number) => {
     playSfx(nextStepIndex === 5 ? "victory" : "round-clear");
     syncCart(userId, targetLang);
@@ -86,6 +99,7 @@ function VocabBridgeContent({
   const handleFinishBridge = async () => {
     if (isFinishing) return;
     setIsFinishing(true);
+    playSfx("victory");
 
     try {
       if (syncCart && userId && targetLang) {
@@ -157,13 +171,40 @@ function VocabBridgeContent({
 
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center gap-6 p-4 md:flex-row md:items-center md:gap-8 md:p-8">
+      <AudioStepGuard step={step} />
+
+      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-3 p-3 sm:gap-5 sm:p-5 md:flex-row md:items-center md:gap-8 md:p-8">
         {/* =================================================================
-            LEFT SIDEBAR: 3D TACTILE STEPPER CARD
+            MOBILE-ONLY STICKY SLIM CONTEXT BAR (< md)
             ================================================================= */}
-        <div className="flex h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-sm md:min-h-[640px] md:w-72 md:p-7 lg:w-80">
+        <div className="sticky top-2 z-30 flex items-center justify-between gap-3 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur-md md:hidden">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-gradient-to-b from-amber-300 to-orange-500 px-2 py-0.5 text-[10px] font-black tracking-wide text-slate-950 uppercase">
+                <Zap className="h-2.5 w-2.5 fill-current" />
+                Bridge {spoonNum}
+              </span>
+              <span className="truncate text-xs font-black text-slate-900">
+                {BRIDGE_STEPS[step - 1]?.title}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-500 transition-all duration-500"
+                style={{ width: `${Math.max(15, progressPct)}%` }}
+              />
+            </div>
+          </div>
+          <span className="shrink-0 text-xs font-black text-emerald-600">
+            {step}/5
+          </span>
+        </div>
+
+        {/* =================================================================
+            LEFT SIDEBAR: 3D TACTILE STEPPER CARD (md+)
+            ================================================================= */}
+        <div className="hidden h-fit w-full shrink-0 flex-col justify-between rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-sm md:flex md:min-h-[640px] md:w-72 md:p-7 lg:w-80">
           <div>
-            {/* Top Accent Amber Pill */}
             <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border-b-[3px] border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-3 py-1 text-[11px] font-black tracking-wide text-slate-950 uppercase shadow-2xs">
               <Zap className="h-3.5 w-3.5 fill-current" />
               <span>Vocab Bridge • Spoon {spoonNum}</span>
@@ -177,9 +218,7 @@ function VocabBridgeContent({
             </p>
           </div>
 
-          {/* 3D Stepping-Stone Vertical Track */}
           <div className="relative my-7">
-            {/* Background Track Line */}
             <div className="absolute top-5 bottom-5 left-[21px] w-1 rounded-full bg-slate-100">
               <div
                 className="w-full rounded-full bg-gradient-to-b from-emerald-400 to-sky-500 transition-all duration-500"
@@ -202,7 +241,6 @@ function VocabBridgeContent({
                         : ""
                     }`}
                   >
-                    {/* 3D Tactile Node Icon */}
                     <div
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl font-black transition-all duration-300 ${
                         isCompleted
@@ -249,7 +287,6 @@ function VocabBridgeContent({
             </div>
           </div>
 
-          {/* Bottom Progress Footer */}
           <div className="space-y-1.5 border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-500">
               <span>Stage {step} of 5</span>
@@ -265,9 +302,9 @@ function VocabBridgeContent({
         </div>
 
         {/* =================================================================
-            RIGHT SIDE: MAIN CONTENT STAGE CARD (Centered in Viewport)
+            RIGHT SIDE: MAIN CONTENT STAGE CARD
             ================================================================= */}
-        <div className="relative flex min-h-[640px] flex-1 flex-col justify-center overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white shadow-sm">
+        <div className="relative flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white shadow-sm md:min-h-[640px] md:rounded-[2rem]">
           {isFinishing && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/85 backdrop-blur-xs">
               <Loader2 className="h-9 w-9 animate-spin text-blue-600" />

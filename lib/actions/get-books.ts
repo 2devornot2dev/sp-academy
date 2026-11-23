@@ -1,5 +1,6 @@
 // lib/actions/get-books.ts
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { prisma } from "@/lib/prisma";
 import { getPresignedImageUrl } from "@/lib/aws/services/s3-presigned-url";
 import type { BookshelfItem } from "@/components/books/bookshelf-client";
@@ -116,6 +117,11 @@ export async function getBookshelfData(): Promise<BookshelfItem[]> {
 
 export async function getBookReaderData(identifier: string) {
   const user = await requireUser();
+  const entitlements = await getUserEntitlements(user.id);
+
+  if (!entitlements.canAccessBooks) {
+    return null;
+  }
 
   const [book, dbUser] = await Promise.all([
     prisma.spoonBook.findFirst({
@@ -209,7 +215,8 @@ export async function getBookReaderData(identifier: string) {
       },
     },
     userPlan:
-      dbUser?.BillingInformation?.currentPlan?.toLowerCase() || "founder",
+      dbUser?.BillingInformation?.currentPlan?.toLowerCase() ||
+      entitlements.plan.toLowerCase(),
     initialPage: progress?.completedAt ? 0 : (progress?.currentPage ?? 0),
     initialCompletedCheckpoints: completedCheckpoints,
     initialPronunciationScores: pronunciationScores,

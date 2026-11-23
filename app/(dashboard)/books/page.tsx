@@ -1,9 +1,27 @@
 // app/books/page.tsx
 import { BookOpen } from "lucide-react";
+import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
+import { LockedFeaturePage } from "@/components/billing/locked-feature-page";
 import { BookshelfClient } from "@/components/books/bookshelf-client";
 import { getBookshelfData } from "@/lib/actions/get-books";
 
 export default async function BooksPage() {
+  const user = await requireUser();
+  const entitlements = await getUserEntitlements(user.id);
+
+  if (!entitlements.canAccessBooks) {
+    return (
+      <LockedFeaturePage
+        badge="Unlimited+ Exclusive"
+        title="Unlock Interactive Audio Books"
+        description="Read bilingual Spoon Original stories with native tap-to-hear audio, interactive definitions, and live Azure pronunciation checkpoints."
+        ctaLabel="Upgrade to Unlimited+"
+        ctaHref="/pricing"
+      />
+    );
+  }
+
   const hydratedBooks = await getBookshelfData();
 
   return (

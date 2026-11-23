@@ -101,7 +101,6 @@ function VerbalClozeQuestion({
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
 
-      // Safety valve: after 2 mic tries, reveal & allow advancing so a noisy mic never soft-locks
       if (nextAttempts >= 2) {
         playSfx("tap");
         setLocalStatus("correct");
@@ -135,13 +134,14 @@ function VerbalClozeQuestion({
     }
   };
 
-  const promptParts = item.prompt.split("___");
+  const promptParts = (item.prompt || "").split("___");
+  const hasBlank = promptParts.length > 1;
 
   return (
     <div className="flex w-full flex-col items-center animate-in fade-in duration-300">
       {/* 3D Stage Card */}
       <div
-        className={`relative mb-6 w-full overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 ${
+        className={`relative mb-4 sm:mb-6 w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[5px] sm:border-b-[6px] bg-white p-5 sm:p-10 text-center transition-all duration-300 ${
           isRecording
             ? "border-indigo-500 ring-4 ring-indigo-500/10"
             : localStatus === "correct"
@@ -152,42 +152,50 @@ function VerbalClozeQuestion({
         }`}
       >
         <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70">
-          <Mic size={150} />
+          <Mic className="size-28 sm:size-36" />
         </div>
 
-        <p className="relative z-10 mb-3 text-[11px] font-black tracking-widest text-blue-600 uppercase">
+        <p className="relative z-10 mb-2.5 sm:mb-3 text-[10px] sm:text-[11px] font-black tracking-widest text-blue-600 uppercase">
           Speak the Missing Word Out Loud
         </p>
 
-        <div className="relative z-10 mb-6 text-2xl sm:text-4xl font-black tracking-tight leading-snug text-slate-900">
-          {promptParts[0]}
-          <span
-            className={`mx-1.5 inline-block rounded-2xl border-b-4 px-4 py-1 transition-colors ${
-              localStatus === "correct"
-                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                : "border-sky-300 bg-sky-50 text-blue-600"
-            }`}
-          >
-            {localStatus === "correct" ? item.acceptableAnswers[0] : "____"}
-          </span>
-          {promptParts[1]}
+        <div className="relative z-10 mb-4 sm:mb-6 text-xl sm:text-4xl font-black tracking-tight leading-snug text-slate-900">
+          {hasBlank ? (
+            <>
+              {promptParts[0]}
+              <span
+                className={`mx-1.5 inline-block rounded-xl sm:rounded-2xl border-b-4 px-3 py-0.5 sm:px-4 sm:py-1 transition-colors ${
+                  localStatus === "correct"
+                    ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                    : "border-slate-300 bg-slate-100 text-slate-400"
+                }`}
+              >
+                <span className={localStatus === "correct" ? "" : "opacity-55 select-none"}>
+                  {targetWord}
+                </span>
+              </span>
+              {promptParts.slice(1).join("___")}
+            </>
+          ) : (
+            <span>{item.prompt}</span>
+          )}
         </div>
 
         {item.hint && (
-          <div className="relative z-10 inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs sm:text-sm font-black text-amber-900">
-            <AlertCircle size={16} className="text-amber-600" />
+          <div className="relative z-10 inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-sm font-black text-amber-900">
+            <AlertCircle size={15} className="shrink-0 text-amber-600" />
             <span>Hint: {item.hint}</span>
           </div>
         )}
       </div>
 
       {/* 3D Recorder Control Dock */}
-      <div className="flex w-full max-w-md flex-col items-center gap-3">
+      <div className="flex w-full max-w-md flex-col items-center gap-2.5 sm:gap-3">
         <button
           type="button"
           onClick={handleToggleMic}
           disabled={localStatus === "correct"}
-          className={`inline-flex w-full items-center justify-center gap-3 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+          className={`inline-flex w-full items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-3.5 sm:py-4 text-sm sm:text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
             localStatus === "correct"
               ? "cursor-default border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600"
               : isRecording
@@ -199,17 +207,17 @@ function VerbalClozeQuestion({
         >
           {localStatus === "correct" ? (
             <>
-              <CheckCircle2 size={22} />
+              <CheckCircle2 size={20} />
               <span>Pronunciation Verified</span>
             </>
           ) : isRecording ? (
             <>
-              <Square size={18} className="fill-current" />
+              <Square size={16} className="fill-current" />
               <span>Tap When Done Speaking</span>
             </>
           ) : (
             <>
-              <Mic size={22} />
+              <Mic size={20} />
               <span>
                 {localStatus === "incorrect"
                   ? "Try Speaking Again"
@@ -219,7 +227,7 @@ function VerbalClozeQuestion({
           )}
         </button>
 
-        <div className="min-h-[24px] text-center">
+        <div className="min-h-[20px] text-center">
           {isRecording ? (
             <p className="animate-pulse text-xs font-black text-blue-600">
               Listening:{" "}
@@ -228,10 +236,10 @@ function VerbalClozeQuestion({
               </span>
             </p>
           ) : (
-            <p className="text-xs font-semibold text-slate-400">
+            <p className="text-[11px] sm:text-xs font-semibold text-slate-400">
               {localStatus === "correct"
                 ? "Click Next Question below to continue"
-                : "Say the missing word clearly — matches automatically"}
+                : "Say the highlighted word clearly — matches automatically"}
             </p>
           )}
         </div>
@@ -286,11 +294,13 @@ function TrueFalseQuestion({
     }
   };
 
+  const isLongStatement = (item.statement || "").length > 75;
+
   return (
     <div className="flex w-full flex-col animate-in fade-in duration-300">
       {/* 3D Stage Card */}
       <div
-        className={`relative mb-6 w-full overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 ${
+        className={`relative mb-4 sm:mb-6 w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[5px] sm:border-b-[6px] bg-white p-5 sm:p-9 text-center transition-all duration-300 ${
           guessed === null
             ? "border-slate-200 shadow-sm"
             : isCorrectGuess
@@ -299,25 +309,31 @@ function TrueFalseQuestion({
         }`}
       >
         <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70">
-          <HelpCircle size={150} />
+          <HelpCircle className="size-28 sm:size-36" />
         </div>
 
-        <p className="relative z-10 mb-3 text-[11px] font-black tracking-widest text-blue-600 uppercase">
+        <p className="relative z-10 mb-2.5 text-[10px] sm:text-[11px] font-black tracking-widest text-blue-600 uppercase">
           True or False?
         </p>
 
-        <p className="relative z-10 mx-auto max-w-2xl text-2xl sm:text-3xl font-black leading-snug text-slate-900">
+        <p
+          className={`relative z-10 mx-auto max-w-2xl font-black leading-snug text-slate-900 ${
+            isLongStatement
+              ? "text-base sm:text-2xl"
+              : "text-xl sm:text-3xl"
+          }`}
+        >
           &ldquo;{item.statement}&rdquo;
         </p>
       </div>
 
       {/* 3D True / False Choice Buttons */}
-      <div className="grid w-full grid-cols-2 gap-4">
+      <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
         <button
           type="button"
           onClick={() => handleGuess(true)}
           disabled={isCorrectGuess || guessed === true}
-          className={`rounded-2xl border-2 border-b-[5px] px-6 py-4 text-lg font-black transition-all duration-150 ${
+          className={`rounded-2xl border-2 border-b-[5px] px-4 py-3.5 sm:px-6 sm:py-4 text-base sm:text-lg font-black transition-all duration-150 ${
             guessed === true && isTrueAnswer
               ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
               : guessed === true && !isTrueAnswer
@@ -332,7 +348,7 @@ function TrueFalseQuestion({
           type="button"
           onClick={() => handleGuess(false)}
           disabled={isCorrectGuess || guessed === false}
-          className={`rounded-2xl border-2 border-b-[5px] px-6 py-4 text-lg font-black transition-all duration-150 ${
+          className={`rounded-2xl border-2 border-b-[5px] px-4 py-3.5 sm:px-6 sm:py-4 text-base sm:text-lg font-black transition-all duration-150 ${
             guessed === false && !isTrueAnswer
               ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
               : guessed === false && isTrueAnswer
@@ -347,7 +363,7 @@ function TrueFalseQuestion({
       {/* Dedicated Explanation Card */}
       {guessed !== null && item.explanation && (
         <div
-          className={`mt-5 flex items-start gap-3 rounded-2xl border p-4 text-sm font-semibold leading-relaxed animate-in fade-in slide-in-from-top-2 duration-200 ${
+          className={`mt-4 flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-xs sm:text-sm font-semibold leading-relaxed animate-in fade-in slide-in-from-top-2 duration-200 ${
             isCorrectGuess
               ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
               : "border-amber-200 bg-amber-50/80 text-amber-900"
@@ -471,22 +487,22 @@ function ReorderQuestion({
   return (
     <div className="flex w-full flex-col animate-in fade-in duration-300">
       {/* 3D Prompt Card */}
-      <div className="relative mb-5 w-full overflow-hidden rounded-3xl border-2 border-b-[5px] border-slate-200 bg-white p-7 text-center shadow-xs">
+      <div className="relative mb-4 sm:mb-5 w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[5px] border-slate-200 bg-white p-4 sm:p-7 text-center shadow-xs">
         <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70">
-          <Layers size={140} />
+          <Layers className="size-24 sm:size-36" />
         </div>
 
-        <p className="relative z-10 mb-2 text-[11px] font-black tracking-widest text-blue-600 uppercase">
+        <p className="relative z-10 mb-1.5 text-[10px] sm:text-[11px] font-black tracking-widest text-blue-600 uppercase">
           Build the Sentence
         </p>
-        <h3 className="relative z-10 text-xl sm:text-2xl font-black text-slate-900">
+        <h3 className="relative z-10 text-base sm:text-2xl font-black text-slate-900">
           {item.prompt}
         </h3>
       </div>
 
       {/* Sentence Drop Zone */}
       <div
-        className={`mb-5 flex min-h-[84px] w-full flex-wrap items-center justify-center gap-2.5 rounded-3xl border-2 border-dashed p-4 transition-colors ${
+        className={`mb-4 sm:mb-5 flex min-h-[68px] sm:min-h-[84px] w-full flex-wrap items-center justify-center gap-2 sm:gap-2.5 rounded-2xl sm:rounded-3xl border-2 border-dashed p-3 sm:p-4 transition-colors ${
           localStatus === "correct"
             ? "border-emerald-400 bg-emerald-50/60"
             : localStatus === "incorrect"
@@ -495,7 +511,7 @@ function ReorderQuestion({
         }`}
       >
         {selectedWords.length === 0 && (
-          <span className="w-full text-center text-sm font-bold text-slate-400">
+          <span className="w-full text-center text-xs sm:text-sm font-bold text-slate-400">
             Tap the 3D word tiles below in the right order...
           </span>
         )}
@@ -518,12 +534,12 @@ function ReorderQuestion({
               type="button"
               onClick={() => handleRemoveWord(word, idx)}
               disabled={localStatus === "correct"}
-              className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-base sm:text-lg font-black shadow-sm transition-all active:translate-y-0.5 active:border-b-2 ${tileClass}`}
+              className={`inline-flex items-center gap-1 rounded-xl sm:rounded-2xl border-2 border-b-4 px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-lg font-black shadow-sm transition-all active:translate-y-0.5 active:border-b-2 ${tileClass}`}
               title="Tap to remove"
             >
               <span>{word}</span>
               {(localStatus === "correct" || isCorrectPos) && (
-                <Check size={15} className="shrink-0 stroke-[3.5]" />
+                <Check size={14} className="shrink-0 stroke-[3.5]" />
               )}
             </button>
           );
@@ -531,21 +547,21 @@ function ReorderQuestion({
       </div>
 
       {/* 3D Word Bank */}
-      <div className="rounded-3xl border border-slate-200/80 bg-slate-50/50 p-4">
-        <div className="flex flex-wrap justify-center gap-2.5">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-slate-50/50 p-3 sm:p-4">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-2.5">
           {availableWords.map((word, idx) => (
             <button
               key={`bank-${idx}`}
               type="button"
               onClick={() => handleAddWord(word, idx)}
-              className="rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-2.5 text-base sm:text-lg font-black text-slate-800 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
+              className="rounded-xl sm:rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-3 py-1.5 sm:px-4 sm:py-2.5 text-sm sm:text-lg font-black text-slate-800 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
             >
               {word}
             </button>
           ))}
           {availableWords.length === 0 && (
             <div className="flex items-center gap-3 py-1">
-              <span className="text-sm font-bold text-slate-400">
+              <span className="text-xs sm:text-sm font-bold text-slate-400">
                 All words placed!
               </span>
               {localStatus === "incorrect" && (
@@ -610,14 +626,14 @@ export function QuizStep({
   };
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-8 md:p-10 animate-in fade-in duration-500">
       {/* 1. Header & Segmented Progress */}
-      <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
+      <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 border-b border-slate-100 pb-3.5 sm:pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
-          <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">
+          <span className="text-[10px] sm:text-[11px] font-black tracking-wider text-blue-600 uppercase">
             Question {currentIndex + 1} of {totalQuestions}
           </span>
-          <h2 className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+          <h2 className="mt-0.5 text-xl sm:text-3xl font-black tracking-tight text-slate-900">
             Knowledge Check
           </h2>
         </div>
@@ -626,12 +642,12 @@ export function QuizStep({
           {data.items.map((_: any, idx: number) => (
             <div
               key={idx}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
+              className={`h-2 sm:h-2.5 rounded-full transition-all duration-300 ${
                 idx === currentIndex
-                  ? "w-9 bg-gradient-to-r from-sky-400 to-blue-600"
+                  ? "w-8 sm:w-9 bg-gradient-to-r from-sky-400 to-blue-600"
                   : idx < currentIndex
-                    ? "w-5 bg-emerald-500"
-                    : "w-5 bg-slate-200"
+                    ? "w-4 sm:w-5 bg-emerald-500"
+                    : "w-4 sm:w-5 bg-slate-200"
               }`}
             />
           ))}
@@ -665,20 +681,20 @@ export function QuizStep({
       </div>
 
       {/* 3. Zero-Shift Footer */}
-      <div className="mt-6 flex min-h-[80px] shrink-0 flex-col items-center justify-between gap-4 rounded-3xl bg-slate-50 p-4 sm:flex-row sm:px-6 ring-1 ring-slate-200/80">
-        <div className="flex items-center gap-3 text-center sm:text-left">
+      <div className="mt-4 sm:mt-6 flex min-h-[72px] sm:min-h-[80px] shrink-0 flex-col items-center justify-between gap-3 sm:gap-4 rounded-2xl sm:rounded-3xl bg-slate-50 p-3.5 sm:flex-row sm:px-6 ring-1 ring-slate-200/80">
+        <div className="flex items-center gap-2.5 text-center sm:text-left">
           {status === "correct" ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs">
-              <Sparkles className="h-5 w-5" />
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           ) : status === "incorrect" ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-              <AlertCircle className="h-5 w-5" />
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           ) : null}
 
           <p
-            className={`text-sm sm:text-base font-extrabold ${
+            className={`text-xs sm:text-base font-extrabold ${
               status === "correct"
                 ? "text-emerald-800"
                 : status === "incorrect"
@@ -694,13 +710,13 @@ export function QuizStep({
           type="button"
           onClick={handleNextQuestion}
           disabled={status !== "correct"}
-          className={`inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
+          className={`inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-black transition-all ${
             status === "correct"
               ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               : "cursor-not-allowed bg-slate-200/80 text-slate-400"
           }`}
         >
-          {status !== "correct" && <Lock size={16} />}
+          {status !== "correct" && <Lock size={15} />}
           <span>
             {currentIndex === totalQuestions - 1
               ? "Enter Final Mission"

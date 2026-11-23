@@ -7,11 +7,11 @@ import {
   Square,
   Loader2,
   Volume2,
-  Sparkles,
 } from "lucide-react";
 import { useS3Media } from "@/context/s3-context";
 import { useWordAudio } from "@/context/word-audio-context";
 import { getPresignedUrls } from "@/app/actions/s3";
+import { playSfx } from "@/lib/sfx";
 
 export function BridgeSceneStep({
   data,
@@ -35,7 +35,6 @@ export function BridgeSceneStep({
   const imageUrl = urls?.[0] || undefined;
   const videoUrl = data.videoS3Key ? urls?.[1] || undefined : undefined;
 
-  // Support both npcLineNative (from bridgeSceneSchema) and nativeNpcLine fallback
   const npcNativeLine: string | undefined =
     data.npcLineNative || data.nativeNpcLine || undefined;
 
@@ -56,6 +55,7 @@ export function BridgeSceneStep({
   }, []);
 
   const toggleAudio = async () => {
+    playSfx("tap");
     if (isPlayingAudio) {
       audioRef.current?.pause();
       setIsPlayingAudio(false);
@@ -117,58 +117,58 @@ export function BridgeSceneStep({
   };
 
   return (
-    <div className="flex h-full flex-col justify-between p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between p-4 sm:p-8 md:p-10 animate-in fade-in duration-500">
       {/* 1. Header */}
-      <div className="mb-6 text-center">
-        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
+      <div className="mb-4 sm:mb-6 text-center">
+        <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
           Scene Context
         </h2>
-        <p className="mt-1.5 text-sm sm:text-base font-medium text-slate-500">
+        <p className="mt-1 text-xs sm:text-base font-medium text-slate-500">
           Listen to the NPC line in context before reviewing the key vocabulary.
         </p>
       </div>
 
-      {/* 2. 16:9 Cinema Stage + Floating NPC Dialogue Dock */}
-      <div className="relative my-auto flex aspect-[16/10] sm:aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-3xl bg-slate-900 shadow-xl ring-1 ring-slate-200/80">
-        {videoUrl ? (
-          <video
-            src={videoUrl}
-            poster={imageUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-          />
-        ) : imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={data.altText ?? "Scene Context"}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full animate-pulse bg-slate-800" />
-        )}
+      {/* 2. Cinema Stage + NPC Dock (below image on phones, overlaid on sm+) */}
+      <div className="my-auto w-full space-y-3 sm:relative sm:space-y-0">
+        <div className="relative flex aspect-[16/10] sm:aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-900 shadow-xl ring-1 ring-slate-200/80">
+          {videoUrl ? (
+            <video
+              src={videoUrl}
+              poster={imageUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-full w-full object-cover"
+            />
+          ) : imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={data.altText ?? "Scene Context"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full animate-pulse bg-slate-800" />
+          )}
 
-        {/* Bottom Scrim */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="pointer-events-none hidden sm:block absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        </div>
 
-        {/* Floating 3D NPC Dialogue Dock */}
+        {/* 3D NPC Dialogue Dock */}
         <div
-          className={`absolute inset-x-3 bottom-3 sm:inset-x-6 sm:bottom-5 rounded-2xl p-4 sm:p-5 transition-all duration-300 ${
+          className={`rounded-2xl border border-slate-200/80 p-3.5 sm:border-0 sm:p-5 sm:absolute sm:inset-x-6 sm:bottom-5 transition-all duration-300 ${
             isPlayingAudio
-              ? "bg-white/98 shadow-2xl ring-2 ring-sky-400"
-              : "bg-white/90 hover:bg-white/96 shadow-xl backdrop-blur-md"
+              ? "bg-white shadow-xl sm:shadow-2xl ring-2 ring-sky-400"
+              : "bg-slate-50/95 sm:bg-white/90 sm:hover:bg-white/96 sm:shadow-xl sm:backdrop-blur-md"
           }`}
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3.5 min-w-0 flex-1">
-              {/* 3D Tactile Play Button */}
+          <div className="flex items-start justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={toggleAudio}
                 disabled={isFetching}
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 disabled:opacity-40 ${
+                className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 transition-all active:translate-y-0.5 active:border-b-0 disabled:opacity-40 ${
                   isPlayingAudio
                     ? "border-rose-700 bg-gradient-to-b from-rose-400 to-rose-600 text-white shadow-md shadow-rose-500/25"
                     : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md shadow-blue-500/25 hover:-translate-y-0.5"
@@ -176,15 +176,14 @@ export function BridgeSceneStep({
                 title={isPlayingAudio ? "Stop Audio" : "Listen to NPC"}
               >
                 {isFetching ? (
-                  <Loader2 size={20} className="animate-spin" />
+                  <Loader2 size={18} className="animate-spin" />
                 ) : isPlayingAudio ? (
-                  <Square size={18} className="fill-current" />
+                  <Square size={16} className="fill-current" />
                 ) : (
-                  <Play size={20} className="ml-0.5 fill-current" />
+                  <Play size={18} className="ml-0.5 fill-current" />
                 )}
               </button>
 
-              {/* NPC Target Line + Native Translation */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-black tracking-wider text-blue-800 uppercase">
@@ -198,13 +197,12 @@ export function BridgeSceneStep({
                   )}
                 </div>
 
-                <p className="mt-1 text-base sm:text-xl font-black leading-snug text-slate-900">
+                <p className="mt-1 text-sm sm:text-xl font-black leading-snug text-slate-900">
                   &ldquo;{data.npcLine}&rdquo;
                 </p>
 
-                {/* Native Translation (npcLineNative) */}
                 {npcNativeLine && showTranslation && (
-                  <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-500">
+                  <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-slate-500">
                     {npcNativeLine}
                   </p>
                 )}
@@ -217,11 +215,13 @@ export function BridgeSceneStep({
               </div>
             </div>
 
-            {/* Show / Hide English Toggle (if npcLineNative is present) */}
             {npcNativeLine && (
               <button
                 type="button"
-                onClick={() => setShowTranslation((prev) => !prev)}
+                onClick={() => {
+                  playSfx("tap");
+                  setShowTranslation((prev) => !prev);
+                }}
                 className="shrink-0 rounded-xl border-b-2 border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-600 transition hover:bg-slate-200 active:translate-y-0.5 active:border-b-0"
               >
                 {showTranslation ? "Hide EN" : "Show EN"}
@@ -232,7 +232,7 @@ export function BridgeSceneStep({
       </div>
 
       {/* 3. Footer 3D CTA Button */}
-      <div className="mt-6 flex items-center justify-between gap-4 border-t border-slate-100 pt-5">
+      <div className="mt-5 sm:mt-6 flex items-center justify-between gap-4 border-t border-slate-100 pt-4 sm:pt-5">
         <p className="hidden sm:block text-xs font-bold text-slate-400">
           {hasListenedOnce
             ? "Great! Continue to unlock the scene's core vocabulary."
@@ -242,7 +242,7 @@ export function BridgeSceneStep({
         <button
           type="button"
           onClick={handleNext}
-          className={`ml-auto inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 px-10 py-4 text-base font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 ${
+          className={`ml-auto inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 px-8 py-3.5 sm:px-10 sm:py-4 text-sm sm:text-base font-black text-white transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 ${
             hasListenedOnce
               ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25"
               : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-lg shadow-blue-500/25"

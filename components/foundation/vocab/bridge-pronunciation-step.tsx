@@ -18,12 +18,13 @@ import { usePronunciation } from "@/context/pronunciation-context";
 import { useWordAudio } from "@/context/word-audio-context";
 import { useMatrix } from "@/context/matrix-context";
 import { useSpeakWord, cleanWord } from "@/components/foundation/word-tap";
+import { playSfx } from "@/lib/sfx";
 
 type WordResult = { score: number; omitted: boolean };
 type VoicePhase = "waiting" | "speaking" | "wrapping_up";
 
 const PASSING_SCORE = 65;
-const MAX_REQUIRED_ATTEMPTS = 2; // Unlocks after 2 tries even if mic is noisy
+const MAX_REQUIRED_ATTEMPTS = 2;
 
 const tone = (score: number, omitted: boolean) => {
   if (omitted || score < 60)
@@ -226,6 +227,13 @@ export function BridgePronunciationStep({
     lastTrackedScore.current = score;
     setAttemptsCount((prev) => prev + 1);
 
+    const overall = Math.round(score.pronunciationScore);
+    if (overall >= PASSING_SCORE) {
+      playSfx(overall >= 85 ? "spark" : "correct");
+    } else {
+      playSfx("wrong");
+    }
+
     (data.referenceText ?? "")
       .split(/\s+/)
       .map(cleanWord)
@@ -240,9 +248,9 @@ export function BridgePronunciationStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [score]);
 
-  // Works even if previous attempt ended in "error" or "done" state!
   const handleStartRecording = () => {
     if (!isBusy) {
+      playSfx("tap");
       stopAudio();
       assessSpeech(data.referenceText, targetLang);
     }
@@ -264,13 +272,13 @@ export function BridgePronunciationStep({
     hasPassedScore || attemptsCount >= MAX_REQUIRED_ATTEMPTS;
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-8 md:p-10 animate-in fade-in duration-500">
       {/* 1. Header */}
-      <div className="mb-6 text-center">
-        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
+      <div className="mb-4 sm:mb-6 text-center">
+        <h2 className="text-xl sm:text-4xl font-black tracking-tight text-slate-900">
           Final Pronunciation Check
         </h2>
-        <p className="mt-1.5 text-sm sm:text-base font-medium text-slate-500">
+        <p className="mt-1 text-xs sm:text-base font-medium text-slate-500">
           Say the phrase out loud—tap any word to hear it or retry as many times
           as you like.
         </p>
@@ -278,7 +286,7 @@ export function BridgePronunciationStep({
 
       {/* 2. Target Phrase Stage Card */}
       <div
-        className={`relative mb-6 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 ${
+        className={`relative mb-4 sm:mb-6 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[5px] sm:border-b-[6px] bg-white p-5 sm:p-10 text-center transition-all duration-300 ${
           isListening
             ? "border-indigo-500 ring-4 ring-indigo-500/10"
             : isAnalyzing
@@ -290,19 +298,20 @@ export function BridgePronunciationStep({
                   : "border-slate-200 shadow-sm"
         }`}
       >
-        <Mic
-          size={150}
-          className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70"
-        />
+        <Mic className="pointer-events-none absolute top-1/2 left-1/2 size-28 sm:size-36 -translate-x-1/2 -translate-y-1/2 text-slate-100/70" />
 
-        {/* Reference sentence: each word is clickable to hear & colored by score */}
-        <p className="relative z-10 mb-6 flex flex-wrap justify-center gap-x-2.5 gap-y-2 text-2xl sm:text-4xl font-black leading-snug text-slate-900">
+        <p className="relative z-10 mb-4 sm:mb-6 flex flex-wrap justify-center gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2 text-xl sm:text-4xl font-black leading-snug text-slate-900">
           {tokens.map((token, i) => {
             const r = resultFor(token);
             return (
               <span
                 key={i}
-                onClick={() => !isBusy && speak(token)}
+                onClick={() => {
+                  if (!isBusy) {
+                    playSfx("tap");
+                    speak(token);
+                  }
+                }}
                 title={
                   r
                     ? r.omitted
@@ -310,7 +319,7 @@ export function BridgePronunciationStep({
                       : `${Math.round(r.score)}% — tap to hear`
                     : "Tap to hear word"
                 }
-                className={`cursor-pointer rounded-xl px-2.5 py-1 transition-all hover:scale-105 ${
+                className={`cursor-pointer rounded-xl px-2 py-0.5 sm:px-2.5 sm:py-1 transition-all hover:scale-105 ${
                   r
                     ? `${tone(r.score, r.omitted)} ${
                         r.omitted ? "line-through decoration-2" : ""
@@ -324,37 +333,39 @@ export function BridgePronunciationStep({
           })}
         </p>
 
-        <div className="relative z-10 flex flex-wrap items-center justify-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
           <button
             type="button"
-            onClick={() => speak(data.referenceText, { each: true })}
+            onClick={() => {
+              playSfx("tap");
+              speak(data.referenceText, { each: true });
+            }}
             disabled={isBusy}
-            className={`inline-flex items-center gap-2 rounded-xl border-b-[3px] px-4 py-2 text-xs sm:text-sm font-extrabold transition-all disabled:opacity-50 ${
+            className={`inline-flex items-center gap-2 rounded-xl border-b-[3px] px-3.5 py-2 sm:px-4 text-xs sm:text-sm font-extrabold transition-all disabled:opacity-50 ${
               activeWord === data.referenceText
                 ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
                 : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
             }`}
           >
-            <Volume2 size={16} /> Listen to Phrase
+            <Volume2 size={15} /> Listen to Phrase
           </button>
 
           {focusSound && (
-            <div className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-xs sm:text-sm font-extrabold text-purple-700">
-              <Ear size={16} /> Focus Sound: {focusSound.sound}
+            <div className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-2 sm:px-4 text-xs sm:text-sm font-extrabold text-purple-700">
+              <Ear size={15} /> Focus Sound: {focusSound.sound}
             </div>
           )}
         </div>
       </div>
 
       {/* 3. Interactive Recorder & Retry Dock */}
-      <div className="mb-6 flex flex-col items-center">
-        {/* IDLE / READY TO RECORD OR RETRY */}
+      <div className="mb-4 sm:mb-6 flex flex-col items-center">
         {!isListening && !isAnalyzing && (
-          <div className="flex w-full flex-col items-center gap-2.5">
+          <div className="flex w-full flex-col items-center gap-2">
             <button
               type="button"
               onClick={handleStartRecording}
-              className={`inline-flex w-full sm:w-80 items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-4 text-base sm:text-lg font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+              className={`inline-flex w-full sm:w-80 items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-3.5 sm:py-4 text-sm sm:text-lg font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
                 score && !hasPassedScore
                   ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25"
                   : score
@@ -364,7 +375,7 @@ export function BridgePronunciationStep({
             >
               {score || error ? (
                 <>
-                  <RotateCcw size={20} />
+                  <RotateCcw size={18} />
                   <span>
                     {hasPassedScore
                       ? "Practice Again"
@@ -373,13 +384,13 @@ export function BridgePronunciationStep({
                 </>
               ) : (
                 <>
-                  <Mic size={22} />
+                  <Mic size={20} />
                   <span>Start Speaking</span>
                 </>
               )}
             </button>
 
-            <p className="text-xs font-semibold text-slate-400">
+            <p className="text-center text-[11px] sm:text-xs font-semibold text-slate-400">
               {score && !hasPassedScore
                 ? "Tap any red/orange word above to hear it, then tap Try Again!"
                 : "Recording stops and grades automatically when you pause"}
@@ -387,12 +398,11 @@ export function BridgePronunciationStep({
           </div>
         )}
 
-        {/* LISTENING STATE */}
         {isListening && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-indigo-200 bg-indigo-50/60 px-6 py-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-indigo-200 bg-indigo-50/60 px-5 py-4 sm:px-6 sm:py-5 animate-in fade-in zoom-in-95 duration-200">
             <LiveWaveform onPhaseChange={setVoicePhase} />
 
-            <div className="mt-3 flex items-center gap-2 text-sm font-extrabold">
+            <div className="mt-3 flex items-center gap-2 text-xs sm:text-sm font-extrabold">
               {voicePhase === "waiting" && (
                 <>
                   <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-indigo-500" />
@@ -434,11 +444,10 @@ export function BridgePronunciationStep({
           </div>
         )}
 
-        {/* ANALYZING STATE */}
         {isAnalyzing && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-amber-200 bg-amber-50/60 px-6 py-6 text-center animate-in fade-in duration-200">
-            <Loader2 size={30} className="mb-2 animate-spin text-amber-600" />
-            <p className="text-base font-extrabold text-slate-900">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-amber-200 bg-amber-50/60 px-6 py-5 text-center animate-in fade-in duration-200">
+            <Loader2 size={28} className="mb-2 animate-spin text-amber-600" />
+            <p className="text-sm sm:text-base font-extrabold text-slate-900">
               Analyzing your pronunciation...
             </p>
             <p className="mt-0.5 text-xs font-medium text-slate-500">
@@ -450,7 +459,7 @@ export function BridgePronunciationStep({
 
       {/* 4. Score Breakdown Card */}
       {overallScore !== null && !isBusy && (
-        <div className="mb-6 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 animate-in slide-in-from-bottom-3">
+        <div className="mb-4 sm:mb-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-slate-50/80 p-4 sm:p-5 animate-in slide-in-from-bottom-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-indigo-500" />
@@ -482,7 +491,7 @@ export function BridgePronunciationStep({
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap justify-center gap-4 border-t border-slate-200/70 pt-3 text-xs font-bold text-slate-500">
+          <div className="mt-3 flex flex-wrap justify-center gap-3 sm:gap-4 border-t border-slate-200/70 pt-3 text-[11px] sm:text-xs font-bold text-slate-500">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 80%+
               Great
@@ -500,7 +509,7 @@ export function BridgePronunciationStep({
       )}
 
       {error && !isBusy && (
-        <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+        <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 sm:p-4 text-xs sm:text-sm font-bold text-rose-700">
           <div className="flex items-center gap-2.5">
             <AlertCircle size={18} className="shrink-0" />
             <p>{error}</p>
@@ -515,19 +524,19 @@ export function BridgePronunciationStep({
         </div>
       )}
 
-      {/* 5. Footer CTA (Gated until passed or 2 attempts made) */}
-      <div className="mt-auto flex justify-end border-t border-slate-100 pt-5">
+      {/* 5. Footer CTA */}
+      <div className="mt-auto flex justify-end border-t border-slate-100 pt-4 sm:pt-5">
         <button
           type="button"
           onClick={handleNext}
           disabled={isBusy || !canContinue}
-          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-10 py-4 text-base font-black transition-all ${
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-3.5 sm:px-10 sm:py-4 text-sm sm:text-base font-black transition-all ${
             !isBusy && canContinue
               ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               : "cursor-not-allowed bg-slate-200/80 text-slate-400"
           }`}
         >
-          {!canContinue && <Lock size={16} />}
+          {!canContinue && <Lock size={15} />}
           <span>Complete Bridge</span>
           <ArrowRight size={18} />
         </button>

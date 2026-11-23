@@ -1,6 +1,8 @@
 // app/(dashboard)/learning-hub/ladder/page.tsx
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
+import { LockedFeaturePage } from "@/components/billing/locked-feature-page";
 import { getUserLanguage } from "@/app/actions/get-user-language";
 import { getLadderOverview } from "@/app/actions/ladder-actions";
 import { toLanguageCode } from "@/lib/languages";
@@ -44,6 +46,20 @@ const TIERS = [
 
 export default async function VocabLadderMapPage() {
   const user = await requireUser();
+  const entitlements = await getUserEntitlements(user.id);
+
+  if (entitlements.isTrial) {
+    return (
+      <LockedFeaturePage
+        badge="Beta Founder Feature"
+        title="Unlock Vocab Ladders"
+        description="Your Free Trial includes Milestone 1 (Spoons 1–3). Upgrade to Beta Founder to progress toward Spoon 15 and climb all 3 Vocab Ladder tiers!"
+        ctaLabel="Upgrade to Beta Founder"
+        ctaHref="/pricing"
+      />
+    );
+  }
+
   const { lang } = await getUserLanguage(user.id);
   const targetLang = toLanguageCode(lang?.targetLanguage || "FRENCH");
   const overview = await getLadderOverview(user.id, targetLang);
@@ -53,7 +69,7 @@ export default async function VocabLadderMapPage() {
       {/* Header */}
       <header className="relative overflow-hidden animate-bg pt-6 pb-20 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
-        <div className="relative z-10 mx-auto max-w-5xl px-6">
+        <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <Link
               href="/learning-hub"
@@ -72,7 +88,7 @@ export default async function VocabLadderMapPage() {
             </div>
           </div>
 
-          <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+          <h1 className="text-2xl font-black tracking-tight text-white sm:text-4xl">
             Vocab Ladder
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm font-medium text-white/90 sm:text-base">
@@ -82,15 +98,15 @@ export default async function VocabLadderMapPage() {
         </div>
       </header>
 
-      <main className="relative z-20 mx-auto -mt-12 max-w-5xl space-y-6 px-6 pb-16">
+      <main className="relative z-20 mx-auto -mt-12 max-w-5xl space-y-5 sm:space-y-6 px-4 sm:px-6 pb-16">
         {!overview.isUnlocked && (
-          <div className="flex flex-col justify-between gap-4 rounded-[2rem] border-2 border-b-[6px] border-amber-200 border-b-amber-300 bg-white p-6 shadow-sm sm:flex-row sm:items-center">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
-                <Lock className="h-6 w-6" />
+          <div className="flex flex-col justify-between gap-4 rounded-3xl sm:rounded-[2rem] border-2 border-b-[6px] border-amber-200 border-b-amber-300 bg-white p-5 sm:p-6 shadow-sm sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950">
+                <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-900">
+                <h2 className="text-base sm:text-lg font-black text-slate-900">
                   Unlocks at Spoon {overview.unlockThreshold}
                 </h2>
                 <p className="text-xs font-semibold text-slate-500 sm:text-sm">
@@ -104,7 +120,7 @@ export default async function VocabLadderMapPage() {
 
             <Link
               href="/learning-hub"
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-3 text-xs font-black text-white shadow-md"
+              className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-6 py-3 text-xs font-black text-white shadow-md"
             >
               <span>Continue Spoons</span>
               <ArrowRight className="h-4 w-4" />
@@ -121,9 +137,9 @@ export default async function VocabLadderMapPage() {
           return (
             <section
               key={tierCfg.tier}
-              className="rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 shadow-sm sm:p-7"
+              className="rounded-3xl sm:rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-5 sm:p-7 shadow-sm"
             >
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <div className="mb-4 sm:mb-5 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <span
                     className={`inline-block rounded-full px-3 py-1 text-[10px] font-black tracking-wider uppercase ${tierCfg.badge}`}
@@ -153,9 +169,9 @@ export default async function VocabLadderMapPage() {
                             : "bg-slate-50/80 opacity-75 ring-1 ring-slate-200/70"
                       }`}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3.5 sm:gap-4">
                         <div
-                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl font-black ${
+                          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl text-lg sm:text-xl font-black ${
                             isDone
                               ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
                               : isActive
@@ -183,7 +199,7 @@ export default async function VocabLadderMapPage() {
                               </span>
                             )}
                           </div>
-                          <h3 className="text-base font-black text-slate-900">
+                          <h3 className="text-sm sm:text-base font-black text-slate-900">
                             {rung.title}
                           </h3>
                           <p className="text-xs font-medium text-slate-500">
@@ -195,7 +211,7 @@ export default async function VocabLadderMapPage() {
                       {canPlay ? (
                         <Link
                           href={`/learning-hub/ladder/${rung.slug}`}
-                          className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-5 py-3 text-xs font-black transition hover:-translate-y-0.5 hover:brightness-105 ${
+                          className={`inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-5 py-3 text-xs font-black transition hover:-translate-y-0.5 hover:brightness-105 ${
                             isDone
                               ? "border-slate-300 bg-white text-slate-700 ring-1 ring-slate-200"
                               : tierCfg.activeBtn
@@ -206,7 +222,7 @@ export default async function VocabLadderMapPage() {
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Link>
                       ) : (
-                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-400 ring-1 ring-slate-200">
+                        <span className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs font-black text-slate-400 ring-1 ring-slate-200">
                           <Lock className="h-3.5 w-3.5" />
                           <span>Locked</span>
                         </span>

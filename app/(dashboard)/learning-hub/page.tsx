@@ -2,6 +2,7 @@ import FoundationHubPage from "@/components/learning-hub/foundation-hub-page";
 import { getLearningPath } from "@/app/actions/get-learning-path";
 import { getUserLanguage } from "@/app/actions/get-user-language";
 import { requireUser } from "@/lib/auth-guard";
+import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { getUserGeneration } from "@/lib/upstash";
 import { PronunciationProvider } from "@/context/pronunciation-context";
 import { MatrixProvider } from "@/context/matrix-context";
@@ -17,17 +18,20 @@ export default async function Page({
   const setupToken =
     typeof params?.setup === "string" ? params.setup : undefined;
 
-  const [path, userLang, generationData] = await Promise.all([
+  const [path, userLang, generationData, entitlements] = await Promise.all([
     getLearningPath(user.id),
     getUserLanguage(user.id),
     getUserGeneration(setupToken),
+    getUserEntitlements(user.id),
   ]);
 
   const activeTargetLang =
-    path?.standardTrack?.targetLanguage || userLang?.lang?.targetLanguage || "fr-FR";
+    path?.standardTrack?.targetLanguage ||
+    userLang?.lang?.targetLanguage ||
+    "fr-FR";
   const ladderOverview = await getLadderOverview(user.id, activeTargetLang);
 
-   return (
+  return (
     <PronunciationProvider>
       <MatrixProvider>
         <FoundationHubPage
@@ -35,6 +39,7 @@ export default async function Page({
           lang={userLang as any}
           generationData={generationData}
           ladder={ladderOverview}
+          isTrial={entitlements.isTrial}
         />
       </MatrixProvider>
     </PronunciationProvider>

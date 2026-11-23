@@ -2,8 +2,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Dumbbell, Sparkles, ArrowRight } from "lucide-react";
+import {
+  MessageSquare,
+  Dumbbell,
+  Sparkles,
+  ArrowRight,
+  Trophy,
+  Lock,
+} from "lucide-react";
 import type { LearningPathData } from "@/app/actions/get-learning-path";
 import type { UserGenerationData } from "@/lib/upstash";
 import { useSprite } from "@/context/sprite-context";
@@ -30,6 +38,7 @@ type Props = {
   lang: { nativeLanguage: string; targetLanguage: string | null | any };
   generationData?: UserGenerationData | null;
   ladder?: LadderOverviewData | null;
+  isTrial?: boolean;
 };
 
 export default function FoundationHubPage({
@@ -37,6 +46,7 @@ export default function FoundationHubPage({
   lang,
   generationData,
   ladder = null,
+  isTrial = false,
 }: Props) {
   const router = useRouter();
   const {
@@ -63,7 +73,7 @@ export default function FoundationHubPage({
 
   const completedStandardSpoonsCount =
     standardTrack?.lessons.filter((l) => Boolean(l.completedAt)).length || 0;
-  const hardModeUnlocked = completedStandardSpoonsCount >= 30;
+  const hardModeUnlocked = !isTrial && completedStandardSpoonsCount >= 30;
   const isHardView = activeTrack === "HARD" && hardModeUnlocked;
 
   const currentTrackData = isHardView && hardTrack ? hardTrack : standardTrack;
@@ -101,17 +111,29 @@ export default function FoundationHubPage({
       ? ((currentFocus.data as any)?.bossStage ?? currentFocus.data)
       : null;
 
-  const isBossUnlocked = (bossStageObj as any)?.freestyleUnlocked ?? true;
+  const isBossUnlocked =
+    isTrial || ((bossStageObj as any)?.freestyleUnlocked ?? true);
 
   const waitingOnBoss =
     currentFocus?.type === "BOSS" &&
     (!bossStageObj || bossStageObj.status === "BUILDING");
 
-  const isGenerating = waitingOnSpoon || waitingOnVocab || waitingOnBoss;
-
   const completedLessonsCount = lessons.filter((l) =>
     Boolean(l.completedAt),
   ).length;
+
+  const isTrialComplete =
+    isTrial &&
+    completedLessonsCount >= 3 &&
+    !waitingOnVocab &&
+    !waitingOnBoss &&
+    (currentFocus === null ||
+      (currentFocus.type === "SPOON" &&
+        ((currentFocus.data as any)?.orderIndex ?? 0) > 3) ||
+      (currentFocus.type === "BOSS" && Boolean((bossStageObj as any)?.passed)));
+
+  const isGenerating =
+    !isTrialComplete && (waitingOnSpoon || waitingOnVocab || waitingOnBoss);
 
   const totalWordsLearned = lessons.reduce((acc, l) => {
     return (
@@ -145,7 +167,7 @@ export default function FoundationHubPage({
 
   // --- SPRITE TRIGGER LOGIC ---
   useEffect(() => {
-    if (!profile?.sprite) return;
+    if (!profile?.sprite || isTrialComplete) return;
 
     let orderIndex: number | null = null;
     let actionHref: string | null = null;
@@ -191,6 +213,7 @@ export default function FoundationHubPage({
     });
   }, [
     profile,
+    isTrialComplete,
     waitingOnSpoon,
     waitingOnVocab,
     waitingOnBoss,
@@ -208,6 +231,11 @@ export default function FoundationHubPage({
   // --- SYNC GENERATION STATUS WITH SPRITE CONTEXT ---
   useEffect(() => {
     if (liveTask?.status === "FAILED") return;
+
+    if (isTrialComplete) {
+      if (liveTask?.status === "BUILDING") setLiveTask(null);
+      return;
+    }
 
     if (waitingOnSpoon) {
       setLiveTask({
@@ -237,6 +265,7 @@ export default function FoundationHubPage({
       setLiveTask(null);
     }
   }, [
+    isTrialComplete,
     waitingOnSpoon,
     waitingOnVocab,
     waitingOnBoss,
@@ -251,6 +280,7 @@ export default function FoundationHubPage({
   // --- SPOON 15 VOCAB LADDER UNLOCK NOTIFICATION ---
   useEffect(() => {
     if (
+      isTrial ||
       !ladder?.isUnlocked ||
       ladder.completedCount > 0 ||
       !ladder.activeRung
@@ -276,7 +306,7 @@ export default function FoundationHubPage({
           router.push(`/learning-hub/ladder/${ladder.activeRung!.slug}`),
       },
     });
-  }, [ladder, user?.id, router, summonSprite]);
+  }, [isTrial, ladder, user?.id, router, summonSprite]);
 
   const activeOrderIndex =
     currentFocus?.data.orderIndex ?? completedLessonsCount + 1;
@@ -295,11 +325,44 @@ export default function FoundationHubPage({
         streak={1}
       />
 
-      <main className="relative z-20 mx-auto -mt-12 max-w-7xl px-6 pb-20 lg:px-8">
+      <main className="relative z-20 mx-auto -mt-12 max-w-7xl px-4 sm:px-6 pb-20 lg:px-8">
         <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
           {/* LEFT / MAIN COLUMN */}
           <div className="flex flex-col justify-between gap-7 lg:col-span-8">
-            {waitingOnSpoon && generationData ? (
+            {isTrialComplete ? (
+              <div className="relative overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-amber-300 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-6 sm:p-9 text-white shadow-2xl">
+                <div className="pointer-events-none absolute -top-16 right-8 h-48 w-48 rounded-full bg-amber-400/20 blur-3xl" />
+
+                <div className="relative z-10 flex flex-col gap-5">
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-3.5 py-1 text-xs font-black tracking-wider text-amber-300 uppercase">
+                    <Trophy className="h-3.5 w-3.5" />
+                    <span>Milestone 1 Pass Complete</span>
+                  </div>
+
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                      You Beat Boss Stage 1! Ready for the Full Course?
+                    </h2>
+                    <p className="mt-2 max-w-xl text-sm sm:text-base font-medium leading-relaxed text-slate-300">
+                      Lock in Beta Founder pricing ($35 CAD/mo) to begin your
+                      personalized Day 1 journey—unlocking 45 Spoons/mo, 15
+                      Bosses, daily 3-min AI voice calls, and Vocab Ladders.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Link
+                      href="/pricing"
+                      className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-4 text-sm sm:text-base font-black text-slate-950 shadow-xl transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                    >
+                      <Lock className="h-4 w-4" />
+                      <span>Unlock Beta Founder ($35/mo)</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ) : waitingOnSpoon && generationData ? (
               <GenerationCycleCard data={generationData} />
             ) : (
               <>
@@ -336,31 +399,48 @@ export default function FoundationHubPage({
                             </span>
                           </div>
                           <p className="mt-0.5 text-xs font-bold text-slate-200 sm:text-sm">
-                            Jump into a 3-min AI voice call or practice your
-                            unlocked workouts!
+                            {isTrial
+                              ? "Review your Word Matrix or upgrade for daily AI voice calls!"
+                              : "Jump into a 3-min AI voice call or practice your unlocked workouts!"}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex shrink-0 flex-wrap items-center gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => router.push("/conversation")}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          <span>Live 3-Min AI Chat</span>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
+                        {isTrial ? (
+                          <button
+                            type="button"
+                            onClick={() => router.push("/pricing")}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-300 to-orange-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>Unlock Beta Founder</span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => router.push("/conversation")}
+                              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>Live 3-Min AI Chat</span>
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => router.push("/conversation/review")}
-                          className="inline-flex items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/25 px-4 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-500/40"
-                        >
-                          <Dumbbell className="h-3.5 w-3.5 text-amber-300" />
-                          <span>3-Min Workouts</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push("/conversation/review")
+                              }
+                              className="inline-flex items-center gap-2 rounded-2xl border border-indigo-400/40 bg-indigo-500/25 px-4 py-2.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-500/40"
+                            >
+                              <Dumbbell className="h-3.5 w-3.5 text-amber-300" />
+                              <span>3-Min Workouts</span>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -427,8 +507,9 @@ export default function FoundationHubPage({
                     (currentFocus?.data as any)?.orderIndex ??
                     completedLessonsCount + 1
                   }`,
-            activeStepHref:
-              currentFocus?.type === "BOSS" && bossDue
+            activeStepHref: isTrialComplete
+              ? "/pricing"
+              : currentFocus?.type === "BOSS" && bossDue
                 ? isBossUnlocked
                   ? getBossHref(
                       (bossDue as any)?.bossStage?.id ??
@@ -443,8 +524,9 @@ export default function FoundationHubPage({
                   : nextLesson
                     ? getLessonHref(nextLesson.id)
                     : undefined,
-            activeStepLabel:
-              currentFocus?.type === "BOSS"
+            activeStepLabel: isTrialComplete
+              ? "Unlock Beta Founder"
+              : currentFocus?.type === "BOSS"
                 ? isBossUnlocked
                   ? "Challenge Boss Stage"
                   : "Unlock Boss: Start 3-Min AI Chat"
