@@ -11,6 +11,9 @@ import {
   ArrowRight,
   Trophy,
   Lock,
+  Map as MapIcon,
+  BrainCircuit,
+  History,
 } from "lucide-react";
 import type { LearningPathData } from "@/app/actions/get-learning-path";
 import type { UserGenerationData } from "@/lib/upstash";
@@ -59,6 +62,10 @@ export default function FoundationHubPage({
     spriteName,
     avatarSrc,
   } = useSprite();
+
+  const [mobileTab, setMobileTab] = useState<"path" | "skills" | "history">(
+    "path",
+  );
 
   const standardTrack = path?.standardTrack;
   const hardTrack = path?.hardTrack;
@@ -325,12 +332,12 @@ export default function FoundationHubPage({
         streak={1}
       />
 
-      <main className="relative z-20 mx-auto -mt-12 max-w-7xl px-4 sm:px-6 pb-20 lg:px-8">
-        <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
+      <main className="relative z-20 mx-auto -mt-10 sm:-mt-12 max-w-7xl px-4 sm:px-6 pb-20 lg:px-8">
+        <div className="grid grid-cols-1 items-stretch gap-5 sm:gap-8 lg:grid-cols-12">
           {/* LEFT / MAIN COLUMN */}
-          <div className="flex flex-col justify-between gap-7 lg:col-span-8">
+          <div className="flex flex-col justify-between gap-5 sm:gap-7 lg:col-span-8">
             {isTrialComplete ? (
-              <div className="relative overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-amber-300 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-6 sm:p-9 text-white shadow-2xl">
+              <div className="relative overflow-hidden rounded-3xl sm:rounded-[2rem] border-2 border-b-[6px] border-amber-300 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-6 sm:p-9 text-white shadow-2xl">
                 <div className="pointer-events-none absolute -top-16 right-8 h-48 w-48 rounded-full bg-amber-400/20 blur-3xl" />
 
                 <div className="relative z-10 flex flex-col gap-5">
@@ -352,7 +359,7 @@ export default function FoundationHubPage({
 
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <Link
-                      href="/pricing"
+                      href="/#pricing"
                       className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-4 text-sm sm:text-base font-black text-slate-950 shadow-xl transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                     >
                       <Lock className="h-4 w-4" />
@@ -381,10 +388,10 @@ export default function FoundationHubPage({
 
                 {/* WHILE BAKING ACTION BAR */}
                 {isGenerating && (
-                  <div className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-xl">
+                  <div className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 text-white shadow-xl">
                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-3.5">
-                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-teal-400/40 bg-slate-800">
+                        <div className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 overflow-hidden rounded-2xl border border-teal-400/40 bg-slate-800">
                           <img
                             src={avatarSrc}
                             alt={spriteName}
@@ -410,7 +417,7 @@ export default function FoundationHubPage({
                         {isTrial ? (
                           <button
                             type="button"
-                            onClick={() => router.push("/pricing")}
+                            onClick={() => router.push("/#pricing")}
                             className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-300 to-orange-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 hover:brightness-105"
                           >
                             <Sparkles className="h-3.5 w-3.5" />
@@ -448,39 +455,97 @@ export default function FoundationHubPage({
               </>
             )}
 
+            {/* MOBILE-ONLY TAB BAR so Path, Ladder/Matrix, & History stay super organized (< lg) */}
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white p-1.5 shadow-xs lg:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileTab("path")}
+                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black transition ${
+                  mobileTab === "path"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                <MapIcon className="h-3.5 w-3.5" />
+                <span>Unit Path</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileTab("skills")}
+                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black transition ${
+                  mobileTab === "skills"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                <BrainCircuit className="h-3.5 w-3.5" />
+                <span>Skills</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileTab("history")}
+                className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black transition ${
+                  mobileTab === "history"
+                    ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                <History className="h-3.5 w-3.5" />
+                <span>History</span>
+              </button>
+            </div>
+
             {path && (
-              <LearningPathMiniCards
-                data={path}
-                displayTitles={displayTitles}
-                activeTrack={activeTrack}
-                setActiveTrack={setActiveTrack}
-              />
+              <div className={mobileTab === "path" ? "block" : "hidden lg:block"}>
+                <LearningPathMiniCards
+                  data={path}
+                  displayTitles={displayTitles}
+                  activeTrack={activeTrack}
+                  setActiveTrack={setActiveTrack}
+                />
+              </div>
             )}
           </div>
 
-          {/* RIGHT PANEL */}
-          <div className="flex flex-col gap-6 lg:col-span-4">
-            <VocabLadderHubCard ladder={ladder} />
+          {/* RIGHT PANEL (Desktop shows all; Mobile shows active tab) */}
+          <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-4">
+            <div
+              className={
+                mobileTab === "skills"
+                  ? "flex flex-col gap-5"
+                  : "hidden lg:flex lg:flex-col lg:gap-6"
+              }
+            >
+              <VocabLadderHubCard ladder={ladder} />
 
-            <WordMatrixCard
-              totalWordsLearned={totalWordsLearned}
-              matrixStats={path?.matrixStats}
-              fallbackWords={recentBridgeWords}
-              isLocked={completedLessonsCount === 0}
-            />
+              <WordMatrixCard
+                totalWordsLearned={totalWordsLearned}
+                matrixStats={path?.matrixStats}
+                fallbackWords={recentBridgeWords}
+                isLocked={completedLessonsCount === 0}
+              />
+            </div>
 
-            <PastActivitySlimList
-              courseId={courseId}
-              lessons={lessons}
-              activeOrderIndex={activeOrderIndex}
-              getLessonHref={getLessonHref}
-              getVocabHref={getVocabHref}
-              getBossHref={getBossHref}
-              displayTitles={displayTitles}
-              onLaunchSpriteExercise={() => {
-                openChat({ tab: "briefing" });
-              }}
-            />
+            <div
+              className={
+                mobileTab === "history" ? "block" : "hidden lg:block"
+              }
+            >
+              <PastActivitySlimList
+                courseId={courseId}
+                lessons={lessons}
+                activeOrderIndex={activeOrderIndex}
+                getLessonHref={getLessonHref}
+                getVocabHref={getVocabHref}
+                getBossHref={getBossHref}
+                displayTitles={displayTitles}
+                onLaunchSpriteExercise={() => {
+                  openChat({ tab: "briefing" });
+                }}
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -508,7 +573,7 @@ export default function FoundationHubPage({
                     completedLessonsCount + 1
                   }`,
             activeStepHref: isTrialComplete
-              ? "/pricing"
+              ? "/#pricing"
               : currentFocus?.type === "BOSS" && bossDue
                 ? isBossUnlocked
                   ? getBossHref(

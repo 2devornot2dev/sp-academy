@@ -6,9 +6,7 @@ import {
   Settings2,
   Play,
   Sparkles,
-  Globe2,
   BarChart3,
-  Mic,
   Check,
   ArrowLeft,
   ArrowRight,
@@ -22,6 +20,7 @@ import {
 } from "lucide-react";
 import { getTutorAvatarByMood } from "@/lib/freestyle/tutors";
 import Link from "next/link";
+
 const MODES = [
   {
     id: "FOCUSED",
@@ -78,6 +77,8 @@ const LEVELS = [
     label: "Zero",
     badge: "A0 Starter",
     desc: "Ultra-short phrases & patient hints",
+    preview:
+      "Ultra-short 2–4 word survival phrases, slower pacing, and gentle guidance for Day-1 starters.",
     activeClass:
       "border-blue-700 bg-gradient-to-b from-sky-50 to-white text-sky-950 ring-2 ring-sky-400/40",
     badgeClass:
@@ -88,6 +89,8 @@ const LEVELS = [
     label: "Easy",
     badge: "A1–A2",
     desc: "Simple vocabulary, slow & clear pace",
+    preview:
+      "Short, clear everyday sentences with familiar vocabulary and helpful reply lifelines.",
     activeClass:
       "border-emerald-700 bg-gradient-to-b from-emerald-50 to-white text-emerald-950 ring-2 ring-emerald-400/40",
     badgeClass:
@@ -98,6 +101,8 @@ const LEVELS = [
     label: "Medium",
     badge: "B1–B2",
     desc: "Natural cadence & everyday idioms",
+    preview:
+      "Natural conversational speed mixing past/future tenses, idioms, and follow-up questions.",
     activeClass:
       "border-orange-700 bg-gradient-to-b from-amber-50 to-white text-amber-950 ring-2 ring-amber-400/40",
     badgeClass:
@@ -108,6 +113,8 @@ const LEVELS = [
     label: "Fluent",
     badge: "C1+",
     desc: "Native speed & complex topics",
+    preview:
+      "Full native speed, rich expressions, and spontaneous back-and-forth depth.",
     activeClass:
       "border-purple-800 bg-gradient-to-b from-purple-50 to-white text-purple-950 ring-2 ring-purple-400/40",
     badgeClass:
@@ -142,13 +149,7 @@ const PERSONAS = [
   },
 ] as const;
 
-const SUPPORTED_LANGUAGES = [
-  { code: "en-US", label: "English (US)", flag: "🇺🇸" },
-  { code: "fr-FR", label: "French", flag: "🇫🇷" },
-  { code: "es-ES", label: "Spanish", flag: "🇪🇸" },
-  { code: "de-DE", label: "German", flag: "🇩🇪" },
-  { code: "it-IT", label: "Italian", flag: "🇮🇹" },
-];
+const SUPPORTED_CODES = ["en-US", "fr-FR", "es-ES", "de-DE", "it-IT"];
 
 const QUICK_TOPICS = [
   "First introductions & small talk",
@@ -171,7 +172,7 @@ function normalizeLangCode(raw: string | undefined, fallback: string): string {
   if (upper === "SPANISH" || upper === "ES" || upper === "ES-ES") return "es-ES";
   if (upper === "GERMAN" || upper === "DE" || upper === "DE-DE") return "de-DE";
   if (upper === "ITALIAN" || upper === "IT" || upper === "IT-IT") return "it-IT";
-  return SUPPORTED_LANGUAGES.some((l) => l.code === raw) ? raw : fallback;
+  return SUPPORTED_CODES.includes(raw) ? raw : fallback;
 }
 
 export default function FreestyleSetup({
@@ -183,35 +184,30 @@ export default function FreestyleSetup({
   dailyMax = 5,
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [mode, setMode] = useState("FOCUSED");
-  const [level, setLevel] = useState<"ZERO" | "EASY" | "MEDIUM" | "FLUENT">(
-    "ZERO"
+  // Unselected by default so users don't accidentally waste a daily 3-min session
+  const [mode, setMode] = useState<string | null>(null);
+  const [level, setLevel] = useState<"ZERO" | "EASY" | "MEDIUM" | "FLUENT" | null>(
+    null
   );
   const [topic, setTopic] = useState("");
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("female");
   const [persona, setPersona] = useState<
     "FRIENDLY" | "COACH" | "LOCAL" | "PRO"
   >("FRIENDLY");
-  const [nativeLang, setNativeLang] = useState(() =>
-    normalizeLangCode(defaultNative, "en-US")
-  );
-  const [targetLang, setTargetLang] = useState(() =>
-    normalizeLangCode(defaultTarget, "fr-FR")
-  );
   const [isStarting, setIsStarting] = useState(false);
 
-  const selectedModeObj = MODES.find((m) => m.id === mode) ?? MODES[0];
-  const selectedLevelObj = LEVELS.find((l) => l.id === level) ?? LEVELS[0];
+  const nativeLang = normalizeLangCode(defaultNative, "en-US");
+  const targetLang = normalizeLangCode(defaultTarget, "fr-FR");
+
+  const selectedModeObj = mode ? MODES.find((m) => m.id === mode) ?? null : null;
+  const selectedLevelObj = level
+    ? LEVELS.find((l) => l.id === level) ?? null
+    : null;
   const selectedPersonaObj =
     PERSONAS.find((p) => p.id === persona) ?? PERSONAS[0];
-  const targetLangObj =
-    SUPPORTED_LANGUAGES.find((l) => l.code === targetLang) ??
-    SUPPORTED_LANGUAGES[1];
-  const nativeLangObj =
-    SUPPORTED_LANGUAGES.find((l) => l.code === nativeLang) ??
-    SUPPORTED_LANGUAGES[0];
 
-  const step1Valid = !(mode === "SPECIFIC" && !topic.trim());
+  const step1Valid = Boolean(mode) && !(mode === "SPECIFIC" && !topic.trim());
+  const canStart = step1Valid && Boolean(level);
 
   const isDailyCapReached = dailyUsed >= dailyMax;
   const remainingToday = Math.max(0, dailyMax - dailyUsed);
@@ -219,7 +215,7 @@ export default function FreestyleSetup({
   const previewAvatarUrl = getTutorAvatarByMood(voiceGender, "default");
 
   const handleStart = async () => {
-    if (isDailyCapReached) return;
+    if (isDailyCapReached || !canStart || !mode || !level) return;
 
     const silentAudio = new Audio("data:audio/mp3;base64,//MkxAA...");
     silentAudio.play().catch(() => {});
@@ -236,63 +232,41 @@ export default function FreestyleSetup({
         voiceGender,
       });
     } finally {
-      // Always reset the spinner, even if onStart returns early or errors out
       setIsStarting(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100 lg:h-screen lg:overflow-hidden">
+    <div className="flex min-h-full flex-col bg-slate-100/80 font-sans text-slate-900 selection:bg-indigo-100 lg:h-dvh lg:overflow-hidden">
       {/* =====================================================================
           1. HEADER BANNER
           ===================================================================== */}
-      <header className="relative shrink-0 overflow-hidden animate-bg pt-6 pb-16 text-white shadow-lg">
+      <header className="relative shrink-0 overflow-hidden animate-bg pt-4 pb-12 sm:pt-6 sm:pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
         <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-slate-950/35 px-4 py-1 text-xs font-semibold tracking-wide text-white shadow-sm backdrop-blur-md">
-              <Globe2 className="h-3.5 w-3.5 text-cyan-300" />
-              <span>
-                Practicing{" "}
-                <strong className="font-extrabold text-white uppercase">
-                  {targetLangObj.label}
-                </strong>{" "}
-                <span className="text-white/75">
-                  from{" "}
-                  <span className="font-bold text-white">
-                    {nativeLangObj.label}
-                  </span>
-                </span>
-              </span>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-amber-300 shadow-sm backdrop-blur-md">
+              <Timer className="h-3.5 w-3.5 text-amber-400" />
+              <span>3-Min Unscripted Arena</span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-xs font-extrabold text-amber-300 shadow-sm backdrop-blur-md">
-                <Timer className="h-3.5 w-3.5 text-amber-400" />
-                <span>3-Min Unscripted Arena</span>
-              </div>
-              <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-1 text-xs font-extrabold text-emerald-300 shadow-sm backdrop-blur-md">
-                <Mic className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Live AI Speech Feedback</span>
-              </div>
-              <Link
-                href="/conversation/review"
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur-md transition hover:bg-white/25"
-              >
-                <History className="h-3.5 w-3.5 text-sky-300" />
-                <span>Past Reviews ({reviewsCount})</span>
-              </Link>
-            </div>
+            <Link
+              href="/conversation/review"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3.5 py-1 text-[11px] sm:text-xs font-black text-white shadow-sm backdrop-blur-md transition hover:bg-white/25"
+            >
+              <History className="h-3.5 w-3.5 text-sky-300" />
+              <span>Past Reviews ({reviewsCount})</span>
+            </Link>
           </div>
 
           <div className="max-w-3xl">
-            <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl md:text-4xl">
+            <h1 className="flex items-center gap-2.5 sm:gap-3 text-xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.22)] sm:text-3xl md:text-4xl">
               <span>Freestyle Conversation Arena</span>
-              <MessagesSquare className="h-7 w-7 text-white/90 sm:h-9 sm:w-9" />
+              <MessagesSquare className="h-6 w-6 sm:h-9 sm:w-9 shrink-0 text-white/90" />
             </h1>
-            <p className="mt-1 text-sm font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">
+            <p className="mt-1 text-xs font-medium text-white/90 drop-shadow-[0_1px_4px_rgba(15,23,42,0.18)] sm:text-base">
               No scripts. No safety nets. Customize your AI partner below and
               jump into a live 3-minute speaking session.
             </p>
@@ -303,14 +277,14 @@ export default function FreestyleSetup({
       {/* =====================================================================
           2. MAIN STAGE GRID
           ===================================================================== */}
-      <main className="relative z-20 mx-auto -mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-6 pb-5 lg:px-8">
-        <div className="grid h-full min-h-0 w-full grid-cols-1 gap-6 lg:grid-cols-12">
+      <main className="relative z-20 mx-auto -mt-8 sm:-mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-4 pb-8 sm:px-6 lg:px-8 lg:pb-5">
+        <div className="grid h-full min-h-0 w-full grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
           {/* LEFT COLUMN (8 Cols) */}
-          <div className="flex min-h-0 flex-col gap-5 lg:col-span-8">
+          <div className="flex min-h-0 flex-col gap-4 sm:gap-5 lg:col-span-8">
             {/* ===============================================================
                 CARD 1: 3D HERO ARENA CARD (THE SINGLE PRIMARY LAUNCH CTA!)
                 =============================================================== */}
-            <div className="group relative shrink-0 overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
+            <div className="group relative shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
               <img
                 src="/freestyle-cover.png"
                 alt="Freestyle Arena"
@@ -319,27 +293,35 @@ export default function FreestyleSetup({
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-indigo-950/45" />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30" />
 
-              <div className="relative z-10 p-6 sm:px-7">
+              <div className="relative z-10 p-4 sm:p-6 sm:px-7">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/35 bg-indigo-500/20 px-3 py-1 text-[11px] font-black tracking-wide text-indigo-200 uppercase backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/35 bg-indigo-500/20 px-3 py-1 text-[10px] sm:text-[11px] font-black tracking-wide text-indigo-200 uppercase backdrop-blur-md">
                     <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                     Freestyle Speaking Mode
                   </span>
 
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-xs font-extrabold text-slate-200 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-slate-200 backdrop-blur-md">
                     <span>
-                      {selectedModeObj.icon} {selectedModeObj.label}
+                      {selectedModeObj
+                        ? `${selectedModeObj.icon} ${selectedModeObj.label}`
+                        : "Pick a Mode"}
                     </span>
                     <span className="text-white/30">•</span>
-                    <span className="text-emerald-300">
-                      {selectedLevelObj.label} ({selectedLevelObj.badge})
+                    <span
+                      className={
+                        selectedLevelObj ? "text-emerald-300" : "text-slate-400"
+                      }
+                    >
+                      {selectedLevelObj
+                        ? `${selectedLevelObj.label} (${selectedLevelObj.badge})`
+                        : "Pick Level"}
                     </span>
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className="relative shrink-0">
-                    <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-b-4 border-indigo-400/80 bg-slate-900 shadow-lg shadow-indigo-500/25">
+                <div className="mt-4 flex flex-col gap-3.5 sm:flex-row sm:items-center sm:gap-4">
+                  <div className="relative w-fit shrink-0">
+                    <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border-2 border-b-4 border-indigo-400/80 bg-slate-900 shadow-lg shadow-indigo-500/25">
                       <img
                         src={previewAvatarUrl}
                         alt="AI Tutor Avatar"
@@ -352,24 +334,26 @@ export default function FreestyleSetup({
                   </div>
 
                   <div className="min-w-0 flex-1 space-y-1">
-                    <span className="text-[11px] font-black tracking-wider text-sky-300 uppercase">
+                    <span className="text-[10px] sm:text-[11px] font-black tracking-wider text-sky-300 uppercase">
                       Your AI Conversation Partner
                     </span>
-                    <h2 className="truncate text-2xl font-black tracking-tight text-white sm:text-3xl">
+                    <h2 className="truncate text-xl font-black tracking-tight text-white sm:text-3xl">
                       {voiceGender === "female" ? "Sophie" : "Antoine"} —{" "}
                       {selectedPersonaObj.icon} {selectedPersonaObj.label} Tutor
                     </h2>
                     <p className="line-clamp-1 max-w-xl text-xs sm:text-sm font-medium text-slate-300">
-                      {mode === "SPECIFIC" && topic
-                        ? `Custom Scenario: "${topic}"`
-                        : `${selectedModeObj.tagline}. Adapts dynamically to your ${selectedLevelObj.label.toLowerCase()} level in ${targetLangObj.label}.`}
+                      {!selectedModeObj || !selectedLevelObj
+                        ? "Choose a conversation type and difficulty below to unlock start."
+                        : mode === "SPECIFIC" && topic
+                          ? `Custom Scenario: "${topic}"`
+                          : `${selectedModeObj.tagline}. Adapts dynamically to your ${selectedLevelObj.label.toLowerCase()} level.`}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-t border-white/10 pt-3.5 sm:pt-4">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-xs font-bold text-slate-300">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
                     <span>
                       Includes full grammar, vocab &amp; pronunciation report
                     </span>
@@ -379,8 +363,8 @@ export default function FreestyleSetup({
                   <button
                     type="button"
                     onClick={handleStart}
-                    disabled={isStarting || !step1Valid || isDailyCapReached}
-                    className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-7 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:opacity-50"
+                    disabled={isStarting || !canStart || isDailyCapReached}
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-7 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-slate-700 disabled:bg-slate-800 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-400 disabled:shadow-none"
                   >
                     {isDailyCapReached ? (
                       <span>
@@ -391,6 +375,8 @@ export default function FreestyleSetup({
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span>Preparing Arena...</span>
                       </>
+                    ) : !canStart ? (
+                      <span>Select Mode &amp; Difficulty Below</span>
                     ) : (
                       <>
                         <Play className="h-4 w-4 fill-current" />
@@ -407,9 +393,9 @@ export default function FreestyleSetup({
             {/* ===============================================================
                 CARD 2: 3D STEPPER CARD
                 =============================================================== */}
-            <div className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm">
+            <div className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white shadow-sm">
               {/* Top 3D Stepper Header */}
-              <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-6 py-3.5">
+              <div className="flex shrink-0 items-center gap-2.5 sm:gap-3 border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-3.5">
                 {STEPS.map((s, i) => {
                   const done = step > s.id;
                   const active = step === s.id;
@@ -421,10 +407,10 @@ export default function FreestyleSetup({
                         type="button"
                         disabled={!canGo || isStarting}
                         onClick={() => setStep(s.id)}
-                        className="flex items-center gap-2.5 text-left disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 text-left disabled:cursor-not-allowed"
                       >
                         <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-xs font-black transition-all ${
+                          className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl border-b-[3px] text-xs font-black transition-all ${
                             done
                               ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
                               : active
@@ -433,21 +419,21 @@ export default function FreestyleSetup({
                           }`}
                         >
                           {done ? (
-                            <Check className="h-4 w-4 stroke-[3.5]" />
+                            <Check className="h-3.5 w-3.5 stroke-[3.5]" />
                           ) : (
                             s.id
                           )}
                         </span>
                         <span className="leading-tight">
                           <span
-                            className={`flex items-center gap-1.5 text-xs font-black tracking-wider uppercase ${
+                            className={`flex items-center gap-1 text-[11px] sm:text-xs font-black tracking-wider uppercase ${
                               active || done
                                 ? "text-slate-800"
                                 : "text-slate-400"
                             }`}
                           >
                             <Icon
-                              className={`h-3.5 w-3.5 ${
+                              className={`hidden sm:inline h-3.5 w-3.5 ${
                                 s.id === 1
                                   ? "text-blue-600"
                                   : "text-emerald-600"
@@ -472,11 +458,11 @@ export default function FreestyleSetup({
               </div>
 
               {/* Step Body */}
-              <div className="flex min-h-0 flex-1 flex-col justify-between px-6 py-4">
+              <div className="flex min-h-0 flex-1 flex-col justify-between px-4 py-3.5 sm:px-6 sm:py-4">
                 {step === 1 ? (
                   <div className="flex h-full flex-col justify-between gap-3">
-                    {/* 4 Tactile 3D Mode Cards */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {/* 4 Tactile 3D Mode Cards (Icon + Title only on mobile) */}
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
                       {MODES.map((m) => {
                         const isSelected = mode === m.id;
                         return (
@@ -484,7 +470,7 @@ export default function FreestyleSetup({
                             key={m.id}
                             type="button"
                             onClick={() => setMode(m.id)}
-                            className={`group relative flex flex-col items-start justify-between rounded-2xl border-2 border-b-[5px] p-3.5 text-left transition-all duration-150 ${
+                            className={`group relative flex flex-col items-start justify-between rounded-2xl border-2 border-b-[5px] p-3 sm:p-3.5 text-left transition-all duration-150 ${
                               isSelected
                                 ? `${m.active3D} -translate-y-0.5 shadow-sm`
                                 : "border-slate-200/90 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-300 active:translate-y-0.5 active:border-b-2"
@@ -492,7 +478,7 @@ export default function FreestyleSetup({
                           >
                             <div className="flex w-full items-center justify-between">
                               <span
-                                className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl shadow-2xs transition-all ${
+                                className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl text-lg sm:text-xl shadow-2xs transition-all ${
                                   isSelected
                                     ? m.icon3D
                                     : "border-b-2 border-slate-200 bg-slate-50"
@@ -508,11 +494,11 @@ export default function FreestyleSetup({
                               )}
                             </div>
 
-                            <div className="mt-2.5">
+                            <div className="mt-2 sm:mt-2.5">
                               <span className="block text-xs sm:text-sm font-black text-slate-900">
                                 {m.label}
                               </span>
-                              <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-500">
+                              <p className="hidden sm:line-clamp-2 mt-0.5 text-[11px] font-medium leading-snug text-slate-500">
                                 {m.tagline}
                               </p>
                             </div>
@@ -521,15 +507,15 @@ export default function FreestyleSetup({
                       })}
                     </div>
 
-                    {/* Fixed-Height Scenario Dock (h-[84px]) */}
-                    <div className="flex h-[84px] shrink-0 flex-col justify-center rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-2.5">
+                    {/* Fixed-Height Scenario Briefing Dock */}
+                    <div className="flex min-h-[76px] sm:h-[84px] shrink-0 flex-col justify-center rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
                       {mode === "SPECIFIC" ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <MessageSquarePlus className="h-4 w-4 shrink-0 text-amber-600" />
                             <input
                               type="text"
-                              placeholder="Type custom scenario (e.g., First introductions, Ordering coffee)..."
+                              placeholder="Type custom scenario (e.g., Ordering coffee)..."
                               value={topic}
                               onChange={(e) => setTopic(e.target.value)}
                               className="h-8 flex-1 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
@@ -557,71 +543,94 @@ export default function FreestyleSetup({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">
-                              <Compass className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
-                                {selectedModeObj.label} Scenario Briefing
-                              </p>
-                              <p className="truncate text-xs sm:text-sm font-bold text-slate-700">
-                                {selectedModeObj.preview}
-                              </p>
-                            </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs">
+                            <Compass className="h-4 w-4 sm:h-5 sm:w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
+                              {selectedModeObj
+                                ? `${selectedModeObj.label} Scenario Briefing`
+                                : "Select a Conversation Type"}
+                            </p>
+                            <p className="line-clamp-2 text-xs sm:text-sm font-bold text-slate-700">
+                              {selectedModeObj
+                                ? selectedModeObj.preview
+                                : "Tap one of the 4 cards above to preview how your session works."}
+                            </p>
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 ) : (
-                  /* STEP 2: 4 Tactile 3D Difficulty Cards */
-                  <div className="my-auto grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-                    {LEVELS.map((l) => {
-                      const isSelected = level === l.id;
-                      return (
-                        <button
-                          key={l.id}
-                          type="button"
-                          onClick={() => setLevel(l.id)}
-                          className={`flex flex-col justify-between rounded-2xl border-2 border-b-[5px] p-4 text-left transition-all duration-150 ${
-                            isSelected
-                              ? `${l.activeClass} -translate-y-0.5 shadow-sm`
-                              : "border-slate-200/90 border-b-slate-300 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-sky-300 active:translate-y-0.5 active:border-b-2"
-                          }`}
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-1">
-                              <span
-                                className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${l.badgeClass}`}
-                              >
-                                {l.badge}
-                              </span>
-                              {isSelected && (
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                                  <Check className="h-3 w-3 stroke-[3.5]" />
+                  /* STEP 2: 4 Tactile 3D Difficulty Cards + Matching Briefing Dock */
+                  <div className="flex h-full flex-col justify-between gap-3">
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
+                      {LEVELS.map((l) => {
+                        const isSelected = level === l.id;
+                        return (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => setLevel(l.id)}
+                            className={`flex flex-col justify-between rounded-2xl border-2 border-b-[5px] p-3 sm:p-4 text-left transition-all duration-150 ${
+                              isSelected
+                                ? `${l.activeClass} -translate-y-0.5 shadow-sm`
+                                : "border-slate-200/90 border-b-slate-300 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-sky-300 active:translate-y-0.5 active:border-b-2"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${l.badgeClass}`}
+                                >
+                                  {l.badge}
                                 </span>
-                              )}
+                                {isSelected && (
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                    <Check className="h-3 w-3 stroke-[3.5]" />
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="mt-2 sm:mt-3 text-sm sm:text-base font-black">
+                                {l.label}
+                              </h3>
                             </div>
-                            <h3 className="mt-3 text-base font-black">
-                              {l.label}
-                            </h3>
-                          </div>
-                          <p className="mt-1.5 text-xs font-medium leading-snug text-slate-500">
-                            {l.desc}
-                          </p>
-                        </button>
-                      );
-                    })}
+                            <p className="hidden sm:block mt-1.5 text-xs font-medium leading-snug text-slate-500">
+                              {l.desc}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Matching Difficulty Briefing Dock */}
+                    <div className="flex min-h-[76px] sm:h-[84px] shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
+                      <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs">
+                        <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black tracking-wider text-emerald-700 uppercase">
+                          {selectedLevelObj
+                            ? `${selectedLevelObj.label} (${selectedLevelObj.badge}) Difficulty Briefing`
+                            : "Select a Difficulty Tier"}
+                        </p>
+                        <p className="line-clamp-2 text-xs sm:text-sm font-bold text-slate-700">
+                          {selectedLevelObj
+                            ? selectedLevelObj.preview
+                            : "Tap a difficulty tier above to set your AI tutor's speed and vocabulary level."}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Step Footer */}
-              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-3">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:px-6">
                 {step === 1 ? (
-                  <span className="text-xs font-extrabold text-slate-400">
+                  <span className="text-[11px] sm:text-xs font-extrabold text-slate-400">
                     Step 1 of 2 • Choose Conversation Type
                   </span>
                 ) : (
@@ -629,7 +638,7 @@ export default function FreestyleSetup({
                     type="button"
                     onClick={() => setStep(1)}
                     disabled={isStarting}
-                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-0 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 sm:px-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:translate-y-0.5 active:border-b-0 disabled:opacity-50"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span>Back to Modes</span>
@@ -647,12 +656,20 @@ export default function FreestyleSetup({
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-200">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] sm:text-xs font-black ring-1 ${
+                      canStart
+                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                        : "bg-amber-50 text-amber-800 ring-amber-200"
+                    }`}
+                  >
                     <Check className="h-3.5 w-3.5 stroke-[3]" />
                     <span>
                       {isDailyCapReached
-                        ? "Daily limit reached — come back tomorrow"
-                        : "Ready — Click Start Above"}
+                        ? "Daily limit reached"
+                        : canStart
+                          ? "Ready — Click Start Above"
+                          : "Pick a Difficulty Tier"}
                     </span>
                   </span>
                 )}
@@ -664,14 +681,14 @@ export default function FreestyleSetup({
               RIGHT COLUMN (4 Cols): 3D SESSION PREFERENCES CARD
               ================================================================= */}
           <div className="flex min-h-0 flex-col lg:col-span-4">
-            <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-2xl sm:rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 sm:p-6 shadow-sm">
               <div className="space-y-5">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">
                     Session Preferences
                   </h3>
                   <p className="mt-0.5 text-xs font-medium text-slate-500">
-                    Customize your AI tutor&apos;s voice, persona, and languages.
+                    Customize your AI tutor&apos;s voice and persona.
                   </p>
                 </div>
 
@@ -706,11 +723,11 @@ export default function FreestyleSetup({
 
                 {/* 2. 3D Tutor Persona Selector */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <label className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
                       Tutor Persona
                     </label>
-                    <span className="text-[10px] font-bold text-blue-600">
+                    <span className="truncate text-[10px] font-bold text-blue-600">
                       {selectedPersonaObj.desc}
                     </span>
                   </div>
@@ -738,46 +755,9 @@ export default function FreestyleSetup({
                     })}
                   </div>
                 </div>
-
-                {/* 3. 3D Language Selectors */}
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-1">
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
-                      <Globe2 className="h-3 w-3 text-blue-500" /> Practicing
-                    </label>
-                    <select
-                      value={targetLang}
-                      onChange={(e) => setTargetLang(e.target.value)}
-                      className="w-full cursor-pointer rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/40 px-3.5 py-2.5 text-xs font-black text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
-                    >
-                      {SUPPORTED_LANGUAGES.map((lang) => (
-                        <option key={lang.code} value={lang.code}>
-                          {lang.flag} {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
-                      <Globe2 className="h-3 w-3 text-slate-400" /> Translations
-                    </label>
-                    <select
-                      value={nativeLang}
-                      onChange={(e) => setNativeLang(e.target.value)}
-                      className="w-full cursor-pointer rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-black text-slate-700 transition focus:border-blue-600 focus:bg-white focus:outline-none"
-                    >
-                      {SUPPORTED_LANGUAGES.map((lang) => (
-                        <option key={lang.code} value={lang.code}>
-                          {lang.flag} {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
               </div>
 
-              {/* 4. Bottom Live Configuration Summary Card */}
+              {/* 3. Bottom Live Configuration Summary Card */}
               <div className="mt-5 space-y-2 rounded-2xl border-2 border-slate-200/80 bg-slate-50/80 p-4 text-xs">
                 <div className="mb-1 flex items-center justify-between border-b border-slate-200/70 pb-2">
                   <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
@@ -791,13 +771,17 @@ export default function FreestyleSetup({
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-400">Mode</span>
                   <span className="font-black text-slate-800">
-                    {selectedModeObj.icon} {selectedModeObj.label}
+                    {selectedModeObj
+                      ? `${selectedModeObj.icon} ${selectedModeObj.label}`
+                      : "Not selected"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-400">Level</span>
                   <span className="font-black text-slate-800">
-                    {selectedLevelObj.label} ({selectedLevelObj.badge})
+                    {selectedLevelObj
+                      ? `${selectedLevelObj.label} (${selectedLevelObj.badge})`
+                      : "Not selected"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

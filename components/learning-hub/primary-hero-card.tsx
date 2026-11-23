@@ -1,4 +1,4 @@
-// primary-hero-card.tsx
+// components/learning-hub/primary-hero-card.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,10 +14,10 @@ import {
   Sparkles,
   Clock,
   Crown,
+  Lock,
 } from "lucide-react";
-import type { LearningPath } from "@/app/actions/get-learning-path";
+import type { LearningPath, LearningTrack } from "@/app/actions/get-learning-path";
 import { vocabWordCount } from "@/lib/utils";
-import type { LearningTrack } from "@/app/actions/get-learning-path";
 
 type Lesson = LearningTrack["lessons"][number];
 
@@ -92,11 +92,11 @@ export function PrimaryHeroCard({
 
   if (!path) {
     return (
-      <div className="rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-8 shadow-sm">
+      <div className="rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
         <span className="text-xs font-black tracking-wider text-slate-400 uppercase">
           Getting Started
         </span>
-        <h3 className="mt-2 text-2xl font-black text-slate-900">
+        <h3 className="mt-2 text-xl sm:text-2xl font-black text-slate-900">
           Welcome to your curriculum
         </h3>
         <p className="mt-1 text-sm font-medium text-slate-500">
@@ -107,7 +107,7 @@ export function PrimaryHeroCard({
   }
 
   // =========================================================================
-  // 1. WAITING ON GENERATION (3D Tactile Loading Stage)
+  // 1. WAITING ON GENERATION
   // =========================================================================
   if (waitingOnSpoon || waitingOnVocab || waitingOnBoss) {
     const spoonNum =
@@ -123,7 +123,7 @@ export function PrimaryHeroCard({
       : `Spoon ${spoonNum}`;
 
     return (
-      <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 p-7 text-white shadow-xl sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 p-5 text-white shadow-xl sm:p-8">
         <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-sky-500/15 blur-3xl" />
 
@@ -137,7 +137,7 @@ export function PrimaryHeroCard({
                 : `Building Vocab Bridge ${spoonNum}`}
           </div>
 
-          <h3 className="mt-4 text-2xl font-black tracking-tight text-white sm:text-3xl">
+          <h3 className="mt-4 text-xl font-black tracking-tight text-white sm:text-3xl">
             {waitingOnSpoon
               ? `Personalizing ${waitingSpoonTitle} for you...`
               : waitingOnBoss
@@ -145,14 +145,14 @@ export function PrimaryHeroCard({
                 : "Synthesizing Your Vocab Bridge..."}
           </h3>
 
-          <p className="mt-2 max-w-xl text-sm font-medium leading-relaxed text-slate-300">
+          <p className="mt-2 max-w-xl text-xs sm:text-sm font-medium leading-relaxed text-slate-300">
             {waitingOnSpoon
               ? "Our language engine is generating your custom audio, speaking drills, and visual scene. This takes about 20–30 seconds."
               : "Preparing your interactive checkpoint. Ready in just a moment..."}
           </p>
 
-          <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
-            <div className="h-2.5 w-48 overflow-hidden rounded-full bg-white/10 p-0.5">
+          <div className="mt-5 sm:mt-6 flex items-center gap-3 border-t border-white/10 pt-4 sm:pt-5">
+            <div className="h-2.5 w-40 sm:w-48 overflow-hidden rounded-full bg-white/10 p-0.5">
               <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" />
             </div>
             <span className="text-xs font-extrabold text-sky-300">
@@ -165,7 +165,7 @@ export function PrimaryHeroCard({
   }
 
   // =========================================================================
-  // 2. BOSS STAGE READY (3D Tertiary Purple/Fuchsia Arena Card)
+  // 2. BOSS STAGE READY (With Tilted LOCKED Stamp Overlay When Gated)
   // =========================================================================
   if (bossDue?.bossStage) {
     const bossStage = bossDue.bossStage;
@@ -202,7 +202,9 @@ export function PrimaryHeroCard({
           <img
             src={coverUrl}
             alt={bossName}
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-700 group-hover:scale-105"
+            className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${
+              isFreestyleUnlocked ? "opacity-55" : "opacity-30 grayscale-[45%]"
+            }`}
           />
         )}
 
@@ -214,17 +216,32 @@ export function PrimaryHeroCard({
           style={{ background: theme.glow }}
         />
 
-        <div className="relative z-10 p-7 sm:p-8">
+        {/* Rubber-Stamp LOCKED Overlay when Boss requires 3-min AI chat */}
+        {!isFreestyleUnlocked && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-16 right-4 z-20 -rotate-12 select-none sm:top-10 sm:right-8"
+          >
+            <div className="flex items-center gap-2 rounded-2xl border-4 border-rose-500/85 bg-slate-950/75 px-4 py-1.5 shadow-[0_0_25px_rgba(244,63,94,0.35)] backdrop-blur-xs sm:px-6 sm:py-2">
+              <Lock className="h-4 w-4 sm:h-6 sm:w-6 text-rose-400" strokeWidth={3} />
+              <span className="text-base sm:text-2xl font-black tracking-[0.22em] text-rose-400 uppercase">
+                LOCKED
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="relative z-10 p-5 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-xs font-black tracking-wide uppercase backdrop-blur-md ${theme.badge}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide uppercase backdrop-blur-md ${theme.badge}`}
             >
               <Crown className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
               Milestone {milestoneNum} Boss Stage
             </span>
 
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-xs font-extrabold text-slate-200 backdrop-blur-md">
-              <span>🎯 Covers Spoons {startSpoon}–{bossDue.orderIndex}</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-slate-200 backdrop-blur-md">
+              <span>🎯 Spoons {startSpoon}–{bossDue.orderIndex}</span>
               {scenario?.rules?.passingScore && (
                 <>
                   <span className="text-white/30">•</span>
@@ -236,42 +253,55 @@ export function PrimaryHeroCard({
             </span>
           </div>
 
-          <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
+          <div className="mt-5 sm:mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
             {avatarUrl && (
-              <div className="relative shrink-0">
+              <div className="relative w-fit shrink-0">
                 <div
-                  className={`h-24 w-24 overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-lg sm:h-28 sm:w-28 ${theme.avatarBorder}`}
+                  className={`relative h-20 w-20 sm:h-28 sm:w-28 overflow-hidden rounded-2xl border-2 bg-slate-900 shadow-lg ${theme.avatarBorder}`}
                 >
                   <img
                     src={avatarUrl}
                     alt={bossName}
-                    className="h-full w-full object-cover"
+                    className={`h-full w-full object-cover ${
+                      !isFreestyleUnlocked ? "opacity-45 grayscale" : ""
+                    }`}
                   />
+                  {!isFreestyleUnlocked && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/45">
+                      <Lock className="h-7 w-7 sm:h-8 sm:w-8 text-rose-400 drop-shadow" />
+                    </div>
+                  )}
                 </div>
-                <span className="absolute -right-1.5 -bottom-1.5 rounded-full border-b-2 border-emerald-700 bg-emerald-400 px-2.5 py-0.5 text-[10px] font-black tracking-wider text-slate-950 uppercase shadow">
-                  Boss
+                <span
+                  className={`absolute -right-1.5 -bottom-1.5 rounded-full border-b-2 px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase shadow ${
+                    isFreestyleUnlocked
+                      ? "border-emerald-700 bg-emerald-400 text-slate-950"
+                      : "border-rose-900 bg-rose-500 text-white"
+                  }`}
+                >
+                  {isFreestyleUnlocked ? "Boss" : "Locked"}
                 </span>
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <span
-                className={`text-xs font-black tracking-wider uppercase ${theme.accentText}`}
+                className={`text-[11px] sm:text-xs font-black tracking-wider uppercase ${theme.accentText}`}
               >
                 Milestone Challenger
               </span>
               <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
                 {bossName}
               </h2>
-              <p className="line-clamp-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-200">
+              <p className="line-clamp-2 max-w-2xl text-xs sm:text-sm font-medium leading-relaxed text-slate-200">
                 {bossPersona}
               </p>
             </div>
           </div>
 
           {boss?.introMessage && (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-md">
-              <div className="flex items-start gap-3">
+            <div className="mt-4 sm:mt-5 rounded-2xl border border-white/10 bg-white/[0.08] p-3.5 sm:p-4 backdrop-blur-md">
+              <div className="flex items-start gap-2.5 sm:gap-3">
                 <Quote
                   className={`mt-0.5 h-4 w-4 shrink-0 rotate-180 ${theme.icon}`}
                 />
@@ -282,7 +312,7 @@ export function PrimaryHeroCard({
             </div>
           )}
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
+          <div className="mt-5 sm:mt-6 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/10 pt-4 sm:pt-5">
             {isFreestyleUnlocked ? (
               <>
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
@@ -292,7 +322,7 @@ export function PrimaryHeroCard({
 
                 <Link
                   href={bossHref}
-                  className={`inline-flex items-center gap-2.5 rounded-2xl border-b-4 px-8 py-3.5 text-sm font-black shadow-xl transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 ${theme.button3D}`}
+                  className={`inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 px-7 py-3.5 text-sm font-black shadow-xl transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 ${theme.button3D}`}
                 >
                   <span>Challenge {bossName.split(",")[0]}</span>
                   <ArrowRight className="h-4 w-4" />
@@ -301,19 +331,19 @@ export function PrimaryHeroCard({
             ) : (
               <>
                 <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
-                  <Mic className="h-4 w-4 text-rose-400" />
+                  <Lock className="h-4 w-4 shrink-0 text-rose-400" />
                   <span>
-                    🔒 Complete 1 Live 3-Min AI Conversation to Unlock Boss
+                    Complete 1 Live 3-Min AI Conversation to Unlock Boss
                   </span>
                 </div>
 
                 <Link
                   href="/conversation"
-                  className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-rose-900 bg-gradient-to-b from-rose-500 to-pink-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-rose-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-rose-900 bg-gradient-to-b from-rose-500 to-pink-600 px-7 py-3.5 text-sm font-black text-white shadow-xl shadow-rose-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
                 >
-                  <Mic className="h-4 w-4" />
+                  <Mic className="h-4 w-4 shrink-0" />
                   <span>Unlock Boss: Start 3-Min AI Chat</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4 shrink-0" />
                 </Link>
               </>
             )}
@@ -324,7 +354,7 @@ export function PrimaryHeroCard({
   }
 
   // =========================================================================
-  // 3. VOCAB BRIDGE READY (3D Split Cinema Card with Accent Amber Theme!)
+  // 3. VOCAB BRIDGE READY
   // =========================================================================
   if (vocabDue?.bridge) {
     const isMilestoneLesson = vocabDue.orderIndex % 3 === 0;
@@ -345,7 +375,6 @@ export function PrimaryHeroCard({
 
     return (
       <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
-        {/* Right-aligned Bright Artwork with Smooth Left Gradient Blend */}
         {vocabDue.imageUrl && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[56%]">
             <img
@@ -358,24 +387,24 @@ export function PrimaryHeroCard({
           </div>
         )}
 
-        <div className="relative z-10 flex flex-col justify-between p-7 sm:p-9">
+        <div className="relative z-10 flex flex-col justify-between p-5 sm:p-9">
           <div className="max-w-xl">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/20 px-3.5 py-1 text-xs font-black tracking-wide text-amber-300 uppercase backdrop-blur-md">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/20 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-amber-300 uppercase backdrop-blur-md">
                 <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 Vocab Bridge {vocabDue.orderIndex} Ready
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-200 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-slate-200 backdrop-blur-md">
                 🔓 Unlocks {unlockTargetText}
               </span>
             </div>
 
-            <h2 className="mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
               Review: {bridgeTitle}
             </h2>
 
-            <p className="mt-2 max-w-lg text-sm font-medium leading-relaxed text-slate-300 sm:text-base">
+            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-slate-300">
               Lock in the {vocabWordCount(vocabDue.bridge.vocabMoment)} core
               scene expressions from Spoon {vocabDue.orderIndex} to unlock{" "}
               <span className="font-black text-amber-300">
@@ -384,13 +413,12 @@ export function PrimaryHeroCard({
               .
             </p>
 
-            {/* 3D Amber Word Preview Chips */}
             {words.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
                 {words.slice(0, 5).map((w, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-slate-900/85 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-slate-900/85 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-black text-white backdrop-blur-md"
                   >
                     <Zap className="h-3 w-3 fill-amber-400 text-amber-400" />
                     <span className="text-amber-300">{w.word}</span>
@@ -405,7 +433,7 @@ export function PrimaryHeroCard({
             )}
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
+          <div className="mt-5 sm:mt-7 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/10 pt-4 sm:pt-5">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
               <Zap className="h-4 w-4 text-amber-400" />
               <span>~3 Min Interactive Recall &amp; Pronunciation</span>
@@ -413,7 +441,7 @@ export function PrimaryHeroCard({
 
             <Link
               href={`/foundation/vocab/${vocabDue.bridge.id}`}
-              className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
             >
               <span>Start Bridge {vocabDue.orderIndex}</span>
               <ArrowRight className="h-4 w-4" />
@@ -425,7 +453,7 @@ export function PrimaryHeroCard({
   }
 
   // =========================================================================
-  // 4. NEXT SPOON READY (3D Split Cinema Card with Primary Blue CTA!)
+  // 4. NEXT SPOON READY
   // =========================================================================
   if (nextLesson) {
     const milestoneNum = Math.ceil(nextLesson.orderIndex / 3);
@@ -437,7 +465,6 @@ export function PrimaryHeroCard({
 
     return (
       <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
-        {/* Right-aligned Bright Artwork with Smooth Left Gradient Blend */}
         {nextLesson.imageUrl && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[58%]">
             <img
@@ -450,44 +477,41 @@ export function PrimaryHeroCard({
           </div>
         )}
 
-        <div className="relative z-10 flex flex-col justify-between p-7 sm:p-9">
+        <div className="relative z-10 flex flex-col justify-between p-5 sm:p-9">
           <div className="max-w-xl">
-            {/* Top Status & Session Duration Pills */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/35 bg-sky-500/20 px-3.5 py-1 text-xs font-black tracking-wide text-sky-300 uppercase backdrop-blur-md">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/35 bg-sky-500/20 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-sky-300 uppercase backdrop-blur-md">
                 <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
                 Spoon {nextLesson.orderIndex} Ready
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-200 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-slate-200 backdrop-blur-md">
                 <Clock className="h-3.5 w-3.5 text-sky-300" />
                 5–7 min session
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-200 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-[11px] sm:text-xs font-bold text-indigo-200 backdrop-blur-md">
                 <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
                 Unit {milestoneNum} • Part {stepInMilestone} of 3
               </span>
             </div>
 
-            {/* Title with Roman Numeral */}
-            <h2 className="mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
               Spoon {nextLesson.orderIndex}: {titleToDisplay}
             </h2>
-            <p className="mt-2.5 max-w-lg text-sm font-medium leading-relaxed text-slate-300 sm:text-base">
+            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-slate-300">
               Master essential speech patterns, native pronunciation, and
               interactive listening drills in this bite-sized audio lesson.
             </p>
           </div>
 
-          {/* Bottom Bar: Feature Tags + 3D Primary Blue Start CTA */}
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
-            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-300">
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4 sm:pt-5">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-300">
               <span className="inline-flex items-center gap-1.5">
                 <Headphones className="h-4 w-4 text-sky-400" />
                 Interactive Audio Lesson
               </span>
-              <span className="text-white/20">•</span>
+              <span className="hidden sm:inline text-white/20">•</span>
               <span className="inline-flex items-center gap-1.5">
                 <Mic className="h-4 w-4 text-emerald-400" />
                 Live Speech Coaching
@@ -496,7 +520,7 @@ export function PrimaryHeroCard({
 
             <Link
               href={getLessonHref(nextLesson.id)}
-              className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
             >
               <span>Start Spoon {nextLesson.orderIndex}</span>
               <ArrowRight className="h-4 w-4" />
@@ -508,8 +532,10 @@ export function PrimaryHeroCard({
   }
 
   return (
-    <div className="rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-7 shadow-sm">
-      <h3 className="text-2xl font-black text-slate-900">All caught up! 🎉</h3>
+    <div className="rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-6 sm:p-7 shadow-sm">
+      <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+        All caught up! 🎉
+      </h3>
       <p className="mt-1 text-sm font-medium text-slate-500">
         You&apos;ve completed every available spoon on this track.
       </p>
