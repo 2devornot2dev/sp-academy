@@ -1,10 +1,9 @@
 // @/components/dashboard/DashboardLayout.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 
 import { Sidebar } from "./Sidebar";
@@ -32,7 +31,6 @@ function TabletSidebarAutoCollapse() {
     if (isMobile) return;
     const mql = window.matchMedia("(min-width: 1024px)");
     const sync = (e: MediaQueryList | MediaQueryListEvent) => {
-      // Landscape (>=1024px) -> expanded; Portrait tablet (<1024px) -> collapsed 3D icon rail
       setOpen(e.matches);
     };
     sync(mql);
@@ -50,7 +48,36 @@ export default function DashboardLayout({
   notifications,
 }: DashboardLayoutProps) {
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [hideMobileHeader, setHideMobileHeader] = useState(false);
   const pathname = usePathname();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lastScrollTop = useRef(0);
+
+  // Reset scroll & show header when navigating to a new page
+  useEffect(() => {
+    setHideMobileHeader(false);
+    lastScrollTop.current = 0;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [pathname]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const st = el.scrollTop;
+    const delta = st - lastScrollTop.current;
+
+    if (st <= 16) {
+      setHideMobileHeader(false);
+    } else if (delta > 8 && st > 48) {
+      setHideMobileHeader(true);
+    } else if (delta < -6) {
+      setHideMobileHeader(false);
+    }
+
+    lastScrollTop.current = st;
+  };
 
   return (
     <SidebarProvider>
@@ -63,8 +90,14 @@ export default function DashboardLayout({
       />
 
       <div className="flex h-dvh w-full min-w-0 flex-1 flex-col overflow-hidden bg-white">
-        {/* Branded mobile-only header (hidden on iPad/Desktop where the 3D rail shows) */}
-        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-3.5 backdrop-blur-md md:hidden">
+        {/* Auto-hiding branded mobile header (hidden on iPad/Desktop) */}
+        <header
+          className={`relative z-40 flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-3.5 backdrop-blur-md transition-[margin,opacity] duration-200 ease-out md:hidden ${
+            hideMobileHeader
+              ? "-mt-12 pointer-events-none opacity-0"
+              : "mt-0 opacity-100"
+          }`}
+        >
           <SidebarTrigger className="h-8 w-8 rounded-xl border border-b-2 border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" />
 
           <Image
@@ -79,9 +112,13 @@ export default function DashboardLayout({
           <div className="w-8" aria-hidden="true" />
         </header>
 
-        <ScrollArea className="h-full w-full flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block [&>[data-radix-scroll-area-viewport]>div]:h-full">
-          <main className="h-full w-full">{children}</main>
-        </ScrollArea>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain"
+        >
+          <main className="min-h-full w-full">{children}</main>
+        </div>
       </div>
 
       <NotificationsPanel

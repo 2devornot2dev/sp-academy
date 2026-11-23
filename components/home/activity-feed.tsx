@@ -1,4 +1,4 @@
-// components/home/ActivityFeed.tsx
+// components/home/activity-feed.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +6,6 @@ import { formatDistanceToNow } from "date-fns";
 import {
   Heart,
   Crown,
-  Sparkles,
   Zap,
   BookOpen,
   Trophy,
@@ -16,6 +15,7 @@ import {
 import type { FeedActivityItem } from "@/app/api/shared-activity/route";
 import { UserProfileData } from "@/app/actions/get-home-dashboard";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+import { playSfx } from "@/lib/sfx";
 
 const ACTIVITY_THEME_MAP: Record<
   FeedActivityItem["type"],
@@ -72,6 +72,7 @@ function LikeButton({ item }: { item: FeedActivityItem }) {
     const nextLiked = !liked;
     const prevLikes = likes;
 
+    if (nextLiked) playSfx("like");
     setAnimating(true);
     setLiked(nextLiked);
     setLikes(nextLiked ? prevLikes + 1 : Math.max(0, prevLikes - 1));
@@ -126,7 +127,7 @@ function ActivityTypeEmblem({ item }: { item: FeedActivityItem }) {
 
   if (item.imageUrl) {
     return (
-      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-900 shadow-2xs">
+      <div className="h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-slate-200 bg-slate-900 shadow-2xs">
         <img
           src={item.imageUrl}
           alt={item.title}
@@ -138,7 +139,7 @@ function ActivityTypeEmblem({ item }: { item: FeedActivityItem }) {
 
   return (
     <div
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-2xs ${theme.emblem3D}`}
+      className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl shadow-2xs ${theme.emblem3D}`}
     >
       <Icon className="h-5 w-5" />
     </div>
@@ -198,7 +199,7 @@ export default function ActivityFeed({
   }
 
   return (
-    <div className="flex-1 space-y-2.5 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200">
+    <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200">
       {activities.map((item, idx) => {
         const safeDate = item.createdAt ? new Date(item.createdAt) : new Date();
         const timeAgo = formatDistanceToNow(safeDate, { addSuffix: true });
@@ -216,7 +217,7 @@ export default function ActivityFeed({
         return (
           <div
             key={`${item.id || idx}-${idx}`}
-            className={`rounded-2xl border-2 border-b-4 border-slate-200/80 border-b-slate-300/80 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs ${theme.cardHover}`}
+            className={`rounded-2xl border-2 border-b-4 border-slate-200/80 border-b-slate-300/80 bg-white p-2.5 sm:p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs ${theme.cardHover}`}
           >
             {/* Top Row: User Avatar + Username + Time + Category Badge */}
             <div className="mb-2 flex items-center justify-between gap-2">
