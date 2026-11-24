@@ -27,6 +27,19 @@ function extractJsonObject(raw: string): any {
   return JSON.parse(match[0]);
 }
 
+function defaultReplyForLang(targetLanguage: string): {
+  starter: string;
+  translation: string;
+} {
+  if (targetLanguage.startsWith("es")) {
+    return { starter: "Sí, ¿y tú?", translation: "Yes, and you?" };
+  }
+  if (targetLanguage.startsWith("en")) {
+    return { starter: "Yes, and you?", translation: "Yes, and you?" };
+  }
+  return { starter: "Oui, et toi ?", translation: "Yes, and you?" };
+}
+
 export async function POST(request: Request, { params }: Params) {
   try {
     const user = await requireUser();
@@ -121,6 +134,8 @@ Output ONLY a JSON object:
         targetLanguage = "fr-FR",
       } = body;
 
+      const fallbackReply = defaultReplyForLang(targetLanguage);
+
       try {
         const completion = await groq.chat.completions.create({
           model: "qwen/qwen3.8-27b",
@@ -163,8 +178,8 @@ Output ONLY a JSON object with 4 keys:
             (nextTargetChunk
               ? `Reply to your partner and try using "${nextTargetChunk}"!`
               : "Keep the flow going—answer and ask your partner a question back!"),
-          starter: parsed.starter || nextTargetChunk || "Oui, et toi ?",
-          translation: parsed.translation || "Yes, and you?",
+          starter: parsed.starter || nextTargetChunk || fallbackReply.starter,
+          translation: parsed.translation || fallbackReply.translation,
         });
       } catch {
         return NextResponse.json({
@@ -172,8 +187,8 @@ Output ONLY a JSON object with 4 keys:
           coachingTip: nextTargetChunk
             ? `Answer the question and try using "${nextTargetChunk}"!`
             : "Answer naturally and ask your partner a question back!",
-          starter: nextTargetChunk || "Oui, et toi ?",
-          translation: "Yes, and you?",
+          starter: nextTargetChunk || fallbackReply.starter,
+          translation: fallbackReply.translation,
         });
       }
     }
@@ -224,6 +239,7 @@ Output ONLY a JSON object with 4 keys:
     } = body;
 
     let currentMilestoneIndex = 1;
+    const primaryPerSpoon: string[] = [];
     const speakablePhrases: string[] = [];
     const spoonThemes: string[] = [];
 
@@ -290,23 +306,18 @@ Output ONLY a JSON object with 4 keys:
           (l) => l.orderIndex >= startOrder && l.orderIndex <= endOrder,
         );
 
-        const addPhrase = (raw?: string | null) => {
-          if (!raw || typeof raw !== "string") return;
+        const cleanPhrase = (raw?: string | null): string | null => {
+          if (!raw || typeof raw !== "string") return null;
           const clean = raw
             .split("=")[0]
             .replace(/^[«"“]+|[»"”]+$/g, "")
             .trim();
           const wordCount = clean.split(/\s+/).filter(Boolean).length;
-          if (
-            wordCount >= 2 &&
-            wordCount <= 7 &&
-            !speakablePhrases.some(
-              (p) => p.toLowerCase() === clean.toLowerCase(),
-            )
-          ) {
-            speakablePhrases.push(clean);
-          }
+          return wordCount >= 2 && wordCount <= 8 ? clean : null;
         };
+
+        const seenGlobal = new Set<string>();
+        const perLessonBuckets: string[][] = [];
 
         for (const l of milestoneLessons) {
           if (l.title) spoonThemes.push(l.title);
@@ -315,16 +326,41 @@ Output ONLY a JSON object with 4 keys:
           const fs = (l.freestyle as any) || {};
           const lh = (l.lessonHandoff as any) || {};
 
-          addPhrase(gc.targetSentence);
-          addPhrase(lh.targetSentence);
-          if (Array.isArray(vc?.constraint?.validReplies)) {
-            vc.constraint.validReplies.forEach(addPhrase);
+          const rawCandidates: Array<string | null | undefined> = [
+            gc.targetSentence,
+            lh.targetSentence,
+            ...(Array.isArray(fs?.requiredChunks) ? fs.requiredChunks : []),
+            ...(Array.isArray(lh?.taughtChunks) ? lh.taughtChunks : []),
+            ...(Array.isArray(vc?.constraint?.validReplies)
+              ? vc.constraint.validReplies
+              : []),
+          ];
+
+          const bucket: string[] = [];
+          for (const rawC of rawCandidates) {
+            const clean = cleanPhrase(rawC);
+            if (!clean) continue;
+            const norm = clean.toLowerCase();
+            if (seenGlobal.has(norm)) continue;
+            seenGlobal.add(norm);
+            bucket.push(clean);
           }
-          if (Array.isArray(fs?.requiredChunks)) {
-            fs.requiredChunks.forEach(addPhrase);
+
+          if (bucket.length > 0) {
+            primaryPerSpoon.push(bucket[0]);
+            perLessonBuckets.push(bucket);
           }
-          if (Array.isArray(lh?.taughtChunks)) {
-            lh.taughtChunks.forEach(addPhrase);
+        }
+
+        // Round-robin across Spoons (1st from Spoon I, 1st from Spoon II, 1st from Spoon III, then 2nds...)
+        // so Spoon 1's validReplies never crowd out Spoon 2 or Spoon 3.
+        const maxBucketLen = Math.max(
+          0,
+          ...perLessonBuckets.map((b) => b.length),
+        );
+        for (let i = 0; i < maxBucketLen; i++) {
+          for (const bucket of perLessonBuckets) {
+            if (bucket[i]) speakablePhrases.push(bucket[i]);
           }
         }
       }
@@ -338,20 +374,36 @@ Output ONLY a JSON object with 4 keys:
     const personaDesc =
       PERSONA_STYLES[String(persona).toUpperCase()] || PERSONA_STYLES.FRIENDLY;
 
+    const fallbackPool = targetLanguage.startsWith("es")
+      ? [
+          "Me gustaría un café",
+          "Trabajo todos los días",
+          "Muchas gracias por todo",
+        ]
+      : targetLanguage.startsWith("en")
+        ? [
+            "I would like a coffee",
+            "I work every day",
+            "Thank you very much",
+          ]
+        : [
+            "Je voudrais un café",
+            "Je travaille chaque jour",
+            "C'est une bonne idée",
+          ];
+
     const defaultChunks =
-      speakablePhrases.length >= 3
-        ? speakablePhrases.slice(0, 3)
-        : targetLanguage.startsWith("es")
-          ? [
-              "Me gustaría un café",
-              "Trabajo todos los días",
-              "Muchas gracias por todo",
-            ]
-          : [
-              "Je voudrais un café",
-              "Je travaille chaque jour",
-              "C'est une bonne idée",
-            ];
+      primaryPerSpoon.length >= 3
+        ? primaryPerSpoon.slice(0, 3)
+        : [
+            ...primaryPerSpoon,
+            ...fallbackPool.filter(
+              (f) =>
+                !primaryPerSpoon.some(
+                  (p) => p.toLowerCase() === f.toLowerCase(),
+                ),
+            ),
+          ].slice(0, 3);
 
     let generated = {
       topic:
@@ -366,19 +418,27 @@ Output ONLY a JSON object with 4 keys:
       openingLine: `Chat with ${tutorName} and work your 3 target phrases into the conversation!`,
       aiOpeningTarget: targetLanguage.startsWith("es")
         ? `¡Hola ${firstName}! ¿Qué te gustaría hacer hoy?`
-        : `Bonjour ${firstName} ! Dis-moi, comment se passe ta journée ?`,
+        : targetLanguage.startsWith("en")
+          ? `Hey ${firstName}! How is your day going so far?`
+          : `Bonjour ${firstName} ! Dis-moi, comment se passe ta journée ?`,
       starterHintTarget: defaultChunks[0],
       starterHintNative: "Start by using your first target phrase!",
     };
 
     try {
       const focusedContext =
-        mode === "FOCUSED" && speakablePhrases.length > 0
+        mode === "FOCUSED" && primaryPerSpoon.length > 0
           ? `\n- FOCUSED MODE: The learner is practicing Milestone ${currentMilestoneIndex} (${spoonThemes.join(
               ", ",
-            )}). Use or lightly adapt 3 complete, speakable 2-to-5 word phrases from this lesson list: ${JSON.stringify(
-              speakablePhrases.slice(0, 8),
-            )}.`
+            )}).
+  Primary phrase from each Spoon built so far: ${JSON.stringify(primaryPerSpoon)}.
+  Additional milestone phrases (ordered across Spoons): ${JSON.stringify(
+    speakablePhrases.slice(0, 9),
+  )}.
+  RULE FOR FOCUSED MODE:
+  * Pick at most ONE phrase per Spoon — NEVER pick 2 rephrasings or variants of the same sentence!
+  * If 3 distinct Spoons are present, use 1 distinct phrase from each Spoon.
+  * If fewer than 3 distinct Spoons exist so far, include the existing Spoon phrase(s) and invent genuinely DIFFERENT follow-up conversational moves on the same theme for the remaining slot(s) (e.g., ask back, react, or close).`
           : "";
 
       const completion = await groq.chat.completions.create({
@@ -393,7 +453,7 @@ Output ONLY a JSON object with 4 keys:
 {
   "topic": "Short scenario title in ${nativeLanguage} (3-6 words)",
   "persona": "1-sentence role for ${tutorName} (${personaDesc}) in ${nativeLanguage}",
-  "requiredChunks": ["2-to-5 word speakable phrase 1 in ${targetLanguage}", "completely distinct phrase 2 (no overlapping words)", "completely distinct phrase 3"],
+  "requiredChunks": ["2-to-5 word speakable phrase 1 in ${targetLanguage}", "completely distinct phrase 2 (different conversational move, no overlapping frame)", "completely distinct phrase 3 (different conversational move)"],
   "chunkTranslations": ["English meaning of phrase 1", "English meaning of phrase 2", "English meaning of phrase 3"],
   "openingLine": "1-sentence coaching tip for ${firstName} in ${nativeLanguage}",
   "aiOpeningTarget": "Warm, friendly 2-sentence opener spoken by ${tutorName} in ${targetLanguage}: Sentence 1 MUST greet ${firstName} by name and share a tiny relatable detail (e.g., 'Bonjour ${firstName} ! Moi je prends un café avant de commencer.'), Sentence 2 asks a warm, easy lead-in question.",
@@ -402,7 +462,8 @@ Output ONLY a JSON object with 4 keys:
 }
 CRITICAL RULES:
 - NEVER put single isolated 1-word fragments in 'requiredChunks'! Every item in 'requiredChunks' MUST be a complete, natural 2-to-5 word phrase or mini-sentence that a learner can say out loud.
-- Mode: ${mode} (SPECIFIC=use "${topic || "Introductions & Small Talk"}"; RANDOM=fun real-world cafe/travel/shop scenario; ARGUMENTATIVE=friendly debate; FOCUSED=practice current Spoon lesson sentences).${focusedContext}
+- NEVER put 2 or 3 rephrasings of the same idea in 'requiredChunks'! Each of the 3 phrases must serve a DIFFERENT conversational move (e.g., open/request, answer/detail, react/ask back/close).
+- Mode: ${mode} (SPECIFIC=use "${topic || "Introductions & Small Talk"}"; RANDOM=fun real-world cafe/travel/shop scenario; ARGUMENTATIVE=friendly debate; FOCUSED=practice current Milestone Spoons).${focusedContext}
 - Level: ${level} (ZERO=simple 2-4 word survival sentences; EASY=3-5 word A1 sentences; MEDIUM=B1 expressions; FLUENT=C1 idioms).`,
           },
           {
@@ -412,8 +473,10 @@ CRITICAL RULES:
               level,
               persona,
               topic: topic || null,
+              primaryPerSpoon:
+                mode === "FOCUSED" ? primaryPerSpoon : undefined,
               speakablePhrases:
-                mode === "FOCUSED" ? speakablePhrases.slice(0, 8) : undefined,
+                mode === "FOCUSED" ? speakablePhrases.slice(0, 9) : undefined,
               nativeLanguage,
               targetLanguage,
             }),
