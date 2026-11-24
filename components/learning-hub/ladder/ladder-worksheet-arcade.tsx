@@ -343,7 +343,7 @@ export function LadderWorksheetArcade({
         : `Read the cue, then speak (or tap) the flipped transformation!`;
 
   return (
-    <div className="flex min-h-screen md:h-full min-h-0 flex-col overflow-hidden animate-bg p-2.5 font-sans text-slate-900 sm:p-5">
+    <div className="flex h-[calc(100dvh-3rem)] md:h-dvh min-h-0 flex-col overflow-hidden animate-bg p-2.5 font-sans text-slate-900 sm:p-5">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-2.5 sm:gap-3.5">
         {/* 1. HORIZONTAL VOX/VIVI COACH BAR */}
         <div className="flex shrink-0 items-center justify-between gap-2.5 sm:gap-4 rounded-2xl sm:rounded-[1.75rem] bg-white px-3.5 py-2.5 sm:px-5 sm:py-3.5 shadow-sm ring-1 ring-slate-200/70">
@@ -440,7 +440,7 @@ export function LadderWorksheetArcade({
             </motion.div>
           ) : stageIdx === 0 ? (
             /* ================= STAGE 1: CONTRAST PAIRS ================= */
-            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
+            <div className="flex flex-1 flex-col justify-between gap-3 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between gap-2">
                 <span className="text-[11px] sm:text-xs font-black tracking-wider text-blue-600 uppercase">
                   Stage 1 • Contrast Pairs (Set {pairWave + 1}/2)
@@ -451,7 +451,7 @@ export function LadderWorksheetArcade({
                 </span>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-rows-2 sm:gap-3">
+              <div className="grid flex-1 grid-cols-1 gap-2.5 sm:grid-rows-2 sm:gap-3 md:min-h-0">
                 {wavePairs.map((pair, pIdx) => (
                   <div
                     key={pIdx}
@@ -537,7 +537,7 @@ export function LadderWorksheetArcade({
             </div>
           ) : stageIdx === 1 ? (
             /* ================= STAGE 2: 3-RUNG SENTENCE STACK ================= */
-            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 sm:gap-4">
+            <div className="flex flex-1 flex-col justify-between gap-3 sm:gap-4 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-amber-700 uppercase">
                   <Layers className="h-4 w-4 shrink-0" />
@@ -632,7 +632,7 @@ export function LadderWorksheetArcade({
             </div>
           ) : (
             /* ================= STAGE 3: THE FLIP CHALLENGE ================= */
-            <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
+            <div className="flex flex-1 flex-col justify-between gap-3 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-purple-700 uppercase">
                   <Zap className="h-4 w-4 fill-current" />
