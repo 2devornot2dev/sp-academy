@@ -8,6 +8,7 @@ import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -337,7 +338,7 @@ export function LadderWorksheetArcade({
   const coachMessage = completed
     ? `Rung ${rung.rungOrder} cleared! All 8 expressions are now in your Word Matrix.`
     : stageIdx === 0
-      ? `Tap every contrast card to hear how the pairs differ, then climb to the Sentence Stack.`
+      ? `Tap both sides of each opposite pair to hear how they contrast, then climb to the Sentence Stack.`
       : stageIdx === 1
         ? `Tap Rungs 1 → 2 → 3 from bottom to top to watch the word grow into a real sentence.`
         : `Read the cue, then speak (or tap) the flipped transformation!`;
@@ -440,7 +441,7 @@ export function LadderWorksheetArcade({
             </motion.div>
           ) : stageIdx === 0 ? (
             /* ================= STAGE 1: CONTRAST PAIRS ================= */
-            <div className="flex flex-1 flex-col justify-between gap-3 md:min-h-0">
+            <div className="flex flex-1 flex-col justify-between gap-2.5 sm:gap-3 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between gap-2">
                 <span className="text-[11px] sm:text-xs font-black tracking-wider text-blue-600 uppercase">
                   Stage 1 • Contrast Pairs (Set {pairWave + 1}/2)
@@ -452,61 +453,118 @@ export function LadderWorksheetArcade({
               </div>
 
               <div className="grid flex-1 grid-cols-1 gap-2.5 sm:grid-rows-2 sm:gap-3 md:min-h-0">
-                {wavePairs.map((pair, pIdx) => (
-                  <div
-                    key={pIdx}
-                    className="grid min-h-0 grid-cols-2 gap-2 sm:gap-3 rounded-2xl sm:rounded-3xl bg-slate-50/90 p-2 sm:p-3 ring-1 ring-slate-200/80"
-                  >
-                    {pair.map((item) => {
-                      const heard = heardIds.has(item.id);
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() =>
-                            handleTapPairCard(item.id, item.wordAudioUrl)
-                          }
-                          className={`group relative flex min-h-0 flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3.5 rounded-xl sm:rounded-2xl border-2 border-b-[4px] p-2.5 sm:p-3 text-left transition-all ${
-                            heard
-                              ? "border-emerald-400 border-b-emerald-500 bg-white shadow-sm"
-                              : "border-slate-200 border-b-slate-300 bg-white hover:-translate-y-0.5 hover:border-sky-400"
-                          }`}
-                        >
-                          {item.imageUrl && (
-                            <div className="h-20 w-full sm:h-full sm:max-h-28 sm:w-32 shrink-0 overflow-hidden rounded-lg sm:rounded-xl bg-slate-100">
-                              <img
-                                src={item.imageUrl}
-                                alt={item.gloss}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                          )}
+                {wavePairs.map((pair, pIdx) => {
+                  const pairNumber = pairWave * 2 + pIdx + 1;
+                  const pairBothHeard =
+                    pair.length > 0 && pair.every((it) => heardIds.has(it.id));
 
-                          <div className="min-w-0 w-full flex-1 space-y-0.5 sm:space-y-1">
-                            <span className="inline-block rounded-md bg-sky-100 px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] font-black text-blue-700 uppercase">
-                              {item.tag}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <span className="truncate text-sm sm:text-xl font-black text-slate-900">
-                                {item.word}
-                              </span>
-                              <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-blue-600" />
-                            </div>
-                            <p className="truncate text-[11px] sm:text-xs font-bold text-slate-500">
-                              &ldquo;{item.gloss}&rdquo;
-                            </p>
+                  return (
+                    <div
+                      key={pIdx}
+                      className={`relative flex min-h-0 flex-col justify-center gap-1.5 rounded-2xl sm:rounded-3xl p-2 sm:p-3 ring-1 transition-colors ${
+                        pairBothHeard
+                          ? "bg-emerald-50/60 ring-emerald-300"
+                          : "bg-slate-50/95 ring-slate-200/90"
+                      }`}
+                    >
+                      {/* Pair Header Label */}
+                      <div className="flex items-center justify-between px-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-wider text-slate-500 uppercase">
+                          <ArrowLeftRight className="h-3 w-3 text-indigo-500" />
+                          Pair {pairNumber} • Opposite Contrast
+                        </span>
+                        {pair[0] && pair[1] && (
+                          <span className="truncate text-[10px] font-extrabold text-slate-400">
+                            {pair[0].word} ↔ {pair[1].word}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 2-Card Contrast Grid with central VS/Flip badge */}
+                      <div className="relative grid min-h-0 flex-1 grid-cols-2 gap-2.5 sm:gap-4">
+                        {/* Center VS / Opposite Pill */}
+                        <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+                          <div
+                            className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 border-b-[3px] text-[10px] font-black shadow-md transition-colors ${
+                              pairBothHeard
+                                ? "border-emerald-600 bg-emerald-500 text-white"
+                                : "border-indigo-700 bg-gradient-to-b from-indigo-500 to-purple-600 text-white"
+                            }`}
+                          >
+                            <ArrowLeftRight className="h-3.5 w-3.5 stroke-[2.75]" />
                           </div>
+                        </div>
 
-                          {heard && (
-                            <span className="absolute top-2 right-2 sm:static flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
-                              <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3.5]" />
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
+                        {pair.map((item, sideIdx) => {
+                          const heard = heardIds.has(item.id);
+                          const isLeft = sideIdx === 0;
+
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() =>
+                                handleTapPairCard(item.id, item.wordAudioUrl)
+                              }
+                              className={`group relative flex min-h-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3.5 rounded-xl sm:rounded-2xl border-2 border-b-[4px] p-2.5 sm:p-3 text-left transition-all ${
+                                heard
+                                  ? "border-emerald-400 border-b-emerald-600 bg-white shadow-sm"
+                                  : isLeft
+                                    ? "border-amber-200/90 border-b-amber-400 bg-white hover:-translate-y-0.5 hover:border-amber-400"
+                                    : "border-sky-200/90 border-b-sky-400 bg-white hover:-translate-y-0.5 hover:border-sky-400"
+                              }`}
+                            >
+                              {item.imageUrl && (
+                                <div className="h-24 w-full sm:h-full sm:max-h-28 sm:w-32 shrink-0 overflow-hidden rounded-lg sm:rounded-xl bg-slate-100">
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.gloss}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              )}
+
+                              <div className="min-w-0 w-full sm:flex-1 space-y-0.5 sm:space-y-1">
+                                <span
+                                  className={`inline-block rounded-md px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] font-black uppercase ${
+                                    isLeft
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-sky-100 text-blue-700"
+                                  }`}
+                                >
+                                  {isLeft ? "Side A" : "Side B"} • {item.tag}
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                  <span className="truncate text-sm sm:text-xl font-black text-slate-900">
+                                    {item.word}
+                                  </span>
+                                  <Volume2
+                                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${
+                                      isLeft
+                                        ? "text-amber-600"
+                                        : "text-blue-600"
+                                    }`}
+                                  />
+                                </div>
+
+                                <p className="line-clamp-2 text-[11px] sm:text-xs font-bold leading-snug text-slate-500">
+                                  &ldquo;{item.gloss}&rdquo;
+                                </p>
+                              </div>
+
+                              {heard && (
+                                <span className="absolute top-2 right-2 sm:static flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                                  <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3.5]" />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <button
