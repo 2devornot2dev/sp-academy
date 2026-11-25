@@ -725,7 +725,7 @@ export function BookWrapper({
   let runningFlatWordIdx = 0;
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-3rem)] md:min-h-dvh w-full flex-col overflow-x-hidden bg-slate-100/90 text-slate-900">
+    <div className="relative flex min-h-[calc(100dvh-3rem)] md:min-h-dvh w-full flex-col overflow-x-hidden animate-bg text-slate-900">
       {/* DYNAMIC AMBILIGHT CINEMA BACKDROP */}
       {ambientBackdropUrl && (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
