@@ -10,17 +10,17 @@ export default async function BooksPage() {
   const user = await requireUser();
   const entitlements = await getUserEntitlements(user.id);
 
-  // if (!entitlements.canAccessBooks) {
-  //   return (
-  //     <LockedFeaturePage
-  //       badge="Unlimited+ Exclusive"
-  //       title="Unlock Interactive Audio Books"
-  //       description="Read bilingual Spoon Original stories with native tap-to-hear audio, interactive definitions, and live Azure pronunciation checkpoints."
-  //       ctaLabel="Upgrade to Unlimited+"
-  //       ctaHref="/pricing"
-  //     />
-  //   );
-  // }
+  if (!entitlements.canAccessBooks) {
+    return (
+      <LockedFeaturePage
+        badge="Founder Unlimited+ Exclusive"
+        title="Unlock Interactive Audio Books"
+        description="Read bilingual Spoon Original stories with native tap-to-hear audio, interactive definitions, and live Azure pronunciation checkpoints."
+        ctaLabel="Upgrade to Unlimited+"
+        ctaHref="/pricing"
+      />
+    );
+  }
 
   const hydratedBooks = await getBookshelfData();
 

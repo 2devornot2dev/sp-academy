@@ -36,7 +36,7 @@ const PLAN_LIMITS: Record<PlanTier, Omit<UserEntitlements, "plan">> = {
     dailyFreestyleMax: 5,
     freestyleCooldownSeconds: 300, // 5-min cooldown
     unlimitedSpriteEnergy: false,
-    canAccessBooks: false,
+    canAccessBooks: true,
     canPrebakeNextMilestone: true,
   },
   UNLIMITED: {
