@@ -26,6 +26,7 @@ model FoundationCourse {
   updatedAt            DateTime              @updatedAt
   foundationBridges    FoundationBridge[]
   foundationBossStages FoundationBossStage[]
+  milestoneGraduations MilestoneGraduation[]
 
   // Since courses are now personal, cacheKey shouldn't be globally @unique. 
   // This prevents the user from accidentally creating the exact same course twice:

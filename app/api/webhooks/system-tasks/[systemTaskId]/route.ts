@@ -15,6 +15,7 @@ import { handleBookGeneration } from "@/lib/system-tasks/handlers/handle-book-ge
 import { handleTrialGeneration } from "@/lib/system-tasks/handlers/handle-trial-generation";
 import { handleTutorExercise } from "@/lib/system-tasks/handlers/handle-tutor-exercise";
 import { handleLadderGeneration } from "@/lib/system-tasks/handlers/handle-ladder-generation";
+import { handleMilestoneGraduation } from "@/lib/system-tasks/handlers/handle-milestone-graduation";
 import { SystemTaskType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
@@ -113,6 +114,10 @@ export async function POST(req: Request, { params }: Params) {
       
       case SystemTaskType.LADDER_GENERATION: {
         return await handleLadderGeneration(task, body);
+      }
+      
+      case SystemTaskType.GENERATE_MILESTONE_GRADUATION: {
+        return await handleMilestoneGraduation(task, body);
       }
 
       default:

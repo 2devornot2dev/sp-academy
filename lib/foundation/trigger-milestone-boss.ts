@@ -11,11 +11,12 @@ import { getBossSpriteOrderIndex } from "@/lib/foundation/tools";
 import { invokeEduBuilder } from "@/app/actions/invoke-edu-builder";
 import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { SystemTaskType } from "@prisma/client";
+import { generateMilestoneGraduation } from "@/lib/actions/generate-milestone-graduation";
 
 const BOSS_LAMBDA =
   process.env.BOSS_BUILDER_LAMBDA_NAME ?? "spoon-boss-builder";
 const EVENT_PAYLOAD_LIMIT_BYTES = 256 * 1024;
-const BASE_WEBHOOK =  "https://spoonacademy.com/api/webhooks/system-tasks";
+const BASE_WEBHOOK = "https://spoonacademy.com/api/webhooks/system-tasks";
 
 export async function triggerMilestoneBossAndNextSpoon({
   userId,
@@ -271,6 +272,15 @@ export async function triggerMilestoneBossAndNextSpoon({
       );
     }
   }
+
+  // 2.5. PRE-BAKE MILESTONE GRADUATION (personalized video + 3-spoon recap)
+  await generateMilestoneGraduation({
+    userId,
+    courseId,
+    milestoneIndex,
+  }).catch((err) =>
+    console.error("⚠️ Milestone Graduation trigger warning (non-fatal):", err),
+  );
 
   // 3. PRE-BAKE NEXT SPOON (e.g. Spoon 4, 7, 10) — ONLY for paid tiers!
   const shouldPrebake = prebakeNextSpoon && entitlements.canPrebakeNextMilestone;
