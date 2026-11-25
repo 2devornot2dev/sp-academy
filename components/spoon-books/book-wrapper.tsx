@@ -242,7 +242,6 @@ export function BookWrapper({
   const currentPagePron = pagePronScores[pageScoreKey] || null;
   const hasReadCurrentPageAloud = Boolean(currentPagePron);
 
-  // Play button is disabled in Read-Along mode until the user has read the page out loud
   const isPlayDisabled =
     isRecording || (readingMode === "read" && !hasReadCurrentPageAloud);
 
@@ -510,7 +509,6 @@ export function BookWrapper({
     [book.id, selectedLang, onSaveProgress, outroPage, pagePronScores]
   );
 
-  // READ-ALONG: User reads the page out loud -> highlights words & unlocks page (NO score punishment!)
   const handleReadPageAloud = useCallback(async () => {
     if (!activePageContent?.sentences?.length) return;
     stopAudio();
@@ -538,7 +536,6 @@ export function BookWrapper({
     const nextScores = { ...pagePronScores, [pageScoreKey]: parsed };
     setPagePronScores(nextScores);
 
-    // Mark page completed immediately without punishing for score
     const nextSet = new Set(completedCheckpoints);
     nextSet.add(currentPage);
     setCompletedCheckpoints(nextSet);
@@ -558,7 +555,6 @@ export function BookWrapper({
     syncProgress,
   ]);
 
-  // CHECKPOINT SPEAK: User speaks phrase -> highlights words & unlocks immediately (NO score punishment!)
   const handleCheckpointSpeak = useCallback(async () => {
     const targetPhrase =
       activePageContent?.checkpoint?.speakChallenge?.targetPhrase;
@@ -601,7 +597,6 @@ export function BookWrapper({
     syncProgress,
   ]);
 
-  // Only auto-narrate in "listen" mode (NEVER in "read" mode!)
   useEffect(() => {
     stopAudio();
     cancelAssessment();
@@ -696,9 +691,6 @@ export function BookWrapper({
     syncProgress(currentPage, nextSet);
   };
 
-  // GATING LOGIC:
-  // - In "read" mode (Read Along): user MUST read the page out loud to unlock Next Page.
-  // - In "listen" mode (Listen Along): user solves the page checkpoint to unlock Next Page.
   const isCurrentPageSolved = completedCheckpoints.has(currentPage);
   const isCurrentPageGated =
     currentPage >= 1 &&
@@ -733,7 +725,7 @@ export function BookWrapper({
   let runningFlatWordIdx = 0;
 
   return (
-    <div className="relative flex min-h-[calc(100vh-1rem)] w-full flex-col overflow-hidden bg-slate-100/90 text-slate-900">
+    <div className="relative flex min-h-[calc(100dvh-3rem)] md:min-h-dvh w-full flex-col overflow-x-hidden bg-slate-100/90 text-slate-900">
       {/* DYNAMIC AMBILIGHT CINEMA BACKDROP */}
       {ambientBackdropUrl && (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -748,27 +740,28 @@ export function BookWrapper({
       )}
 
       {/* =====================================================================
-          1. 3D TACTILE HEADER BAR (With Read-Along vs Listen-Along Mode Switch)
+          1. 3D TACTILE HEADER BAR (Compact on mobile so nothing clips off right)
           ===================================================================== */}
-      <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 backdrop-blur-md sm:px-8">
+      <header className="sticky top-0 z-20 flex h-12 sm:h-14 w-full items-center justify-between gap-2 border-b border-slate-200/70 bg-white/90 px-2.5 backdrop-blur-md sm:px-8">
         <button
           type="button"
           onClick={() => {
             ambientAudioRef.current?.pause();
             onBackToLibrary();
           }}
-          className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3.5 py-1.5 text-xs font-black text-slate-700 transition hover:border-sky-300 active:translate-y-0.5 active:border-b-0"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-2.5 py-1.5 sm:px-3.5 text-xs font-black text-slate-700 transition hover:border-sky-300 active:translate-y-0.5 active:border-b-0"
+          title="Back to Bookshelf"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Bookshelf</span>
+          <span className="hidden sm:inline">Bookshelf</span>
         </button>
 
         {/* Center Title + Progress Pills */}
-        <div className="flex flex-col items-center gap-1">
-          <span className="max-w-[180px] truncate text-xs font-black text-slate-900 sm:max-w-md sm:text-sm">
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+          <span className="max-w-full truncate text-[11px] font-black text-slate-900 sm:max-w-md sm:text-sm">
             {currentTranslation?.title || book.slug}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             {Array.from({ length: totalPages }).map((_, idx) => {
               const pNum = idx + 1;
               const isCurrent = currentPage === pNum;
@@ -778,10 +771,10 @@ export function BookWrapper({
                   key={pNum}
                   className={`h-1.5 rounded-full transition-all ${
                     isCurrent
-                      ? "w-7 bg-gradient-to-r from-sky-500 to-emerald-500"
+                      ? "w-5 sm:w-7 bg-gradient-to-r from-sky-500 to-emerald-500"
                       : isDone
-                        ? "w-2.5 bg-emerald-400"
-                        : "w-2 bg-slate-200"
+                        ? "w-2 sm:w-2.5 bg-emerald-400"
+                        : "w-1.5 sm:w-2 bg-slate-200"
                   }`}
                 />
               );
@@ -789,8 +782,31 @@ export function BookWrapper({
           </div>
         </div>
 
-        {/* Right Controls: Mode Switch (Read Along vs Listen Along) + Speed + Lang + Music */}
-        <div className="flex items-center gap-2">
+        {/* Right Controls */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Mobile compact Read/Listen switch */}
+          <button
+            type="button"
+            onClick={() =>
+              setReadingMode((m) => (m === "read" ? "listen" : "read"))
+            }
+            className={`inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-black text-white md:hidden ${
+              readingMode === "read" ? "bg-emerald-500" : "bg-blue-600"
+            }`}
+            title={
+              readingMode === "read"
+                ? "Switch to Listen Along"
+                : "Switch to Read Along"
+            }
+          >
+            {readingMode === "read" ? (
+              <Mic className="h-3.5 w-3.5" />
+            ) : (
+              <Headphones className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          {/* Desktop Read/Listen switch */}
           <div className="hidden items-center rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200/70 md:flex">
             <button
               type="button"
@@ -845,7 +861,7 @@ export function BookWrapper({
                 setSelectedLang(e.target.value);
                 setCurrentPage(0);
               }}
-              className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-blue-700 uppercase focus:outline-none"
+              className="rounded-xl bg-slate-100 px-2 py-1.5 sm:px-3 text-[11px] sm:text-xs font-black text-blue-700 uppercase focus:outline-none"
             >
               {availableLanguages.map((lang) => (
                 <option key={lang} value={lang}>
@@ -855,7 +871,7 @@ export function BookWrapper({
             </select>
           ) : (
             <div
-              className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600"
+              className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600"
               title="Multi-language editions unlocked on Unlimited+"
             >
               <Globe2 className="h-3.5 w-3.5 text-sky-500" />
@@ -867,7 +883,7 @@ export function BookWrapper({
           <button
             type="button"
             onClick={() => setIsMusicEnabled((prev) => !prev)}
-            className={`rounded-xl p-2 transition ${
+            className={`rounded-xl p-1.5 sm:p-2 transition ${
               isMusicEnabled
                 ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                 : "bg-slate-100 text-slate-400 hover:bg-slate-200"
@@ -882,7 +898,7 @@ export function BookWrapper({
           <button
             type="button"
             onClick={() => setIsAudioMuted((prev) => !prev)}
-            className="rounded-xl bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
+            className="rounded-xl bg-slate-100 p-1.5 sm:p-2 text-slate-700 transition hover:bg-slate-200"
             title={isAudioMuted ? "Unmute" : "Mute"}
           >
             {isAudioMuted ? (
@@ -897,81 +913,85 @@ export function BookWrapper({
       {/* =====================================================================
           2. MAIN CINEMA STORYBOOK STAGE
           ===================================================================== */}
-      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-3 sm:px-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-3 py-3 sm:px-6">
         <AnimatePresence mode="wait">
           {currentPage === 0 ? (
-            /* ================= PAGE 0: CINEMATIC COVER + MODE CHOICE ================= */
+            /* ================= PAGE 0: CINEMATIC COVER (Stacks cleanly on mobile!) ================= */
             <motion.div
               key="book-intro"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="relative w-full overflow-hidden rounded-[2.25rem] border-2 border-b-[6px] border-slate-900 bg-slate-950 shadow-2xl"
+              className="relative w-full overflow-hidden rounded-3xl sm:rounded-[2.25rem] border-2 border-b-[6px] border-slate-900 bg-slate-950 shadow-2xl"
             >
-              <div className="relative aspect-[16/9] min-h-[440px] w-full overflow-hidden bg-slate-950">
-                {book.mediaUrls?.introVideoUrl ? (
-                  <video
-                    src={book.mediaUrls.introVideoUrl}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <motion.img
-                    src={
-                      book.mediaUrls?.coverImageUrl || book.characterAvatarUrl
-                    }
-                    alt={currentTranslation?.title}
-                    animate={{ scale: [1.0, 1.06] }}
-                    transition={{
-                      duration: 14,
-                      repeat: Infinity,
-                      repeatType: "reverse",
-                      ease: "easeInOut",
-                    }}
-                    className="h-full w-full object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
+              <div className="relative w-full bg-slate-950 sm:aspect-[16/9] sm:min-h-[440px]">
+                {/* Cover Art / Intro Video: 16:10 hero on mobile, full bleed on sm+ */}
+                <div className="relative aspect-[16/10] w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto">
+                  {book.mediaUrls?.introVideoUrl ? (
+                    <video
+                      src={book.mediaUrls.introVideoUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <motion.img
+                      src={
+                        book.mediaUrls?.coverImageUrl || book.characterAvatarUrl
+                      }
+                      alt={currentTranslation?.title}
+                      animate={{ scale: [1.0, 1.06] }}
+                      transition={{
+                        duration: 14,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        ease: "easeInOut",
+                      }}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-black/30 to-transparent sm:from-black/95 sm:via-black/45" />
+                </div>
 
-                <div className="absolute inset-x-0 bottom-0 flex flex-col items-start justify-end p-6 text-white sm:p-10">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="rounded-lg bg-emerald-400 px-3 py-1 text-[11px] font-black tracking-wide text-slate-950 uppercase">
+                {/* Cover Content: stacked below art on mobile, overlaid at bottom on sm+ */}
+                <div className="relative -mt-6 flex flex-col items-start justify-end px-4 pt-2 pb-5 text-white sm:absolute sm:inset-x-0 sm:bottom-0 sm:mt-0 sm:p-10">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <span className="rounded-lg bg-emerald-400 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-black tracking-wide text-slate-950 uppercase">
                       {book.levelBand}
                     </span>
-                    <span className="rounded-lg bg-white/20 px-3 py-1 text-[11px] font-bold text-white capitalize backdrop-blur-md">
+                    <span className="rounded-lg bg-white/20 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-bold text-white capitalize backdrop-blur-md">
                       {book.genre}
                     </span>
                   </div>
 
-                  <h1 className="text-3xl font-black tracking-tight drop-shadow-md sm:text-5xl">
+                  <h1 className="text-2xl font-black leading-tight tracking-tight drop-shadow-md sm:text-5xl">
                     {currentTranslation?.title}
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm font-medium text-white/90 sm:text-base">
+                  <p className="mt-1.5 max-w-2xl text-xs font-medium leading-relaxed text-white/85 sm:mt-2 sm:text-base sm:text-white/90">
                     {currentTranslation?.synopsis}
                   </p>
 
                   {/* CHOOSE HOW TO EXPERIENCE THIS STORY */}
-                  <div className="mt-5 grid w-full max-w-xl grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <div className="mt-4 sm:mt-5 grid w-full max-w-xl grid-cols-1 gap-2 sm:gap-2.5 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => setReadingMode("read")}
-                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-3 text-left transition-all ${
+                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-2.5 sm:p-3 text-left transition-all ${
                         readingMode === "read"
                           ? "border-emerald-400 bg-emerald-950/85 text-white shadow-lg"
                           : "border-white/20 bg-white/10 text-white/75 backdrop-blur-md hover:bg-white/15"
                       }`}
                     >
                       <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl ${
                           readingMode === "read"
                             ? "bg-emerald-400 text-slate-950"
                             : "bg-white/15 text-white"
                         }`}
                       >
-                        <Mic className="h-5 w-5" />
+                        <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
                       <div>
                         <p className="text-xs font-black uppercase tracking-wide">
@@ -986,20 +1006,20 @@ export function BookWrapper({
                     <button
                       type="button"
                       onClick={() => setReadingMode("listen")}
-                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-3 text-left transition-all ${
+                      className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 p-2.5 sm:p-3 text-left transition-all ${
                         readingMode === "listen"
                           ? "border-sky-400 bg-sky-950/85 text-white shadow-lg"
                           : "border-white/20 bg-white/10 text-white/75 backdrop-blur-md hover:bg-white/15"
                       }`}
                     >
                       <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl ${
                           readingMode === "listen"
                             ? "bg-sky-400 text-slate-950"
                             : "bg-white/15 text-white"
                         }`}
                       >
-                        <Headphones className="h-5 w-5" />
+                        <Headphones className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
                       <div>
                         <p className="text-xs font-black uppercase tracking-wide">
@@ -1012,12 +1032,12 @@ export function BookWrapper({
                     </button>
                   </div>
 
-                  <div className="mt-5 flex w-full flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 rounded-full border border-white/15 bg-white/15 py-1.5 pr-4 pl-1.5 backdrop-blur-md">
+                  <div className="mt-4 sm:mt-5 flex w-full flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div className="flex w-fit items-center gap-2.5 rounded-full border border-white/15 bg-white/15 py-1 pr-3.5 pl-1.5 backdrop-blur-md">
                       <img
                         src={book.characterAvatarUrl}
                         alt={book.characterName}
-                        className="h-8 w-8 rounded-full object-cover ring-2 ring-emerald-400"
+                        className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover ring-2 ring-emerald-400"
                       />
                       <span className="text-xs font-extrabold text-white">
                         Starring {book.characterName}
@@ -1027,7 +1047,7 @@ export function BookWrapper({
                     <button
                       type="button"
                       onClick={handleNextPage}
-                      className="inline-flex items-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 sm:text-base"
+                      className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-3.5 sm:py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 sm:text-base"
                     >
                       {readingMode === "read" ? (
                         <Mic className="h-4 w-4" />
@@ -1046,157 +1066,178 @@ export function BookWrapper({
               </div>
             </motion.div>
           ) : currentPage >= 1 && currentPage <= totalPages ? (
-            /* ================= PAGES 1..N: LIVING KEN-BURNS CINEMA STAGE ================= */
+            /* ================= PAGES 1..N: CLEAN STACK ON MOBILE, CINEMA OVERLAY ON DESKTOP ================= */
             <motion.div
               key={`page-${currentPage}`}
               initial={{ opacity: 0, y: 12, scale: 0.99 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.99 }}
               transition={{ duration: 0.28, ease: "easeOut" }}
-              className="flex w-full flex-col gap-3.5"
+              className="flex w-full flex-col gap-3"
             >
-              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[2.25rem] border-2 border-b-[6px] border-slate-900/90 bg-slate-950 shadow-2xl sm:aspect-[16/9]">
-                <motion.img
-                  key={`art-${currentPage}-${activePageImageUrl}`}
-                  src={activePageImageUrl}
-                  alt={`Page ${currentPage}`}
-                  animate={cameraMotion}
-                  transition={{
-                    duration: 16,
-                    repeat: Infinity,
-                    repeatType: "reverse",
-                    ease: "easeInOut",
-                  }}
-                  className="h-full w-full object-cover will-change-transform"
-                />
-
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent" />
-
-                <div
-                  className={`pointer-events-none absolute inset-x-0 bottom-0 transition-all duration-500 ${
-                    isAudioActive || isRecording
-                      ? "h-60 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-transparent"
-                      : "h-48 bg-gradient-to-t from-slate-950/90 via-slate-950/55 to-transparent"
-                  }`}
-                />
-
-                <div className="absolute inset-x-4 top-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-xl border border-white/15 bg-slate-950/75 px-3.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur-md">
-                      Page {currentPage} of {totalPages}
-                    </span>
-
-                    {currentPagePron && (
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-950/80 px-3 py-1 text-xs font-black text-emerald-300 shadow-sm backdrop-blur-md">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>
-                          Read Aloud ({currentPagePron.overallScore}%) • Tap any
-                          word to hear
-                        </span>
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSfx("tap");
-                      setIsCheckpointDrawerOpen(true);
+              <div className="relative w-full overflow-hidden rounded-3xl sm:rounded-[2.25rem] border-2 border-b-[6px] border-slate-900/90 bg-slate-950 shadow-2xl sm:aspect-[16/9]">
+                {/* Illustration Area: unobstructed 16:10 on mobile, full bleed on sm+ */}
+                <div className="relative aspect-[16/10] w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto">
+                  <motion.img
+                    key={`art-${currentPage}-${activePageImageUrl}`}
+                    src={activePageImageUrl}
+                    alt={`Page ${currentPage}`}
+                    animate={cameraMotion}
+                    transition={{
+                      duration: 16,
+                      repeat: Infinity,
+                      repeatType: "reverse",
+                      ease: "easeInOut",
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border-b-[3px] px-4 py-1.5 text-xs font-black shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
-                      isCurrentPageSolved
-                        ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                        : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
+                    className="h-full w-full object-cover will-change-transform"
+                  />
+
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent" />
+                  <div
+                    className={`pointer-events-none absolute inset-x-0 bottom-0 transition-all duration-500 ${
+                      isAudioActive || isRecording
+                        ? "h-16 bg-gradient-to-t from-slate-950 to-transparent sm:h-60 sm:from-slate-950/95 sm:via-slate-950/80"
+                        : "h-16 bg-gradient-to-t from-slate-950 to-transparent sm:h-48 sm:from-slate-950/90 sm:via-slate-950/55"
                     }`}
-                  >
-                    {isCurrentPageSolved ? (
-                      <>
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>Checkpoint Solved</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>Open Checkpoint</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                  />
 
-                {/* CINEMA SUBTITLE STAGE */}
-                <div className="absolute inset-x-4 bottom-3 z-10 flex items-end justify-between gap-4 sm:inset-x-7 sm:bottom-5">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {/* In Read-Along mode, Mic is the primary button; Play is locked until they read the page! */}
-                    {readingMode === "read" && (
-                      <button
-                        type="button"
-                        onClick={handleReadPageAloud}
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
-                          recordingTarget === "page" &&
-                          pronStatus === "listening"
-                            ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
-                            : recordingTarget === "page" &&
-                                pronStatus === "analyzing"
-                              ? "border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
-                              : "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
-                        }`}
-                        title="Tap and read this page out loud"
-                      >
-                        {recordingTarget === "page" &&
-                        pronStatus === "analyzing" ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Mic className="h-5 w-5" />
-                        )}
-                      </button>
-                    )}
+                  {/* Top Badges inside Illustration */}
+                  <div className="absolute inset-x-3 top-3 sm:inset-x-4 sm:top-4 z-10 flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span className="rounded-xl border border-white/15 bg-slate-950/75 px-2.5 py-1 sm:px-3.5 text-[11px] sm:text-xs font-black text-white shadow-sm backdrop-blur-md">
+                        Page {currentPage} of {totalPages}
+                      </span>
 
-                    {/* Play Narration Button (Disabled in Read-Along mode until user has read the page!) */}
+                      {currentPagePron && (
+                        <span className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-950/80 px-3 py-1 text-xs font-black text-emerald-300 shadow-sm backdrop-blur-md">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>
+                            Read Aloud ({currentPagePron.overallScore}%) • Tap
+                            any word to hear
+                          </span>
+                        </span>
+                      )}
+                    </div>
+
                     <button
                       type="button"
-                      onClick={handlePlayAllSentences}
-                      disabled={isPlayDisabled}
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all ${
-                        isPlayDisabled
-                          ? "cursor-not-allowed border-slate-700 bg-slate-800/80 text-slate-500"
-                          : isPlayingPage
-                            ? "border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
-                            : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
+                      onClick={() => {
+                        playSfx("tap");
+                        setIsCheckpointDrawerOpen(true);
+                      }}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border-b-[3px] px-3 py-1.5 sm:px-4 text-[11px] sm:text-xs font-black shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                        isCurrentPageSolved
+                          ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                          : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
                       }`}
-                      title={
-                        isPlayDisabled
-                          ? "Read this page out loud first to unlock narrator audio"
-                          : isPlayingPage
-                            ? "Stop narrator"
-                            : "Listen to narrator"
-                      }
                     >
-                      {isPlayingPage ? (
-                        <Square className="h-4 w-4 fill-current" />
+                      {isCurrentPageSolved ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Solved</span>
+                        </>
                       ) : (
-                        <Play className="ml-0.5 h-5 w-5 fill-current" />
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Checkpoint</span>
+                        </>
                       )}
                     </button>
+                  </div>
+                </div>
 
-                    <div className="min-w-0 flex-1 space-y-1">
+                {/* CINEMA SUBTITLE STAGE: Cleanly stacked below art on mobile, overlaid on sm+ */}
+                <div className="relative z-10 flex flex-col gap-3 bg-slate-950 px-4 pt-2 pb-4 sm:absolute sm:inset-x-7 sm:bottom-5 sm:flex-row sm:items-end sm:justify-between sm:gap-4 sm:bg-transparent sm:p-0">
+                  <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center gap-3">
+                    {/* Controls Row on mobile (stays side-by-side with text on sm+) */}
+                    <div className="flex items-center justify-between sm:justify-start gap-2.5 shrink-0">
+                      <div className="flex items-center gap-2">
+                        {readingMode === "read" && (
+                          <button
+                            type="button"
+                            onClick={handleReadPageAloud}
+                            className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                              recordingTarget === "page" &&
+                              pronStatus === "listening"
+                                ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
+                                : recordingTarget === "page" &&
+                                    pronStatus === "analyzing"
+                                  ? "border-amber-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950"
+                                  : "border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white"
+                            }`}
+                            title="Tap and read this page out loud"
+                          >
+                            {recordingTarget === "page" &&
+                            pronStatus === "analyzing" ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Mic className="h-5 w-5" />
+                            )}
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handlePlayAllSentences}
+                          disabled={isPlayDisabled}
+                          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl border-b-4 shadow-xl transition-all ${
+                            isPlayDisabled
+                              ? "cursor-not-allowed border-slate-700 bg-slate-800/80 text-slate-500"
+                              : isPlayingPage
+                                ? "border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
+                                : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0"
+                          }`}
+                          title={
+                            isPlayDisabled
+                              ? "Read this page out loud first to unlock narrator audio"
+                              : isPlayingPage
+                                ? "Stop narrator"
+                                : "Listen to narrator"
+                          }
+                        >
+                          {isPlayingPage ? (
+                            <Square className="h-4 w-4 fill-current" />
+                          ) : (
+                            <Play className="ml-0.5 h-5 w-5 fill-current" />
+                          )}
+                        </button>
+
+                        {currentPagePron && (
+                          <span className="inline-flex sm:hidden items-center gap-1 rounded-xl border border-emerald-400/40 bg-emerald-950/80 px-2.5 py-1 text-[11px] font-black text-emerald-300">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {currentPagePron.overallScore}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Hide EN button moves into controls row on mobile */}
+                      <button
+                        type="button"
+                        onClick={() => setShowTranslations((prev) => !prev)}
+                        className="sm:hidden shrink-0 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/90"
+                      >
+                        {showTranslations ? "Hide EN" : "Show EN"}
+                      </button>
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-1.5">
                       {readingMode === "read" &&
                         !hasReadCurrentPageAloud &&
                         pronStatus === "idle" && (
-                          <p className="text-xs font-black tracking-wide text-emerald-300 uppercase">
-                            🎙️ Your turn: Tap the Mic and read this page out loud
-                            to continue
+                          <p className="text-[11px] sm:text-xs font-black tracking-wide text-emerald-300 uppercase">
+                            🎙️ Tap the Mic &amp; read out loud to continue
                           </p>
                         )}
 
                       {recordingTarget === "page" && pronStatus !== "idle" && (
-                        <p className="text-xs font-black tracking-wide text-amber-300 uppercase">
+                        <p className="text-[11px] sm:text-xs font-black tracking-wide text-amber-300 uppercase">
                           {pronStatus === "listening"
-                            ? "🎙️ Listening... Read the page out loud (tap mic when finished)"
+                            ? "🎙️ Listening... Tap mic when finished"
                             : "✨ Highlighting your pronunciation..."}
                         </p>
                       )}
 
-                      <div className="text-lg leading-snug font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-xl md:text-2xl">
+                      <div className="text-base leading-relaxed font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-xl sm:leading-snug md:text-2xl">
                         {activePageContent?.sentences.map((sent, sIdx) => {
                           const isSentenceActive = activeSentenceIdx === sIdx;
                           const words = sent.textTarget.trim().split(/\s+/);
@@ -1205,7 +1246,7 @@ export function BookWrapper({
                             <span
                               key={sent.sentenceIndex ?? sIdx}
                               onClick={() => handleTapSentence(sIdx, sent)}
-                              className={`mr-2.5 inline rounded-lg px-1 py-0.5 transition-opacity ${
+                              className={`mr-2 inline rounded-lg px-0.5 py-0.5 transition-opacity sm:mr-2.5 sm:px-1 ${
                                 isPlayDisabled
                                   ? "cursor-default"
                                   : "cursor-pointer"
@@ -1238,7 +1279,7 @@ export function BookWrapper({
                                         handleTapVocab(matchedDefn);
                                       }
                                     }}
-                                    className={`mr-1 inline-block rounded-lg px-1.5 py-0.5 transition-all duration-150 ${
+                                    className={`mr-1 inline-block rounded-lg px-1 py-0.5 transition-all duration-150 sm:px-1.5 ${
                                       isWordHighlighted
                                         ? "-translate-y-0.5 scale-105 bg-amber-300 text-slate-950 shadow-[0_0_20px_rgba(252,211,77,0.65)]"
                                         : pronClass
@@ -1258,7 +1299,7 @@ export function BookWrapper({
                       </div>
 
                       {showTranslations && (
-                        <p className="text-xs font-semibold text-slate-300/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] sm:text-sm">
+                        <p className="text-xs font-semibold leading-relaxed text-slate-300/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] sm:text-sm">
                           {activePageContent?.sentences
                             .map((s) => s.textNative)
                             .join(" ")}
@@ -1267,10 +1308,11 @@ export function BookWrapper({
                     </div>
                   </div>
 
+                  {/* Desktop Hide EN button */}
                   <button
                     type="button"
                     onClick={() => setShowTranslations((prev) => !prev)}
-                    className="shrink-0 rounded-xl border border-white/20 bg-black/50 px-3 py-1.5 text-[10px] font-black text-white/90 backdrop-blur-md transition hover:bg-black/75"
+                    className="hidden sm:inline-flex shrink-0 rounded-xl border border-white/20 bg-black/50 px-3 py-1.5 text-[10px] font-black text-white/90 backdrop-blur-md transition hover:bg-black/75"
                   >
                     {showTranslations ? "Hide EN" : "Show EN"}
                   </button>
@@ -1278,9 +1320,9 @@ export function BookWrapper({
               </div>
 
               {/* BOTTOM BAR: WORD SPOTLIGHT + PAGE NAVIGATION */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-b-[5px] border-slate-200/90 border-b-slate-300 bg-white/95 px-4 py-3 shadow-md backdrop-blur-md">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-1.5 text-[11px] font-black tracking-wide text-emerald-800 uppercase">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 rounded-2xl sm:rounded-3xl border-2 border-b-[5px] border-slate-200/90 border-b-slate-300 bg-white/95 px-3.5 py-3 sm:px-4 shadow-md backdrop-blur-md">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-black tracking-wide text-emerald-800 uppercase">
                     <BookOpenCheck className="h-3.5 w-3.5" />
                     Word Spotlight
                   </span>
@@ -1292,21 +1334,21 @@ export function BookWrapper({
                         key={idx}
                         type="button"
                         onClick={() => handleTapVocab(defn)}
-                        className={`inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 px-3.5 py-1.5 text-xs transition-all active:translate-y-0.5 active:border-b-2 sm:text-sm ${
+                        className={`inline-flex max-w-full flex-wrap items-center gap-1.5 sm:gap-2 rounded-2xl border-2 border-b-4 px-3 py-1.5 sm:px-3.5 text-xs transition-all active:translate-y-0.5 active:border-b-2 sm:text-sm ${
                           isSelected
                             ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
                             : "border-slate-200 border-b-slate-300 bg-slate-50/90 text-slate-900 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white"
                         }`}
                       >
                         <Volume2
-                          className={`h-4 w-4 ${
+                          className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${
                             isSelected ? "text-white" : "text-blue-600"
                           }`}
                         />
                         <span className="font-black">{defn.word}</span>
                         {defn.phonetic && (
                           <span
-                            className={`text-xs font-semibold ${
+                            className={`text-[11px] sm:text-xs font-semibold ${
                               isSelected ? "text-sky-100" : "text-slate-400"
                             }`}
                           >
@@ -1314,7 +1356,7 @@ export function BookWrapper({
                           </span>
                         )}
                         <span
-                          className={`rounded-lg px-2 py-0.5 text-xs font-black ${
+                          className={`rounded-lg px-2 py-0.5 text-[11px] sm:text-xs font-black ${
                             isSelected
                               ? "bg-white/20 text-white"
                               : "bg-emerald-100 text-emerald-800"
@@ -1327,11 +1369,11 @@ export function BookWrapper({
                   })}
                 </div>
 
-                <div className="ml-auto flex items-center gap-2.5">
+                <div className="flex w-full sm:w-auto sm:ml-auto items-center gap-2">
                   <button
                     type="button"
                     onClick={handlePrevPage}
-                    className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
+                    className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-0.5 active:border-b-2"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     <span>Previous</span>
@@ -1342,19 +1384,19 @@ export function BookWrapper({
                       <button
                         type="button"
                         onClick={handleReadPageAloud}
-                        className={`inline-flex items-center gap-2 rounded-2xl border-b-4 px-5 py-2.5 text-xs font-black shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                        className={`inline-flex flex-[1.5] sm:flex-initial items-center justify-center gap-2 rounded-2xl border-b-4 px-4 sm:px-5 py-2.5 text-xs font-black shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
                           recordingTarget === "page" &&
                           pronStatus === "listening"
                             ? "animate-pulse border-rose-800 bg-gradient-to-b from-rose-400 to-rose-600 text-white"
                             : "border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-amber-500/20"
                         }`}
                       >
-                        <Mic className="h-4 w-4" />
-                        <span>
+                        <Mic className="h-4 w-4 shrink-0" />
+                        <span className="truncate">
                           {recordingTarget === "page" &&
                           pronStatus === "listening"
-                            ? "Tap When Done Reading"
-                            : "Read Page Out Loud to Continue"}
+                            ? "Tap When Done"
+                            : "Read Aloud to Continue"}
                         </span>
                       </button>
                     ) : (
@@ -1364,9 +1406,9 @@ export function BookWrapper({
                           playSfx("tap");
                           setIsCheckpointDrawerOpen(true);
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                        className="inline-flex flex-[1.5] sm:flex-initial items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 px-4 sm:px-5 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/20 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                       >
-                        <HelpCircle className="h-4 w-4" />
+                        <HelpCircle className="h-4 w-4 shrink-0" />
                         <span>Answer Checkpoint</span>
                       </button>
                     )
@@ -1374,7 +1416,7 @@ export function BookWrapper({
                     <button
                       type="button"
                       onClick={handleNextPage}
-                      className="inline-flex items-center gap-1.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+                      className="inline-flex flex-[1.5] sm:flex-initial items-center justify-center gap-1.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-5 sm:px-6 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                     >
                       <span>
                         {currentPage === totalPages
@@ -1463,7 +1505,7 @@ export function BookWrapper({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.98 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="fixed inset-x-3 bottom-3 z-50 mx-auto w-auto max-w-xl overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-slate-200 bg-white p-6 shadow-2xl sm:inset-x-0 sm:bottom-5 sm:w-full sm:p-7"
+              className="fixed inset-x-3 bottom-3 z-50 mx-auto max-h-[85dvh] w-auto max-w-xl overflow-y-auto rounded-[2rem] border-2 border-b-[6px] border-slate-200 bg-white p-5 shadow-2xl sm:inset-x-0 sm:bottom-5 sm:w-full sm:p-7"
             >
               <AnimatePresence>
                 {emojiBurstKey > 0 && (
