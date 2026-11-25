@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export async function getBossData(bossId: string, userId: string) {
-  return prisma.foundationBossStage.findFirst({
+  const boss = await prisma.foundationBossStage.findFirst({
     where: {
       id: bossId,
       userId,
@@ -16,6 +16,23 @@ export async function getBossData(bossId: string, userId: string) {
       },
     },
   });
+
+  if (!boss) return null;
+
+  const graduation = await prisma.milestoneGraduation.findUnique({
+    where: {
+      foundationCourseId_milestoneIndex: {
+        foundationCourseId: boss.foundationCourseId,
+        milestoneIndex: boss.milestoneIndex,
+      },
+    },
+    select: { id: true, status: true },
+  });
+
+  return {
+    ...boss,
+    graduationId: graduation?.id ?? null,
+  };
 }
 
 export type BossData = Awaited<ReturnType<typeof getBossData>>;

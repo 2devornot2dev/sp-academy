@@ -56,6 +56,14 @@ export default function BossFoundationClient({
   const [hasStarted, setHasStarted] = useState(false);
 
   const handleEnd = () => router.push("/learning-hub");
+
+  const handleVictory = () => {
+    if (session.graduationId) {
+      router.push(`/foundation/graduation/${session.graduationId}`);
+    } else {
+      router.push("/learning-hub");
+    }
+  };
   const handleRetry = () => setHasStarted(false);
 
   const scenarioData =
@@ -114,8 +122,7 @@ export default function BossFoundationClient({
   const resolvedCoverUrl = urls[1];
   const bossAvatar = resolvedDefaultAvatarUrl || FALLBACK_AVATAR;
   const resolvedIntroVideoUrl =
-    urls[5] ||
-    (introVideoKey?.startsWith("http") ? introVideoKey : undefined);
+    urls[5] || (introVideoKey?.startsWith("http") ? introVideoKey : undefined);
 
   const handleStartEncounter = () => {
     setHasStarted(true);
@@ -225,7 +232,9 @@ export default function BossFoundationClient({
                   <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-rose-600 uppercase">
                     Lives
                   </span>
-                  <span className="text-xl sm:text-2xl font-black text-slate-900">3</span>
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">
+                    3
+                  </span>
                 </div>
               </div>
 
@@ -247,7 +256,9 @@ export default function BossFoundationClient({
                     size={20}
                   />
                 )}
-                <span>{isLoading ? "Loading Media..." : "Start Encounter"}</span>
+                <span>
+                  {isLoading ? "Loading Media..." : "Start Encounter"}
+                </span>
               </button>
             </div>
           </div>
@@ -263,6 +274,7 @@ export default function BossFoundationClient({
             <WordAudioProvider targetLang={rawLang}>
               <BossFoundationFreestyle
                 onEnd={handleEnd}
+                onVictory={handleVictory}
                 onRetry={handleRetry}
                 introVideoUrl={resolvedIntroVideoUrl}
                 coverImageUrl={resolvedCoverUrl}

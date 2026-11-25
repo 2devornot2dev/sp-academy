@@ -85,6 +85,7 @@ export async function generateMilestoneGraduation({
       lessonHandoff: true,
       grammarContent: true,
       pronunciationData: true,
+      visualContent: true,
     },
   });
 
@@ -106,6 +107,30 @@ export async function generateMilestoneGraduation({
     spriteProfile?.nativeVoiceId || `${nativeLanguage}-${defaultSuffix}`;
   const targetVoiceId =
     spriteProfile?.targetVoiceId || `${targetLanguage}-${defaultSuffix}`;
+
+  const mappedLessons = lessons.map((l) => {
+    const lh = (l.lessonHandoff as Record<string, any>) || {};
+    const gc = (l.grammarContent as Record<string, any>) || {};
+    const pd = (l.pronunciationData as Record<string, any>) || {};
+    const vc = (l.visualContent as Record<string, any>) || {};
+    return {
+      id: l.id,
+      orderIndex: l.orderIndex,
+      title: l.title || lh.theme || `Spoon ${l.orderIndex}`,
+      theme: lh.theme || l.title || "",
+      taughtChunks: lh.taughtChunks || [],
+      targetSentence: gc.targetSentence || lh.targetSentence || "",
+      nativeSentence: gc.nativeSentence || "",
+      audioS3Key: pd.audioS3Key || null,
+      visualImageS3Key: vc.imageS3Key || null,
+      sceneDescription: vc.sceneDescription || "",
+    };
+  });
+
+  // Full-circle callback: prefer Spoon 1's location image, falling back to Spoon 2 or 3
+  const anchorSceneImageS3Key =
+    mappedLessons.find((l) => Boolean(l.visualImageS3Key))?.visualImageS3Key ||
+    null;
 
   const graduation = await prisma.milestoneGraduation.upsert({
     where: {
@@ -153,21 +178,8 @@ export async function generateMilestoneGraduation({
     persona: spriteProfile?.sprite.persona || "",
     nativeVoiceId,
     targetVoiceId,
-    lessons: lessons.map((l) => {
-      const lh = (l.lessonHandoff as Record<string, any>) || {};
-      const gc = (l.grammarContent as Record<string, any>) || {};
-      const pd = (l.pronunciationData as Record<string, any>) || {};
-      return {
-        id: l.id,
-        orderIndex: l.orderIndex,
-        title: l.title || lh.theme || `Spoon ${l.orderIndex}`,
-        theme: lh.theme || l.title || "",
-        taughtChunks: lh.taughtChunks || [],
-        targetSentence: gc.targetSentence || lh.targetSentence || "",
-        nativeSentence: gc.nativeSentence || "",
-        audioS3Key: pd.audioS3Key || null,
-      };
-    }),
+    anchorSceneImageS3Key,
+    lessons: mappedLessons,
   };
 
   const systemTask = await prisma.systemTask.create({

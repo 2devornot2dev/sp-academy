@@ -36,6 +36,7 @@ import { playSfx, preloadSfx } from "@/lib/sfx";
 
 interface Props {
   onEnd: () => void;
+  onVictory?: () => void;
   onRetry: () => void;
   introVideoUrl?: string;
   coverImageUrl?: string;
@@ -86,6 +87,7 @@ const BOSS_MOOD_OVERLAY: Record<
 
 export default function BossFoundationFreestyle({
   onEnd,
+  onVictory,
   onRetry,
   introVideoUrl,
   coverImageUrl,
@@ -805,7 +807,7 @@ export default function BossFoundationFreestyle({
             type="button"
             onClick={() => {
               playSfx("tap");
-              onEnd();
+              (onVictory ?? onEnd)();
             }}
             className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 md:w-auto"
           >
