@@ -15,6 +15,7 @@ import {
   Loader2,
   Mic,
   Quote,
+  Sparkles,
   Square,
   Trophy,
   Volume2,
@@ -60,9 +61,151 @@ export function LadderWorksheetArcade({
     } catch {}
   };
 
-  // ================= STAGE 1: CONTRAST PAIRS =================
+  // ================= SHARED MIC / PRONUNCIATION RECORDER =================
+  const [isRecording, setIsRecording] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startMsRef = useRef<number>(0);
+  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cleanupMic = () => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cleanupMic();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const stopActiveMic = () => {
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      playSfx("tap");
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const startSpeechAssessment = async ({
+    transcript,
+    shortErrorMessage,
+    micBlockedMessage,
+    onPass,
+    onRetry,
+  }: {
+    transcript: string;
+    shortErrorMessage: string;
+    micBlockedMessage: string;
+    onPass: (score: number | null) => void;
+    onRetry: (message: string) => void;
+  }) => {
+    if (isRecording || isGrading) return;
+    if (audioRef.current) audioRef.current.pause();
+    playSfx("tap");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      mediaRecorderRef.current = rec;
+      startMsRef.current = Date.now();
+      setIsRecording(true);
+
+      rec.ondataavailable = (e) => {
+        if (e.data?.size > 0) chunksRef.current.push(e.data);
+      };
+
+      rec.onstop = async () => {
+        const elapsed = Date.now() - startMsRef.current;
+        cleanupMic();
+        setIsRecording(false);
+        const blob = new Blob(chunksRef.current, {
+          type: rec.mimeType || "audio/webm",
+        });
+
+        if (elapsed < 500 || blob.size < 900) {
+          playSfx("wrong");
+          onRetry(shortErrorMessage);
+          return;
+        }
+
+        setIsGrading(true);
+        try {
+          const wav = await convertBlobToWav(blob);
+          const fd = new FormData();
+          fd.append("audio", wav, "recording.wav");
+          fd.append("transcript", transcript);
+          fd.append("language", rung.targetLanguage);
+
+          const res = await fetch("/api/pronunciation-assessment", {
+            method: "POST",
+            body: fd,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const score = Math.round(
+              data?.pronunciationScore ??
+                data?.pronScore ??
+                data?.accuracyScore ??
+                85,
+            );
+            if (score >= 55) {
+              playSfx("correct");
+              onPass(score);
+            } else {
+              playSfx("wrong");
+              onRetry(`Scored ${score}% — listen once and give it another try!`);
+            }
+          } else {
+            playSfx("correct");
+            onPass(null);
+          }
+        } catch {
+          playSfx("correct");
+          onPass(null);
+        } finally {
+          setIsGrading(false);
+        }
+      };
+
+      rec.start();
+      autoStopTimerRef.current = setTimeout(() => stopActiveMic(), 5000);
+    } catch {
+      playSfx("wrong");
+      setIsRecording(false);
+      onRetry(micBlockedMessage);
+    }
+  };
+
+  // ================= STAGE 1: CONTRAST PAIRS + SNAP MATCH =================
   const [pairWave, setPairWave] = useState<0 | 1>(0);
+  const [pairPhase, setPairPhase] = useState<"explore" | "match">("explore");
   const [heardIds, setHeardIds] = useState<Set<string>>(new Set());
+  const [matchIdx, setMatchIdx] = useState(0);
+  const [matchDone, setMatchDone] = useState(false);
+  const [matchWrongId, setMatchWrongId] = useState<string | null>(null);
+  const [matchSolvedIds, setMatchSolvedIds] = useState<Set<string>>(new Set());
 
   const waveItems = useMemo(
     () => rung.items.slice(pairWave * 4, pairWave * 4 + 4),
@@ -73,20 +216,83 @@ export function LadderWorksheetArcade({
     return groups.map((g) => waveItems.filter((it) => it.pairGroup === g));
   }, [waveItems, pairWave]);
 
+  // Pick 1 item from each pair in the current wave for a fast 2-question Snap Match
+  const matchTargets = useMemo(() => {
+    const picks: typeof waveItems = [];
+    wavePairs.forEach((pair, pIdx) => {
+      if (pair.length > 0) {
+        picks.push(pair[(pairWave + pIdx) % pair.length]);
+      }
+    });
+    return picks;
+  }, [wavePairs, pairWave]);
+
+  const currentMatchTarget = matchTargets[matchIdx] ?? null;
   const allWaveHeard = waveItems.every((it) => heardIds.has(it.id));
 
-  const handleTapPairCard = (itemId: string, audioUrl?: string | null) => {
-    playSfx("tap");
-    playAudio(audioUrl);
-    setHeardIds((prev) => {
-      if (prev.has(itemId)) return prev;
-      const next = new Set(prev);
-      next.add(itemId);
-      return next;
-    });
+  const handleTapPairCard = (item: (typeof waveItems)[number]) => {
+    if (pairPhase === "explore") {
+      playSfx("tap");
+      playAudio(item.wordAudioUrl);
+      setHeardIds((prev) => {
+        if (prev.has(item.id)) return prev;
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+      return;
+    }
+
+    // Snap Match phase: active recall from English meaning -> target word
+    if (matchDone || !currentMatchTarget) return;
+
+    if (item.id === currentMatchTarget.id) {
+      playSfx("correct");
+      playAudio(item.wordAudioUrl);
+      setMatchWrongId(null);
+      setMatchSolvedIds((prev) => {
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+
+      if (matchIdx + 1 < matchTargets.length) {
+        setMatchIdx((prev) => prev + 1);
+      } else {
+        setMatchDone(true);
+      }
+    } else {
+      playSfx("wrong");
+      setMatchWrongId(item.id);
+    }
   };
 
-  // ================= STAGE 2: 3-RUNG SENTENCE STACK =================
+  const handleAdvanceStage1 = () => {
+    if (pairPhase === "explore") {
+      playSfx("tap");
+      setPairPhase("match");
+      setMatchIdx(0);
+      setMatchDone(false);
+      setMatchWrongId(null);
+      setMatchSolvedIds(new Set());
+      return;
+    }
+
+    if (pairWave === 0) {
+      playSfx("round-clear");
+      setPairWave(1);
+      setPairPhase("explore");
+      setMatchIdx(0);
+      setMatchDone(false);
+      setMatchWrongId(null);
+      setMatchSolvedIds(new Set());
+    } else {
+      playSfx("round-clear");
+      setStageIdx(1);
+    }
+  };
+
+  // ================= STAGE 2: 3-RUNG SENTENCE STACK + SPEAK RUNG 3 =================
   const stackItems = useMemo(() => {
     const picked: typeof rung.items = [];
     for (const g of [1, 2, 3, 4]) {
@@ -98,6 +304,13 @@ export function LadderWorksheetArcade({
 
   const [stackIdx, setStackIdx] = useState(0);
   const [unlockedRungStep, setUnlockedRungStep] = useState<1 | 2 | 3>(1);
+  const [rung3Heard, setRung3Heard] = useState(false);
+  const [stackSpoken, setStackSpoken] = useState(false);
+  const [stackFeedback, setStackFeedback] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+
   const currentStack = stackItems[stackIdx];
 
   const handleClimbStackRung = (stepNum: 1 | 2 | 3) => {
@@ -112,7 +325,31 @@ export function LadderWorksheetArcade({
       if (unlockedRungStep < 3) setUnlockedRungStep(3);
     } else {
       playAudio(currentStack.rung3AudioUrl);
+      setRung3Heard(true);
     }
+  };
+
+  const startStackMic = () => {
+    if (!currentStack || stackSpoken) return;
+    setStackFeedback(null);
+    void startSpeechAssessment({
+      transcript: currentStack.rung3,
+      shortErrorMessage: "Too short — say the full Rung 3 sentence out loud!",
+      micBlockedMessage:
+        "Mic unavailable — tap 'Continue without mic' below to advance.",
+      onPass: (score) => {
+        setStackSpoken(true);
+        setStackFeedback({
+          ok: true,
+          message: score
+            ? `Nailed it! Speech Score ${score}% — "${currentStack.rung3}"`
+            : `Great job saying "${currentStack.rung3}"!`,
+        });
+      },
+      onRetry: (msg) => {
+        setStackFeedback({ ok: false, message: msg });
+      },
+    });
   };
 
   // ================= STAGE 3: THE FLIP CHALLENGE =================
@@ -123,14 +360,6 @@ export function LadderWorksheetArcade({
     ok: boolean;
     message: string;
   } | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isGrading, setIsGrading] = useState(false);
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const startMsRef = useRef<number>(0);
-  const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentFlip = flips[flipIdx];
 
@@ -153,27 +382,6 @@ export function LadderWorksheetArcade({
       return () => clearTimeout(t);
     }
   }, [stageIdx, flipIdx, currentFlip?.promptAudioUrl]);
-
-  const cleanupMic = () => {
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      cleanupMic();
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   const handleFlipTapChoice = (choice: string) => {
     if (!currentFlip || flipSolved) return;
@@ -199,120 +407,27 @@ export function LadderWorksheetArcade({
     }
   };
 
-  const stopFlipMic = () => {
-    if (autoStopTimerRef.current) {
-      clearTimeout(autoStopTimerRef.current);
-      autoStopTimerRef.current = null;
-    }
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      playSfx("tap");
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const startFlipMic = async () => {
-    if (!currentFlip || flipSolved || isRecording || isGrading) return;
-    if (audioRef.current) audioRef.current.pause();
-    playSfx("tap");
+  const startFlipMic = () => {
+    if (!currentFlip || flipSolved) return;
     setFlipFeedback(null);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
-      const rec = new MediaRecorder(stream);
-      mediaRecorderRef.current = rec;
-      startMsRef.current = Date.now();
-      setIsRecording(true);
-
-      rec.ondataavailable = (e) => {
-        if (e.data?.size > 0) chunksRef.current.push(e.data);
-      };
-
-      rec.onstop = async () => {
-        const elapsed = Date.now() - startMsRef.current;
-        cleanupMic();
-        setIsRecording(false);
-        const blob = new Blob(chunksRef.current, {
-          type: rec.mimeType || "audio/webm",
+    void startSpeechAssessment({
+      transcript: currentFlip.targetAnswer,
+      shortErrorMessage:
+        "Too short — tap Speak and say the full flipped sentence!",
+      micBlockedMessage: "Mic blocked — tap the correct choice below instead!",
+      onPass: (score) => {
+        setFlipSolved(true);
+        setFlipFeedback({
+          ok: true,
+          message: score
+            ? `Speech Score ${score}% — "${currentFlip.targetAnswer}"!`
+            : `Nice! "${currentFlip.targetAnswer}"`,
         });
-
-        if (elapsed < 500 || blob.size < 900) {
-          playSfx("wrong");
-          setFlipFeedback({
-            ok: false,
-            message: "Too short — hold Speak and say the full flipped sentence!",
-          });
-          return;
-        }
-
-        setIsGrading(true);
-        try {
-          const wav = await convertBlobToWav(blob);
-          const fd = new FormData();
-          fd.append("audio", wav, "recording.wav");
-          fd.append("transcript", currentFlip.targetAnswer);
-          fd.append("language", rung.targetLanguage);
-
-          const res = await fetch("/api/pronunciation-assessment", {
-            method: "POST",
-            body: fd,
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const score = Math.round(
-              data?.pronunciationScore ??
-                data?.pronScore ??
-                data?.accuracyScore ??
-                85,
-            );
-            if (score >= 55) {
-              playSfx("correct");
-              setFlipSolved(true);
-              setFlipFeedback({
-                ok: true,
-                message: `Speech Score ${score}% — "${currentFlip.targetAnswer}"!`,
-              });
-            } else {
-              playSfx("wrong");
-              setFlipFeedback({
-                ok: false,
-                message: `Scored ${score}%. Listen once or tap the flipped phrase below!`,
-              });
-            }
-          } else {
-            playSfx("correct");
-            setFlipSolved(true);
-            setFlipFeedback({
-              ok: true,
-              message: `Nice! "${currentFlip.targetAnswer}"`,
-            });
-          }
-        } catch {
-          playSfx("correct");
-          setFlipSolved(true);
-          setFlipFeedback({
-            ok: true,
-            message: `Nice! "${currentFlip.targetAnswer}"`,
-          });
-        } finally {
-          setIsGrading(false);
-        }
-      };
-
-      rec.start();
-      autoStopTimerRef.current = setTimeout(() => stopFlipMic(), 5000);
-    } catch {
-      playSfx("wrong");
-      setIsRecording(false);
-      setFlipFeedback({
-        ok: false,
-        message: "Mic blocked — tap the correct choice below instead!",
-      });
-    }
+      },
+      onRetry: (msg) => {
+        setFlipFeedback({ ok: false, message: msg });
+      },
+    });
   };
 
   const handleFinishRung = async () => {
@@ -338,9 +453,17 @@ export function LadderWorksheetArcade({
   const coachMessage = completed
     ? `Rung ${rung.rungOrder} cleared! All 8 expressions are now in your Word Matrix.`
     : stageIdx === 0
-      ? `Tap both sides of each opposite pair to hear how they contrast, then climb to the Sentence Stack.`
+      ? pairPhase === "explore"
+        ? `Tap both sides of each opposite pair to hear how they contrast.`
+        : matchDone
+          ? `Snap Match cleared! Ready for the next set.`
+          : `Quick Recall: tap the word that matches the English cue!`
       : stageIdx === 1
-        ? `Tap Rungs 1 → 2 → 3 from bottom to top to watch the word grow into a real sentence.`
+        ? !rung3Heard
+          ? `Tap Rungs 1 → 2 → 3 from bottom to top to hear the sentence grow.`
+          : stackSpoken
+            ? `Clean delivery! Climb to the next sentence ladder.`
+            : `Now say Rung 3 out loud to lock the full sentence into muscle memory!`
         : `Read the cue, then speak (or tap) the flipped transformation!`;
 
   return (
@@ -401,7 +524,7 @@ export function LadderWorksheetArcade({
           </div>
         </div>
 
-        {/* 2. EXERCISE CARD (scrolls cleanly on short phones, zero-scroll on desktop) */}
+        {/* 2. EXERCISE CARD */}
         <section className="flex min-h-0 flex-1 flex-col overflow-y-auto md:overflow-hidden rounded-2xl sm:rounded-[2rem] bg-white p-3.5 shadow-sm ring-1 ring-slate-200/70 sm:p-6">
           {completed ? (
             <motion.div
@@ -440,17 +563,64 @@ export function LadderWorksheetArcade({
               </div>
             </motion.div>
           ) : stageIdx === 0 ? (
-            /* ================= STAGE 1: CONTRAST PAIRS ================= */
+            /* ================= STAGE 1: CONTRAST PAIRS + SNAP MATCH ================= */
             <div className="flex flex-1 flex-col justify-between gap-2.5 sm:gap-3 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between gap-2">
-                <span className="text-[11px] sm:text-xs font-black tracking-wider text-blue-600 uppercase">
-                  Stage 1 • Contrast Pairs (Set {pairWave + 1}/2)
+                <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-blue-600 uppercase">
+                  {pairPhase === "match" && (
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                  Stage 1 •{" "}
+                  {pairPhase === "explore"
+                    ? `Contrast Pairs (Set ${pairWave + 1}/2)`
+                    : `Snap Match (Set ${pairWave + 1}/2)`}
                 </span>
-                <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-black text-blue-700">
-                  {waveItems.filter((i) => heardIds.has(i.id)).length}/
-                  {waveItems.length} Heard
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-black ${
+                    pairPhase === "match"
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-sky-100 text-blue-700"
+                  }`}
+                >
+                  {pairPhase === "explore"
+                    ? `${waveItems.filter((i) => heardIds.has(i.id)).length}/${waveItems.length} Heard`
+                    : `${matchSolvedIds.size}/${matchTargets.length} Matched`}
                 </span>
               </div>
+
+              {/* Snap Match Prompt Banner */}
+              {pairPhase === "match" && (
+                <div
+                  className={`flex shrink-0 items-center justify-between gap-3 rounded-2xl border-2 px-3.5 py-2.5 sm:px-4 ${
+                    matchDone
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                      : "border-indigo-200 bg-indigo-50/80 text-indigo-950"
+                  }`}
+                >
+                  {matchDone ? (
+                    <div className="flex items-center gap-2 text-xs sm:text-sm font-black">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                      <span>
+                        Spot on! You nailed all {matchTargets.length} opposite
+                        matches.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-2 text-xs sm:text-sm font-black">
+                      <span className="shrink-0 rounded-lg bg-indigo-600 px-2 py-0.5 text-[10px] text-white uppercase">
+                        Tap Match
+                      </span>
+                      <span className="truncate">
+                        Which word means:{" "}
+                        <span className="text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-2">
+                          &ldquo;{currentMatchTarget?.gloss}&rdquo;
+                        </span>
+                        ?
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid flex-1 grid-cols-1 gap-2.5 sm:grid-rows-2 sm:gap-3 md:min-h-0">
                 {wavePairs.map((pair, pIdx) => {
@@ -462,7 +632,7 @@ export function LadderWorksheetArcade({
                     <div
                       key={pIdx}
                       className={`relative flex min-h-0 flex-col justify-center gap-1.5 rounded-2xl sm:rounded-3xl p-2 sm:p-3 ring-1 transition-colors ${
-                        pairBothHeard
+                        pairPhase === "explore" && pairBothHeard
                           ? "bg-emerald-50/60 ring-emerald-300"
                           : "bg-slate-50/95 ring-slate-200/90"
                       }`}
@@ -480,13 +650,12 @@ export function LadderWorksheetArcade({
                         )}
                       </div>
 
-                      {/* 2-Card Contrast Grid with central VS/Flip badge */}
+                      {/* 2-Card Contrast Grid with central Flip badge */}
                       <div className="relative grid min-h-0 flex-1 grid-cols-2 gap-2.5 sm:gap-4">
-                        {/* Center VS / Opposite Pill */}
                         <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
                           <div
                             className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 border-b-[3px] text-[10px] font-black shadow-md transition-colors ${
-                              pairBothHeard
+                              pairPhase === "explore" && pairBothHeard
                                 ? "border-emerald-600 bg-emerald-500 text-white"
                                 : "border-indigo-700 bg-gradient-to-b from-indigo-500 to-purple-600 text-white"
                             }`}
@@ -498,27 +667,34 @@ export function LadderWorksheetArcade({
                         {pair.map((item, sideIdx) => {
                           const heard = heardIds.has(item.id);
                           const isLeft = sideIdx === 0;
+                          const isSolvedInMatch = matchSolvedIds.has(item.id);
+                          const isWrongInMatch =
+                            pairPhase === "match" && matchWrongId === item.id;
 
                           return (
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() =>
-                                handleTapPairCard(item.id, item.wordAudioUrl)
-                              }
+                              onClick={() => handleTapPairCard(item)}
                               className={`group relative flex min-h-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3.5 rounded-xl sm:rounded-2xl border-2 border-b-[4px] p-2.5 sm:p-3 text-left transition-all ${
-                                heard
-                                  ? "border-emerald-400 border-b-emerald-600 bg-white shadow-sm"
-                                  : isLeft
-                                    ? "border-amber-200/90 border-b-amber-400 bg-white hover:-translate-y-0.5 hover:border-amber-400"
-                                    : "border-sky-200/90 border-b-sky-400 bg-white hover:-translate-y-0.5 hover:border-sky-400"
+                                isWrongInMatch
+                                  ? "border-rose-400 border-b-rose-600 bg-rose-50"
+                                  : pairPhase === "match"
+                                    ? isSolvedInMatch
+                                      ? "border-emerald-500 border-b-emerald-700 bg-emerald-50/70 shadow-sm"
+                                      : "border-indigo-200 border-b-indigo-300 bg-white hover:-translate-y-0.5 hover:border-indigo-400"
+                                    : heard
+                                      ? "border-emerald-400 border-b-emerald-600 bg-white shadow-sm"
+                                      : isLeft
+                                        ? "border-amber-200/90 border-b-amber-400 bg-white hover:-translate-y-0.5 hover:border-amber-400"
+                                        : "border-sky-200/90 border-b-sky-400 bg-white hover:-translate-y-0.5 hover:border-sky-400"
                               }`}
                             >
                               {item.imageUrl && (
-                                <div className="h-24 w-full sm:h-full sm:max-h-28 sm:w-32 shrink-0 overflow-hidden rounded-lg sm:rounded-xl bg-slate-100">
+                                <div className="h-20 w-full sm:h-full sm:max-h-24 sm:w-28 shrink-0 overflow-hidden rounded-lg sm:rounded-xl bg-slate-100">
                                   <img
                                     src={item.imageUrl}
-                                    alt={item.gloss}
+                                    alt={item.word}
                                     className="h-full w-full object-cover"
                                   />
                                 </div>
@@ -539,21 +715,26 @@ export function LadderWorksheetArcade({
                                   <span className="truncate text-sm sm:text-xl font-black text-slate-900">
                                     {item.word}
                                   </span>
-                                  <Volume2
-                                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${
-                                      isLeft
-                                        ? "text-amber-600"
-                                        : "text-blue-600"
-                                    }`}
-                                  />
+                                  {pairPhase === "explore" && (
+                                    <Volume2
+                                      className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${
+                                        isLeft
+                                          ? "text-amber-600"
+                                          : "text-blue-600"
+                                      }`}
+                                    />
+                                  )}
                                 </div>
 
                                 <p className="line-clamp-2 text-[11px] sm:text-xs font-bold leading-snug text-slate-500">
-                                  &ldquo;{item.gloss}&rdquo;
+                                  {pairPhase === "explore" || isSolvedInMatch
+                                    ? `"${item.gloss}"`
+                                    : "Tap to match"}
                                 </p>
                               </div>
 
-                              {heard && (
+                              {((pairPhase === "explore" && heard) ||
+                                (pairPhase === "match" && isSolvedInMatch)) && (
                                 <span className="absolute top-2 right-2 sm:static flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
                                   <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3.5]" />
                                 </span>
@@ -569,113 +750,197 @@ export function LadderWorksheetArcade({
 
               <button
                 type="button"
-                disabled={!allWaveHeard}
-                onClick={() => {
-                  if (pairWave === 0) {
-                    playSfx("tap");
-                    setPairWave(1);
-                  } else {
-                    playSfx("round-clear");
-                    setStageIdx(1);
-                  }
-                }}
+                disabled={pairPhase === "explore" ? !allWaveHeard : !matchDone}
+                onClick={handleAdvanceStage1}
                 className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-xs sm:text-sm font-black transition ${
-                  allWaveHeard
-                    ? "border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md hover:brightness-105"
+                  (pairPhase === "explore" ? allWaveHeard : matchDone)
+                    ? pairPhase === "match"
+                      ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md hover:brightness-105"
+                      : "border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md hover:brightness-105"
                     : "cursor-not-allowed bg-slate-200 text-slate-400"
                 }`}
               >
                 <span>
-                  {pairWave === 0
-                    ? "Next 2 Contrast Pairs"
-                    : "Next: 3-Rung Sentence Stack"}
+                  {pairPhase === "explore"
+                    ? "Quick Snap Match (2)"
+                    : pairWave === 0
+                      ? "Next 2 Contrast Pairs"
+                      : "Next: 3-Rung Sentence Stack"}
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           ) : stageIdx === 1 ? (
-            /* ================= STAGE 2: 3-RUNG SENTENCE STACK ================= */
+            /* ================= STAGE 2: 3-RUNG SENTENCE STACK + SPEAK RUNG 3 ================= */
             <div className="flex flex-1 flex-col justify-between gap-3 sm:gap-4 md:min-h-0">
               <div className="flex shrink-0 items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-wider text-amber-700 uppercase">
                   <Layers className="h-4 w-4 shrink-0" />
                   Stage 2 • 3-Rung Stack ({stackIdx + 1}/{stackItems.length})
                 </span>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                    stackSpoken
+                      ? "bg-emerald-100 text-emerald-700"
+                      : rung3Heard
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {stackSpoken
+                    ? "Spoken ✓"
+                    : rung3Heard
+                      ? "Speak Rung 3"
+                      : `Step ${unlockedRungStep}/3`}
+                </span>
               </div>
 
               {currentStack && (
-                <div className="my-auto flex flex-col-reverse gap-2.5 sm:gap-3">
-                  {[
-                    {
-                      num: 1 as const,
-                      label: "Rung 1 • Core Word",
-                      text: currentStack.rung1,
-                      gloss: currentStack.gloss,
-                    },
-                    {
-                      num: 2 as const,
-                      label: "Rung 2 • Short Clause",
-                      text: currentStack.rung2,
-                      gloss: currentStack.rung2Gloss,
-                    },
-                    {
-                      num: 3 as const,
-                      label: "Rung 3 • Full Sentence",
-                      text: currentStack.rung3,
-                      gloss: currentStack.rung3Gloss,
-                    },
-                  ].map((stepObj) => {
-                    const isAvailable = unlockedRungStep >= stepObj.num;
-                    return (
-                      <button
-                        key={stepObj.num}
-                        type="button"
-                        disabled={!isAvailable}
-                        onClick={() => handleClimbStackRung(stepObj.num)}
-                        className={`flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border-2 border-b-[4px] p-3 sm:p-4 text-left transition-all ${
-                          isAvailable
-                            ? stepObj.num === 3
-                              ? "border-emerald-500 border-b-emerald-700 bg-emerald-50/70 hover:-translate-y-0.5"
-                              : "border-sky-300 border-b-blue-500 bg-sky-50/50 hover:-translate-y-0.5"
-                            : "cursor-not-allowed border-slate-200 bg-slate-50 opacity-45"
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
-                            {stepObj.label}
-                          </span>
-                          <p className="mt-0.5 text-sm sm:text-xl font-black text-slate-900">
-                            {stepObj.text}
-                          </p>
-                          <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
-                            &ldquo;{stepObj.gloss}&rdquo;
-                          </p>
-                        </div>
+                <div className="my-auto flex flex-col gap-3">
+                  <div className="flex flex-col-reverse gap-2 sm:gap-2.5">
+                    {[
+                      {
+                        num: 1 as const,
+                        label: "Rung 1 • Core Word",
+                        text: currentStack.rung1,
+                        gloss: currentStack.gloss,
+                      },
+                      {
+                        num: 2 as const,
+                        label: "Rung 2 • Short Clause",
+                        text: currentStack.rung2,
+                        gloss: currentStack.rung2Gloss,
+                      },
+                      {
+                        num: 3 as const,
+                        label: "Rung 3 • Full Sentence",
+                        text: currentStack.rung3,
+                        gloss: currentStack.rung3Gloss,
+                      },
+                    ].map((stepObj) => {
+                      const isAvailable = unlockedRungStep >= stepObj.num;
+                      return (
+                        <button
+                          key={stepObj.num}
+                          type="button"
+                          disabled={!isAvailable}
+                          onClick={() => handleClimbStackRung(stepObj.num)}
+                          className={`flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border-2 border-b-[4px] p-2.5 sm:p-3.5 text-left transition-all ${
+                            isAvailable
+                              ? stepObj.num === 3
+                                ? "border-emerald-500 border-b-emerald-700 bg-emerald-50/70 hover:-translate-y-0.5"
+                                : "border-sky-300 border-b-blue-500 bg-sky-50/50 hover:-translate-y-0.5"
+                              : "cursor-not-allowed border-slate-200 bg-slate-50 opacity-45"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
+                              {stepObj.label}
+                            </span>
+                            <p className="mt-0.5 text-sm sm:text-lg font-black text-slate-900">
+                              {stepObj.text}
+                            </p>
+                            <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
+                              &ldquo;{stepObj.gloss}&rdquo;
+                            </p>
+                          </div>
 
-                        <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white">
-                          <Volume2 className="h-4 w-4" />
-                        </div>
-                      </button>
-                    );
-                  })}
+                          <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white">
+                            <Volume2 className="h-4 w-4" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Speak Rung 3 Out Loud Box (Unlocks after tapping Rung 3) */}
+                  {rung3Heard && (
+                    <div className="space-y-2 rounded-2xl border-2 border-sky-200 bg-sky-50/60 p-3 text-center">
+                      {isRecording ? (
+                        <button
+                          type="button"
+                          onClick={stopActiveMic}
+                          className="flex w-full animate-pulse items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 py-2.5 text-xs sm:text-sm font-black text-slate-950"
+                        >
+                          <Square className="h-4 w-4 fill-current" />
+                          <span>Listening... Tap Done</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={stackSpoken || isGrading}
+                          onClick={startStackMic}
+                          className={`flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 py-2.5 text-xs sm:text-sm font-black text-white shadow-sm transition ${
+                            stackSpoken
+                              ? "border-emerald-700 bg-emerald-500"
+                              : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:brightness-105 disabled:opacity-50"
+                          }`}
+                        >
+                          {isGrading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : stackSpoken ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Mic className="h-4 w-4" />
+                          )}
+                          <span>
+                            {isGrading
+                              ? "Checking Pronunciation..."
+                              : stackSpoken
+                                ? "Rung 3 Spoken!"
+                                : `Say Rung 3 Out Loud: "${currentStack.rung3}"`}
+                          </span>
+                        </button>
+                      )}
+
+                      {stackFeedback && (
+                        <p
+                          className={`text-[11px] font-bold ${
+                            stackFeedback.ok
+                              ? "text-emerald-700"
+                              : "text-rose-600"
+                          }`}
+                        >
+                          {stackFeedback.message}
+                        </p>
+                      )}
+
+                      {!stackSpoken && !isRecording && !isGrading && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSfx("tap");
+                            setStackSpoken(true);
+                          }}
+                          className="text-[11px] font-bold text-slate-400 underline underline-offset-2 hover:text-slate-600"
+                        >
+                          Can&apos;t speak right now? Continue without mic
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
               <button
                 type="button"
-                disabled={unlockedRungStep < 3}
+                disabled={!stackSpoken}
                 onClick={() => {
+                  stopActiveMic();
                   if (stackIdx + 1 < stackItems.length) {
                     playSfx("tap");
                     setStackIdx(stackIdx + 1);
                     setUnlockedRungStep(1);
+                    setRung3Heard(false);
+                    setStackSpoken(false);
+                    setStackFeedback(null);
                   } else {
                     playSfx("round-clear");
                     setStageIdx(2);
                   }
                 }}
                 className={`flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-xs sm:text-sm font-black transition ${
-                  unlockedRungStep >= 3
+                  stackSpoken
                     ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md hover:brightness-105"
                     : "cursor-not-allowed bg-slate-200 text-slate-400"
                 }`}
@@ -731,7 +996,7 @@ export function LadderWorksheetArcade({
                     {isRecording ? (
                       <button
                         type="button"
-                        onClick={stopFlipMic}
+                        onClick={stopActiveMic}
                         className="flex w-full animate-pulse items-center justify-center gap-2 rounded-2xl border-b-4 border-orange-700 bg-gradient-to-b from-amber-300 to-orange-500 py-2.5 sm:py-3 text-xs sm:text-sm font-black text-slate-950"
                       >
                         <Square className="h-4 w-4 fill-current" />

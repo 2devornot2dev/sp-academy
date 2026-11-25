@@ -27,6 +27,7 @@ export default async function ConversationPage() {
         userId: user.id,
         status: { in: ["REVIEW_PENDING", "REVIEWED"] },
         createdAt: { gte: startOfToday },
+        OR: [{ isFoundation: false }, { isFoundation: null }],
       },
       orderBy: { createdAt: "desc" },
       select: {
@@ -39,6 +40,7 @@ export default async function ConversationPage() {
       where: {
         userId: user.id,
         status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+        OR: [{ isFoundation: false }, { isFoundation: null }],
       },
     }),
   ]);

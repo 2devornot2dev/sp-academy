@@ -7,7 +7,10 @@ import type {
   ReviewApiResponse,
 } from "@/components/freestyle/review/freestyle-review-hub";
 import { extractTrickyWords } from "@/lib/freestyle/grades";
-import { ReviewData, SpriteOutro } from "@/components/freestyle/review/review-types";
+import {
+  ReviewData,
+  SpriteOutro,
+} from "@/components/freestyle/review/review-types";
 
 async function safePresign(key?: string | null): Promise<string | null> {
   if (!key) return null;
@@ -53,6 +56,7 @@ export async function getUserReviews(
     where: {
       userId,
       status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+      OR: [{ isFoundation: false }, { isFoundation: null }],
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -105,7 +109,8 @@ export async function getUserReviews(
       vocabUpgradesCount: upgrades.length,
       isReady,
       tutorExerciseId: ex?.id ?? null,
-      tutorExerciseStatus: (ex?.status as UserReviewListItem["tutorExerciseStatus"]) ?? null,
+      tutorExerciseStatus:
+        (ex?.status as UserReviewListItem["tutorExerciseStatus"]) ?? null,
       hasUserReviewed: Boolean(rev?.hasUserReviewed),
     };
   });
@@ -121,7 +126,11 @@ export async function getConversationReview(
   data: ReviewApiResponse | null;
 }> {
   const session = await prisma.freestyleSession.findFirst({
-    where: { id: sessionId, userId },
+    where: {
+      id: sessionId,
+      userId,
+      OR: [{ isFoundation: false }, { isFoundation: null }],
+    },
     include: { review: true },
   });
 
@@ -170,8 +179,8 @@ export async function getConversationReview(
         .grammarAnalysis as unknown as ReviewData["grammarAnalysis"]) ??
       undefined,
     vocabUpgrades:
-      (session.review.vocabUpgrades as unknown as ReviewData["vocabUpgrades"]) ??
-      undefined,
+      (session.review
+        .vocabUpgrades as unknown as ReviewData["vocabUpgrades"]) ?? undefined,
     spriteOutro,
   };
 
