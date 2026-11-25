@@ -22,7 +22,7 @@ const PLAN_LIMITS: Record<PlanTier, Omit<UserEntitlements, "plan">> = {
     isPaid: false,
     maxTrialSpoons: 3, // Milestone 1 Pass (Spoons 1-3 + Bridges 1-3 + Boss 1)
     monthlySpoonLimit: 3,
-    dailyFreestyleMax: 0, // Flip to 1 if you want Trial users to sample 1 Arena call
+    dailyFreestyleMax: 1, // Flip to 1 if you want Trial users to sample 1 Arena call
     freestyleCooldownSeconds: 300,
     unlimitedSpriteEnergy: false,
     canAccessBooks: false,
