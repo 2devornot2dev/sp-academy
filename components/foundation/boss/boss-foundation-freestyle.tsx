@@ -579,7 +579,7 @@ export default function BossFoundationFreestyle({
                           stiffness: 420,
                           damping: 18,
                         }}
-                        className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-xl border-2 border-white bg-transparent text-sm shadow-lg"
+                        className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center bg-transparent text-sm shadow-lg"
                       >
                         {BOSS_MOOD_OVERLAY[effectiveMood].badge}
                       </motion.div>
