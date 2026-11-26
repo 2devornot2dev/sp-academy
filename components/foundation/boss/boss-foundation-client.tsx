@@ -137,7 +137,9 @@ export default function BossFoundationClient({
   return (
     <div
       className={`relative flex w-full flex-col justify-center overflow-x-hidden animate-bg ${
-        hasStarted ? "h-full min-h-0 p-2 sm:p-5" : "min-h-full p-3 sm:p-6"
+        hasStarted
+          ? "h-[calc(100dvh-3rem)] md:h-dvh p-2 sm:p-5"
+          : "min-h-[calc(100dvh-3rem)] md:min-h-dvh p-3 sm:p-6"
       }`}
     >
       <div className="pointer-events-none absolute inset-0 bg-slate-950/15 backdrop-blur-[1px]" />
