@@ -8,6 +8,8 @@ export {
   SPRITE_VOICES,
   VOICE_ID_MAP,
   resolveFishVoiceId,
+  getLockedSpriteVoices,
+  getVoiceOptionForSprite,
 } from "@/lib/sprites/voices";
 
 export const LANGUAGES = [
@@ -20,7 +22,6 @@ export const LEVELS = [
   { name: "Beginner", description: "I'm just getting started" },
   { name: "Elementary", description: "I know some basics" },
   { name: "Intermediate", description: "I can hold simple conversations" },
-  { name: "Advanced", description: "I want to become highly fluent" },
 ];
 
 export const GOALS = [
@@ -35,36 +36,42 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export { USERNAME_RE } from "@/lib/username-validation";
 
-
-// export type VoiceOption = {
-//   id: string;          // Clean ID: "fr-FR-boy-01"
-//   fishVoiceId: string; // Real Fish Audio reference_id
-//   sprite: SpriteSlug;
-//   label: string;
-//   sampleUrl: string;   // Static preview mp3 in /public/samples/...
-//   sampleText: string;
-// };
-
 export const SPRITES: Array<{
   slug: SpriteSlug;
   name: string;
   avatarUrl: string;
+  vibe: string;
   tagline: string;
 }> = [
   {
     slug: "vox",
     name: "Vox",
     avatarUrl: "/sprite-m.png",
+    vibe: "Playful • Youthful",
     tagline: "High-energy mic master who keeps your pronunciation sharp.",
   },
   {
     slug: "vivi",
     name: "Vivi",
     avatarUrl: "/sprite-f.png",
+    vibe: "Warm • Youthful",
     tagline: "Chill audio-obsessed guide who breaks down tricky phrases.",
   },
+  {
+    slug: "dex",
+    name: "Dex",
+    avatarUrl: "/sprite-dex.png",
+    vibe: "Sharp • Young Adult",
+    tagline: "Clever, calm strategist who gets you sounding smooth and natural.",
+  },
+  {
+    slug: "deva",
+    name: "Deva",
+    avatarUrl: "/sprite-deva.png",
+    vibe: "Bold • Young Adult",
+    tagline: "Confident, playful hype coach who makes speaking feel effortless.",
+  },
 ];
-
 
 export const LANGUAGE_LOCALE_MAP: Record<string, string> = {
   English: "en-US",

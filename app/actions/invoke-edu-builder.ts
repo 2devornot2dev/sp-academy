@@ -7,6 +7,7 @@ import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { JsonValue } from "@prisma/client/runtime/library";
 import { setupFirstLesson } from "@/lib/foundation/setup-first-lesson";
 import { setupNextLesson } from "@/lib/foundation/setup-next-lesson";
+import type { SpriteSlug } from "@/lib/sprites/voices";
 import Stripe from "stripe";
 import {
   Billing,
@@ -37,7 +38,7 @@ export interface InvokeEduBuilderPayload {
   sessionId?: string;
 
   // Sprite fields
-  spriteSlug?: "vox" | "vivi";
+  spriteSlug?: SpriteSlug
   nativeVoiceId?: string;
   targetVoiceId?: string;
 

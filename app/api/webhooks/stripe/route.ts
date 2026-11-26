@@ -1,25 +1,62 @@
+// app/api/webhooks/stripe/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { prisma } from "@/lib/prisma"; // Adjust this import if your prisma client is exported elsewhere
+import { prisma } from "@/lib/prisma";
 import { Billing, BillingInterval, PaymentStatus } from "@prisma/client";
+import { notifyNewSub } from "@/lib/telegram";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 });
 
-/**
- * Maps Stripe Price IDs to your Prisma Billing enum.
- */
-function getBillingPlan(priceId?: string): Billing {
-  switch (priceId) {
-    case process.env.STRIPE_FOUNDER_MONTHLY_PRICE_ID:
-      return Billing.FOUNDER_MONTHLY;
+function getBillingPlan(
+  priceId?: string,
+  metadataPlanId?: string | null,
+  isAnnual = false,
+): Billing {
+  const founderPrices = [
+    process.env.STRIPE_FOUNDER_MONTHLY_PRICE_ID,
+    process.env.STRIPE_FOUNDER_PRICE_ID,
+    process.env.STRIPE_FOUNDER_YEARLY_PRICE_ID,
+  ].filter(Boolean);
 
-    case process.env.STRIPE_PRO_MONTHLY_PRICE_ID:
-      return Billing.PRO_MONTHLY;
+  const unlimitedPrices = [
+    process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+    process.env.STRIPE_UNLIMITED_PRICE_ID,
+    process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID,
+  ].filter(Boolean);
 
+  if (priceId && founderPrices.includes(priceId)) {
+    return isAnnual ? Billing.FOUNDER_ANNUALLY : Billing.FOUNDER_MONTHLY;
+  }
+  if (priceId && unlimitedPrices.includes(priceId)) {
+    return isAnnual ? Billing.PRO_ANNUALLY : Billing.PRO_MONTHLY;
+  }
+
+  // Fallback to checkout metadata ("founder" | "unlimited")
+  const meta = (metadataPlanId || "").toLowerCase();
+  if (meta === "founder") {
+    return isAnnual ? Billing.FOUNDER_ANNUALLY : Billing.FOUNDER_MONTHLY;
+  }
+  if (meta === "unlimited" || meta === "pro") {
+    return isAnnual ? Billing.PRO_ANNUALLY : Billing.PRO_MONTHLY;
+  }
+
+  return Billing.FREE;
+}
+
+function formatPlanLabel(plan: Billing): string {
+  switch (plan) {
+    case Billing.FOUNDER_MONTHLY:
+      return "Beta Founder (Monthly)";
+    case Billing.FOUNDER_ANNUALLY:
+      return "Beta Founder (Annual)";
+    case Billing.PRO_MONTHLY:
+      return "Unlimited+ (Monthly)";
+    case Billing.PRO_ANNUALLY:
+      return "Unlimited+ (Annual)";
     default:
-      return Billing.FREE;
+      return String(plan);
   }
 }
 
@@ -37,7 +74,7 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET!,
     );
   } catch (error) {
     console.error("[STRIPE_WEBHOOK_VERIFY_ERROR]", error);
@@ -46,9 +83,6 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
-      /**
-       * 1. Checkout session completed (User successfully bought a plan)
-       */
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
@@ -59,7 +93,10 @@ export async function POST(req: Request) {
           "New Customer";
 
         if (!email) {
-          console.error("[STRIPE_WEBHOOK] No customer email in session", session.id);
+          console.error(
+            "[STRIPE_WEBHOOK] No customer email in session",
+            session.id,
+          );
           return new NextResponse("Customer email missing", { status: 400 });
         }
 
@@ -69,13 +106,17 @@ export async function POST(req: Request) {
         let interval: BillingInterval = BillingInterval.MONTHLY;
         let nextBillingDate: Date | null = null;
         let cancelAtPeriodEnd = false;
-        let currentPlan: Billing = Billing.FREE;
+        let currentPlan: Billing = getBillingPlan(
+          undefined,
+          session.metadata?.planId,
+          session.metadata?.interval === "annual",
+        );
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription =
+            await stripe.subscriptions.retrieve(subscriptionId);
           const subItem = subscription.items.data[0];
 
-          // Safe lookup for current_period_end across Stripe API versions
           const currentPeriodEnd =
             (subscription as any).current_period_end ??
             (subItem as any)?.current_period_end;
@@ -84,20 +125,22 @@ export async function POST(req: Request) {
             nextBillingDate = new Date(currentPeriodEnd * 1000);
           }
 
-          if (subItem?.price.recurring?.interval === "year") {
-            interval = BillingInterval.MONTHLY; // Switch to your ANNUAL enum if you add annual billing
-          }
+          const isAnnual = subItem?.price.recurring?.interval === "year";
+          interval = isAnnual
+            ? BillingInterval.ANNUALLY
+            : BillingInterval.MONTHLY;
 
           cancelAtPeriodEnd = subscription.cancel_at_period_end;
-          currentPlan = getBillingPlan(subItem?.price.id);
+          currentPlan = getBillingPlan(
+            subItem?.price.id,
+            subscription.metadata?.planId ?? session.metadata?.planId,
+            isAnnual,
+          );
         }
 
-        // A. Upsert User (creates filler user if they don't exist yet)
         const user = await prisma.user.upsert({
           where: { email },
-          update: {
-            // Keep existing user fields intact if they already had an account
-          },
+          update: {},
           create: {
             email,
             name,
@@ -105,7 +148,6 @@ export async function POST(req: Request) {
           },
         });
 
-        // B. Upsert BillingInformation attached to user.id
         await prisma.billingInformation.upsert({
           where: { userId: user.id },
           create: {
@@ -133,12 +175,10 @@ export async function POST(req: Request) {
           },
         });
 
+        await notifyNewSub(formatPlanLabel(currentPlan));
         break;
       }
 
-      /**
-       * 2. Subscription renewed, changed, or scheduled for cancellation
-       */
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         const subItem = subscription.items.data[0];
@@ -155,11 +195,15 @@ export async function POST(req: Request) {
           subscription.status === "active" ||
           subscription.status === "trialing";
 
+        const isAnnual = subItem?.price.recurring?.interval === "year";
         const currentPlan = isActive
-          ? getBillingPlan(subItem?.price.id)
+          ? getBillingPlan(
+              subItem?.price.id,
+              subscription.metadata?.planId,
+              isAnnual,
+            )
           : Billing.FREE;
 
-        // Find billing row by Stripe subscription or customer ID
         const billingInfo = await prisma.billingInformation.findFirst({
           where: {
             OR: [
@@ -176,6 +220,9 @@ export async function POST(req: Request) {
               isActive,
               cancelAtPeriodEnd: subscription.cancel_at_period_end,
               currentPlan,
+              billingInterval: isAnnual
+                ? BillingInterval.ANNUALLY
+                : BillingInterval.MONTHLY,
               nextBillingDate,
               paymentStatus: isActive
                 ? PaymentStatus.PAID
@@ -186,9 +233,6 @@ export async function POST(req: Request) {
         break;
       }
 
-      /**
-       * 3. Subscription deleted / revoked access
-       */
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
 
@@ -209,16 +253,13 @@ export async function POST(req: Request) {
               currentPlan: Billing.FREE,
               stripeSubscriptionId: null,
               cancelAtPeriodEnd: false,
-              paymentStatus: PaymentStatus.UNPAID,
+              paymentStatus: PaymentStatus.CANCELED,
             },
           });
         }
         break;
       }
 
-      /**
-       * 4. Recurring invoice payment failed
-       */
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
@@ -231,7 +272,7 @@ export async function POST(req: Request) {
           await prisma.billingInformation.update({
             where: { id: billingInfo.id },
             data: {
-              paymentStatus: PaymentStatus.UNPAID,
+              paymentStatus: PaymentStatus.PAST_DUE,
             },
           });
         }

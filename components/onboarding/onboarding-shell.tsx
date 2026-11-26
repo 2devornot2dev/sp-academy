@@ -35,6 +35,7 @@ import { SpriteStep } from "./steps/stripe-step";
 import { invokeTrialBuilder } from "@/app/actions/invoke-trial-builder";
 import { setUserGeneration } from "@/app/actions/set-user-generation";
 import { sendOnboardingWelcomeEmail } from "@/lib/actions/send-welcome-email";
+import { getLockedSpriteVoices } from "@/lib/sprites/voices";
 
 
 
@@ -167,7 +168,7 @@ export default function OnboardingShell({
             ? !!level
             : step === 5
               ? !!goal
-              : !!sprite && !!voiceId;
+              : !!sprite;
 
   const signInWithGoogle = async (e?: React.MouseEvent) => {
     e?.preventDefault();

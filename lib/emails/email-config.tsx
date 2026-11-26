@@ -1,4 +1,6 @@
 import * as React from "react";
+export const SKOOL_COMMUNITY_URL =
+  process.env.NEXT_PUBLIC_SKOOL_COMMUNITY_URL || "";
 import {
   Body,
   Button,

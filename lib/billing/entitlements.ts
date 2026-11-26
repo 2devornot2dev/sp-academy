@@ -83,8 +83,17 @@ export async function getUserEntitlements(
 
   let plan: PlanTier = "TRIAL";
   if (billing?.isActive) {
-    if (billing.currentPlan === "PRO_MONTHLY") plan = "UNLIMITED";
-    else if (billing.currentPlan === "FOUNDER_MONTHLY") plan = "FOUNDER";
+    if (
+      billing.currentPlan === "PRO_MONTHLY" ||
+      billing.currentPlan === "PRO_ANNUALLY"
+    ) {
+      plan = "UNLIMITED";
+    } else if (
+      billing.currentPlan === "FOUNDER_MONTHLY" ||
+      billing.currentPlan === "FOUNDER_ANNUALLY"
+    ) {
+      plan = "FOUNDER";
+    }
   }
 
   return { plan, ...PLAN_LIMITS[plan] };

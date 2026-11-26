@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { getPresignedUrls } from "@/app/actions/s3";
 import { getSpriteNode } from "@/lib/sprites/get-sprite-node";
+import {
+  normalizeSpriteSlug,
+  type SpriteSlug,
+} from "@/lib/sprites/voices";
 import type { SpriteAIContext } from "@/lib/schema/sprite-schema";
 import type { ActiveTab } from "@/components/sprite/sprite-chat-utils";
 import {
@@ -35,8 +39,15 @@ import {
   resolveNotificationByDedupeKey,
 } from "@/app/actions/sprite-notifications";
 
-export type SpriteType = "vox" | "vivi";
+export type SpriteType = SpriteSlug;
 export type ChatViewMode = "single" | "multi";
+
+const SPRITE_FALLBACKS: Record<SpriteType, { name: string; avatar: string }> = {
+  vox: { name: "Vox", avatar: "/sprite-m.png" },
+  vivi: { name: "Vivi", avatar: "/sprite-f.png" },
+  dex: { name: "Dex", avatar: "/sprite-dex.png" },
+  deva: { name: "Deva", avatar: "/sprite-deva.png" },
+};
 
 export type SpriteAction = {
   label: string;
@@ -133,8 +144,15 @@ export function SpriteProvider({
   const userId = spriteData?.userId ?? null;
 
   const [activeSprite, setActiveSprite] = useState<SpriteType>(
-    (dbSprite?.slug as SpriteType) ?? "vox",
+    normalizeSpriteSlug(dbSprite?.slug),
   );
+
+  // Keep activeSprite synced if user switches sprites in Settings
+  useEffect(() => {
+    if (dbSprite?.slug) {
+      setActiveSprite(normalizeSpriteSlug(dbSprite.slug));
+    }
+  }, [dbSprite?.slug]);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("session");
@@ -406,13 +424,16 @@ export function SpriteProvider({
     };
   }, [stopAudio]);
 
-  const resolvedSprite = current?.sprite || activeSprite;
-  const isVivi = resolvedSprite === "vivi";
-  const spriteName = dbSprite?.name ?? (isVivi ? "Vivi" : "Vox");
+  const resolvedSprite = normalizeSpriteSlug(current?.sprite || activeSprite);
+  const fallback = SPRITE_FALLBACKS[resolvedSprite];
+  const spriteName =
+    dbSprite?.slug === resolvedSprite && dbSprite?.name
+      ? dbSprite.name
+      : fallback.name;
   const avatarSrc =
     current?.spriteUrl ||
-    dbSprite?.avatarUrl ||
-    (isVivi ? "/sprite-f.png" : "/sprite-m.png");
+    (dbSprite?.slug === resolvedSprite ? dbSprite?.avatarUrl : null) ||
+    fallback.avatar;
 
   // Docked in the EXACT same corner as the launcher button so they never stack!
   const positionClasses =

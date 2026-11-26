@@ -7,6 +7,7 @@ import type {
   InvokeEduBuilderPayload,
   LessonDbContext,
 } from "@/app/actions/invoke-edu-builder";
+import { getLockedSpriteVoices } from "@/lib/sprites/voices";
 import { getSpoonSpriteOrderIndex, getBridgeSpriteOrderIndex } from "./tools";
 
 const BASE = `${process.env.NEXT_PUBLIC_APP_URL2 ?? "https://spoonacademy.com"}/api/webhooks/system-tasks`;
@@ -39,7 +40,16 @@ export async function setupNextLesson(
     });
 
     if (!spriteProfile) {
-      const chosenSlug = payload.spriteSlug || "vox";
+      const {
+        spriteSlug: chosenSlug,
+        nativeVoiceId,
+        targetVoiceId,
+      } = getLockedSpriteVoices(
+        payload.spriteSlug,
+        payload.nativeLanguage,
+        payload.targetLanguage,
+      );
+
       const sprite = await tx.sprite.findUnique({
         where: { slug: chosenSlug },
       });
@@ -49,13 +59,6 @@ export async function setupNextLesson(
           `Sprite "${chosenSlug}" not found. Run seed-sprites first.`,
         );
       }
-
-      const nativeVoiceId =
-        payload.nativeVoiceId ||
-        `${payload.nativeLanguage}-${chosenSlug === "vivi" ? "girl" : "boy"}-01`;
-      const targetVoiceId =
-        payload.targetVoiceId ||
-        `${payload.targetLanguage}-${chosenSlug === "vivi" ? "girl" : "boy"}-01`;
 
       spriteProfile = await tx.spriteProfile.create({
         data: {
@@ -93,7 +96,6 @@ export async function setupNextLesson(
     const spriteSlug = spriteProfile.sprite.slug;
     const nodeId = `${spriteSlug}:${spriteProfile.nativeVoiceId}:${spriteProfile.targetVoiceId}:${spriteOrderIndex}`;
 
-    // Pre-bake the Vocab Bridge SpriteNode for THIS spoon (so it's ready as soon as they finish the Spoon!)
     const bridgeOrderIndex = getBridgeSpriteOrderIndex(spoon);
     const bridgeNodeId = `${spriteSlug}:${spriteProfile.nativeVoiceId}:${spriteProfile.targetVoiceId}:${bridgeOrderIndex}`;
 
@@ -165,7 +167,6 @@ export async function setupNextLesson(
       spriteWebhookUrl = hookUrl(spriteTask.id);
     }
 
-    // Bridge sprite task if missing!
     let bridgeTaskId: string | null = null;
     let bridgeWebhookUrl: string | null = null;
 
@@ -219,7 +220,6 @@ export async function setupNextLesson(
       targetVoiceId: spriteProfile.targetVoiceId,
       spriteOrderIndex,
       nodeId,
-      // Bridge info
       bridgeTaskId,
       bridgeWebhookUrl,
       bridgeOrderIndex: bridgeOrderIndex ?? undefined,

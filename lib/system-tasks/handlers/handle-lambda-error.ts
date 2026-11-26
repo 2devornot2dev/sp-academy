@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { pusherServer } from "@/lib/pusher-server";
 import { setLiveTaskState } from "@/app/actions/system-task-actions";
+import { notifyLambdaError } from "@/lib/telegram";
 
 export interface LambdaErrorPayload {
   status?: "FAILED" | "ERROR" | "failed" | "error";
@@ -69,7 +70,7 @@ export async function handleLambdaError(
     },
   });
 
-  // 2. If a Boss Stage generation failed, mark the FoundationBossStage row as FAILED
+  // 2. Mark domain stage FAILED if applicable
   if (task.type === "SPOON_BOSS_GENERATION" && prevMeta.bossStageId) {
     await prisma.foundationBossStage
       .update({
@@ -84,7 +85,32 @@ export async function handleLambdaError(
       );
   }
 
-  // ... right where you trigger pusherServer:
+  if (
+    task.type === "GENERATE_MILESTONE_GRADUATION" &&
+    prevMeta.graduationId
+  ) {
+    await prisma.milestoneGraduation
+      .update({
+        where: { id: String(prevMeta.graduationId) },
+        data: { status: "FAILED" },
+      })
+      .catch((err) =>
+        console.error(
+          "[handleLambdaError] failed to mark milestoneGraduation FAILED:",
+          err,
+        ),
+      );
+  }
+
+  // 3. Ping Telegram alerts channel
+  await notifyLambdaError({
+    lambdaName,
+    stage: body.stage ?? undefined,
+    error: errorMessage,
+    taskId: task.id,
+  });
+
+  // 4. Notify user via Pusher + Redis live task state
   const userId = prevMeta.userId;
   if (userId) {
     const friendlyLabel =
@@ -94,7 +120,9 @@ export async function handleLambdaError(
           ? "Vocab Bridge"
           : task.type === "SPOON_BOSS_GENERATION"
             ? "Boss Stage"
-            : "Lesson Generation";
+            : task.type === "GENERATE_MILESTONE_GRADUATION"
+              ? "Milestone Graduation"
+              : "Lesson Generation";
 
     const livePayload = {
       taskId: task.id,
@@ -122,4 +150,9 @@ export async function handleLambdaError(
       console.error("[handleLambdaError] pusher notification failed:", err);
     }
   }
+
+  return NextResponse.json(
+    { ok: false, status: "FAILED", taskId: task.id },
+    { status: 200 },
+  );
 }

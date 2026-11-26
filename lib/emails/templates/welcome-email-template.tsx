@@ -1,10 +1,11 @@
-import * as React from "react";
+
 import {
   APP_URL,
   Button,
   EMAIL_STYLES,
   Heading,
   Section,
+  SKOOL_COMMUNITY_URL,
   SpoonEmailLayout,
   Text,
   type ProgramTier,
@@ -40,6 +41,7 @@ export function WelcomeEmailTemplate({
 }: WelcomeEmailProps) {
   const firstName = name.trim() || "there";
   const tier = PROGRAM_COPY[program] || PROGRAM_COPY.TRIAL;
+  const isPaid = program === "FOUNDER" || program === "UNLIMITED";
 
   return (
     <SpoonEmailLayout previewText="Your first Spoon is ready — start speaking today.">
@@ -70,6 +72,42 @@ export function WelcomeEmailTemplate({
           with 3 hearts
         </Text>
       </Section>
+
+      {isPaid && SKOOL_COMMUNITY_URL && (
+        <Section
+          style={{
+            ...EMAIL_STYLES.box,
+            backgroundColor: "#eef2ff",
+            borderColor: "#c7d2fe",
+          }}
+        >
+          <Text
+            style={{
+              ...EMAIL_STYLES.eyebrow,
+              color: "#4338ca",
+              margin: "0 0 6px",
+            }}
+          >
+            Members-Only Community
+          </Text>
+          <Text style={{ ...EMAIL_STYLES.paragraph, margin: "0 0 12px" }}>
+            As a paid member, you have private access to our{" "}
+            <strong>Spoon Academy Skool Community</strong>—drop questions,
+            request features, and practice with fellow learners.
+          </Text>
+          <Button
+            href={SKOOL_COMMUNITY_URL}
+            style={{
+              ...EMAIL_STYLES.button,
+              backgroundColor: "#4f46e5",
+              padding: "11px 22px",
+              fontSize: "14px",
+            }}
+          >
+            Join the Skool Community &rarr;
+          </Button>
+        </Section>
+      )}
 
       <Section style={{ textAlign: "center" }}>
         <Button href={`${APP_URL}/learning-hub`} style={EMAIL_STYLES.button}>

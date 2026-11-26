@@ -7,13 +7,12 @@ import type {
   LessonDbContext,
 } from "@/app/actions/invoke-edu-builder";
 import { prisma } from "@/lib/prisma";
+import { getLockedSpriteVoices } from "@/lib/sprites/voices";
 import { getSpoonSpriteOrderIndex, getBridgeSpriteOrderIndex } from "./tools";
 
-const BASE = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://spoonacademy.com"}/api/webhooks/system-tasks`;
+const BASE = `${process.env.NEXT_PUBLIC_APP_URL2 ?? "https://spoonacademy.com"}/api/webhooks/system-tasks`;
 const hookUrl = (taskId: string) => `${BASE}/${taskId}`;
 
-// Converts "en-US", "fr-FR", "english", "FRENCH" etc. into the Prisma Languages enum.
-// Returns undefined if it can't match, so Prisma leaves the field alone.
 const CODE_TO_ENUM: Record<string, string> = {
   en: "ENGLISH",
   fr: "FRENCH",
@@ -26,7 +25,8 @@ const CODE_TO_ENUM: Record<string, string> = {
 function toLanguage(v?: string | null): Languages | undefined {
   if (!v) return undefined;
   const raw = v.trim();
-  const candidate = CODE_TO_ENUM[raw.split("-")[0].toLowerCase()] ?? raw.toUpperCase();
+  const candidate =
+    CODE_TO_ENUM[raw.split("-")[0].toLowerCase()] ?? raw.toUpperCase();
   return (Object.values(Languages) as string[]).includes(candidate)
     ? (candidate as Languages)
     : undefined;
@@ -53,8 +53,17 @@ export async function setupFirstLesson(
       },
     });
 
-    // 1. Lookup chosen Sprite (default to "vox") and upsert SpriteProfile with 3/3 Energy
-    const chosenSlug = payload.spriteSlug || "vox";
+    // 1. Lookup chosen Sprite (vox | vivi | dex | deva) & lock its voice set
+    const {
+      spriteSlug: chosenSlug,
+      nativeVoiceId,
+      targetVoiceId,
+    } = getLockedSpriteVoices(
+      payload.spriteSlug,
+      payload.nativeLanguage,
+      payload.targetLanguage,
+    );
+
     const sprite = await tx.sprite.findUnique({
       where: { slug: chosenSlug },
     });
@@ -64,14 +73,6 @@ export async function setupFirstLesson(
         `Sprite "${chosenSlug}" not found. Run seed-sprites first.`,
       );
     }
-
-    const nativeVoiceId =
-      payload.nativeVoiceId ||
-      `${payload.nativeLanguage}-${chosenSlug === "vivi" ? "girl" : "boy"}-01`;
-
-    const targetVoiceId =
-      payload.targetVoiceId ||
-      `${payload.targetLanguage}-${chosenSlug === "vivi" ? "girl" : "boy"}-01`;
 
     const spriteProfile = await tx.spriteProfile.upsert({
       where: { userId: payload.userId },
@@ -96,7 +97,7 @@ export async function setupFirstLesson(
       },
     });
 
-    // 2. Idempotent Upsert for Course & Lesson 1 (prevents unique constraint crash on retry)
+    // 2. Idempotent Upsert for Course & Lesson 1
     const cacheKey = `${payload.userId}-${payload.nativeLanguage}-${payload.targetLanguage}-${payload.levelBand}-${payload.goal}`;
 
     const course = await tx.foundationCourse.upsert({

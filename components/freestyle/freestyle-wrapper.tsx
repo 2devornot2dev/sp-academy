@@ -125,7 +125,8 @@ export default function FreestyleWrapper({
     };
   }, [cooldownSessionId, isReviewReady]);
 
-  if (isTrial || dailySessionsMax <= 0) {
+  const trialCapReached = isTrial && reviewsCount >= 1;
+  if (trialCapReached || dailySessionsMax <= 0) {
     return (
       <div className="flex min-h-full w-full flex-1 items-center justify-center bg-slate-50 p-4 sm:p-8">
         <div className="w-full max-w-xl rounded-[2rem] border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-white p-6 text-center shadow-xl sm:p-10">

@@ -1,7 +1,8 @@
 // @/components/dashboard/Sidebar.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNotifications } from "@/hooks/use-notifications";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,12 +14,19 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
-  Award,
+  LifeBuoy,
+  ExternalLink,
+  Send,
+  X,
 } from "lucide-react";
 import { navItems, settingItems } from "./NavLinks";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
+import {
+  getSupportAccess,
+  sendSupportRequest,
+} from "@/app/actions/support-actions";
 
 import {
   Sidebar as ShadcnSidebar,
@@ -47,14 +55,12 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-
 interface SidebarProps {
   pathname: string;
   isAdmin?: boolean;
   onOpenNotifications?: () => void;
 }
 
-// Subtle 3D icon tile themes for inactive nav items so the sidebar feels alive & gamified
 const ICON_TILE_THEMES = [
   "border-sky-200 bg-sky-50 text-blue-600 group-hover/navitem:border-blue-700 group-hover/navitem:bg-gradient-to-b group-hover/navitem:from-sky-400 group-hover/navitem:to-blue-600 group-hover/navitem:text-white",
   "border-teal-200 bg-teal-50 text-teal-600 group-hover/navitem:border-teal-700 group-hover/navitem:bg-gradient-to-b group-hover/navitem:from-teal-400 group-hover/navitem:to-emerald-600 group-hover/navitem:text-white",
@@ -76,8 +82,25 @@ export const Sidebar = ({
 
   const [isInlineMenuOpen, setIsInlineMenuOpen] = useState(false);
 
+  const [supportAccess, setSupportAccess] = useState<{
+    isPaid: boolean;
+    skoolUrl: string;
+  }>({ isPaid: false, skoolUrl: "" });
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [helpSubject, setHelpSubject] = useState("");
+  const [helpMessage, setHelpMessage] = useState("");
+  const [helpSending, setHelpSending] = useState(false);
+  const [helpStatus, setHelpStatus] = useState<"idle" | "sent" | "error">(
+    "idle",
+  );
+
   const { data: session } = authClient.useSession();
   const user = session?.user;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getSupportAccess().then(setSupportAccess).catch(() => {});
+  }, [user?.id]);
 
   const userInitials = user?.name
     ? user.name
@@ -96,6 +119,25 @@ export const Sidebar = ({
         },
       },
     });
+  };
+
+  const handleSendHelp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!helpSubject.trim() || !helpMessage.trim() || helpSending) return;
+    setHelpSending(true);
+    setHelpStatus("idle");
+    const res = await sendSupportRequest({
+      subject: helpSubject,
+      message: helpMessage,
+    }).catch(() => ({ ok: false }));
+    setHelpSending(false);
+    if (res?.ok) {
+      setHelpStatus("sent");
+      setHelpSubject("");
+      setHelpMessage("");
+    } else {
+      setHelpStatus("error");
+    }
   };
 
   return (
@@ -118,30 +160,32 @@ export const Sidebar = ({
                     "group flex w-full items-center gap-3 rounded-2xl border-2 border-b-4 p-2.5 text-left transition-all duration-150 outline-none select-none active:translate-y-0.5 active:border-b-2",
                     isInlineMenuOpen
                       ? "border-sky-400 border-b-blue-600 bg-white shadow-md"
-                      : "border-slate-200/90 border-b-slate-300 bg-white shadow-2xs hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-sm"
+                      : "border-slate-200/90 border-b-slate-300 bg-white shadow-2xs hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-sm",
                   )}
                 >
-                 <div className="relative shrink-0 pb-[3px]">
-  <Avatar
-    className="h-9 w-9 rounded-full"
-    style={{ boxShadow: "0 3px 0 0 hsla(174, 5%, 44%, 0.84)" }}
-  >
-    <AvatarImage
-      src={user?.image || undefined}
-      alt={user?.name || "User"}
-      className="rounded-full object-cover"
-    />
-    <AvatarFallback className="rounded-full bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white">
-      {userInitials}
-    </AvatarFallback>
-  </Avatar>
+                  <div className="relative shrink-0 pb-[3px]">
+                    <Avatar
+                      className="h-9 w-9 rounded-full"
+                      style={{
+                        boxShadow: "0 3px 0 0 hsla(174, 5%, 44%, 0.84)",
+                      }}
+                    >
+                      <AvatarImage
+                        src={user?.image || undefined}
+                        alt={user?.name || "User"}
+                        className="rounded-full object-cover"
+                      />
+                      <AvatarFallback className="rounded-full bg-gradient-to-b from-sky-400 to-blue-600 text-xs font-black text-white">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
 
-  {unreadCount > 0 && (
-    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
-      {unreadCount}
-    </span>
-  )}
-</div>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
 
                   <div className="grid flex-1 text-left leading-tight">
                     <span className="truncate text-xs font-black text-slate-900">
@@ -155,8 +199,7 @@ export const Sidebar = ({
                   <div
                     className={cn(
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-transform duration-300",
-                      isInlineMenuOpen &&
-                        "rotate-180 bg-sky-100 text-blue-600"
+                      isInlineMenuOpen && "rotate-180 bg-sky-100 text-blue-600",
                     )}
                   >
                     <ChevronDown className="size-3.5" />
@@ -169,7 +212,7 @@ export const Sidebar = ({
                     "grid transition-[grid-template-rows,opacity,margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
                     isInlineMenuOpen
                       ? "pointer-events-auto mt-2 grid-rows-[1fr] opacity-100"
-                      : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"
+                      : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0",
                   )}
                 >
                   <div className="overflow-hidden">
@@ -282,9 +325,9 @@ export const Sidebar = ({
                     <DropdownMenuItem
                       className="cursor-pointer gap-2 rounded-xl font-bold text-slate-700"
                       render={
-                        <Link 
-                        href={settingItems[0]?.href || "/account"}
-                        onClick={() => isMobile && setOpenMobile(false)}
+                        <Link
+                          href={settingItems[0]?.href || "/account"}
+                          onClick={() => isMobile && setOpenMobile(false)}
                         >
                           <Settings className="size-4 text-indigo-500" />
                           <span>Settings &amp; Account</span>
@@ -336,21 +379,19 @@ export const Sidebar = ({
                         "group/navitem flex h-auto items-center gap-3.5 rounded-2xl p-2 transition-all duration-150 select-none group-data-[collapsible=icon]:justify-center",
                         isActive
                           ? "border-b-4 border-teal-800/80 bg-gradient-to-r from-primary via-secondary to-accent text-white shadow-md shadow-sky-500/20 active:translate-y-0.5 active:border-b-0"
-                          : "border-2 border-transparent text-slate-600 hover:-translate-y-0.5 hover:border-slate-200 hover:border-b-4 hover:border-b-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-2xs active:translate-y-0.5 active:border-b-2"
+                          : "border-2 border-transparent text-slate-600 hover:-translate-y-0.5 hover:border-slate-200 hover:border-b-4 hover:border-b-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-2xs active:translate-y-0.5 active:border-b-2",
                       )}
                       render={
-                        <Link 
-                        href={navItem.href}
-                        onClick={() => isMobile && setOpenMobile(false)}
-                        
+                        <Link
+                          href={navItem.href}
+                          onClick={() => isMobile && setOpenMobile(false)}
                         >
-                          {/* 3D Mini Squircle Icon Tile */}
                           <div
                             className={cn(
                               "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-b-[3px] transition-all duration-150 [&_svg]:size-4",
                               isActive
                                 ? "border-white/30 bg-white/20 text-white shadow-inner"
-                                : iconTileTheme
+                                : iconTileTheme,
                             )}
                           >
                             {navItem.icon}
@@ -362,7 +403,7 @@ export const Sidebar = ({
                                 "truncate text-sm transition-transform duration-200 ease-out group-hover/navitem:translate-x-0.5",
                                 isActive
                                   ? "font-black text-white drop-shadow-2xs"
-                                  : "font-extrabold text-slate-700 group-hover/navitem:text-slate-900"
+                                  : "font-extrabold text-slate-700 group-hover/navitem:text-slate-900",
                               )}
                             >
                               {navItem.label}
@@ -380,9 +421,42 @@ export const Sidebar = ({
       </SidebarContent>
 
       {/* =====================================================================
-          3. BOTTOM: 3D ADMIN BUTTON + SPOON LOGO
+          3. BOTTOM: HELP & SKOOL + 3D ADMIN BUTTON + SPOON LOGO
           ===================================================================== */}
-      <SidebarFooter className="flex flex-col gap-4 overflow-hidden p-3">
+      <SidebarFooter className="flex flex-col gap-3 overflow-hidden p-3">
+        {supportAccess.isPaid && supportAccess.skoolUrl ? (
+          <a
+            href={supportAccess.skoolUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => isMobile && setOpenMobile(false)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-indigo-200 border-b-indigo-300 bg-indigo-50/90 py-2.5 text-xs font-black text-indigo-700 transition hover:-translate-y-0.5 hover:bg-indigo-100"
+            title="Community & Help (Skool)"
+          >
+            <LifeBuoy className="h-4 w-4 shrink-0" />
+            {sidebarOpen && (
+              <>
+                <span>Community &amp; Help</span>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              </>
+            )}
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setHelpStatus("idle");
+              setIsHelpOpen(true);
+              if (isMobile) setOpenMobile(false);
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white py-2.5 text-xs font-black text-slate-700 transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50/50"
+            title="Help & Support"
+          >
+            <LifeBuoy className="h-4 w-4 shrink-0 text-blue-600" />
+            {sidebarOpen && <span>Help &amp; Support</span>}
+          </button>
+        )}
+
         {isAdmin && sidebarOpen && (
           <Button
             variant="ghost"
@@ -408,7 +482,7 @@ export const Sidebar = ({
               "absolute h-auto w-[150px] max-w-none object-contain transition-[opacity,transform]",
               sidebarOpen
                 ? "scale-100 opacity-100 delay-200 duration-200 ease-out"
-                : "pointer-events-none scale-90 opacity-0 delay-0 duration-75 ease-in"
+                : "pointer-events-none scale-90 opacity-0 delay-0 duration-75 ease-in",
             )}
           />
 
@@ -423,13 +497,86 @@ export const Sidebar = ({
               "absolute h-auto w-8 object-contain transition-[opacity,transform]",
               !sidebarOpen
                 ? "scale-100 opacity-100 delay-200 duration-200 ease-out"
-                : "pointer-events-none scale-75 opacity-0 delay-0 duration-75 ease-in"
+                : "pointer-events-none scale-75 opacity-0 delay-0 duration-75 ease-in",
             )}
           />
         </div>
       </SidebarFooter>
 
       <SidebarRail />
+
+      {isHelpOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-6 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <LifeBuoy className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-base font-black text-slate-900">
+                    Need Help?
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsHelpOpen(false)}
+                  className="rounded-xl p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {helpStatus === "sent" ? (
+                <div className="space-y-4 py-3 text-center">
+                  <p className="text-sm font-bold text-emerald-700">
+                    Message sent! We&rsquo;ll get back to your email shortly.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsHelpOpen(false)}
+                    className="w-full rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3 text-xs font-black text-white"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSendHelp} className="space-y-3">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Subject (e.g. Mic issue on Spoon 1)"
+                    value={helpSubject}
+                    onChange={(e) => setHelpSubject(e.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:border-sky-400 focus:outline-none"
+                  />
+                  <textarea
+                    required
+                    rows={4}
+                    placeholder="Tell us what happened..."
+                    value={helpMessage}
+                    onChange={(e) => setHelpMessage(e.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:border-sky-400 focus:outline-none"
+                  />
+                  {helpStatus === "error" && (
+                    <p className="text-xs font-bold text-rose-600">
+                      Could not send right now—email hello@spoonacademy.com
+                      directly.
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={helpSending}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3 text-xs font-black text-white disabled:opacity-50"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>{helpSending ? "Sending..." : "Send Message"}</span>
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </ShadcnSidebar>
   );
 };
