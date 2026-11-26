@@ -1458,7 +1458,7 @@ export default function FreestyleChat({
       connect={true}
       audio={true}
       video={false}
-      className="flex h-[calc(100dvh-3rem)] md:h-dvh min-h-0 w-full flex-1 flex-col"
+      className="flex h-[calc(100dvh-3rem)] md:h-dvh w-full shrink-0 flex-col"
     >
       <LiveFreestyleChatInner session={session} onEnd={onEnd} />
     </LiveKitRoom>

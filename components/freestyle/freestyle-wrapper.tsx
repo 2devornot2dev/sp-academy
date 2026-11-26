@@ -370,7 +370,7 @@ export default function FreestyleWrapper({
           </motion.div>
         )}
 
-        {/* 3. LIVEKIT CHAT SCREEN */}
+       {/* 3. LIVEKIT CHAT SCREEN */}
         {activeSession && livekitData && (
           <motion.div
             key="chat"
@@ -378,7 +378,7 @@ export default function FreestyleWrapper({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="flex h-full min-h-0 w-full flex-1 flex-col"
+            className="w-full"
           >
             <FreestyleChat
               session={activeSession}
@@ -388,6 +388,7 @@ export default function FreestyleWrapper({
             />
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
