@@ -8,11 +8,8 @@ import { getUserEntitlements } from "@/lib/billing/entitlements";
 import { GraduationTaskMetadataSchema } from "@/lib/graduation/schemas";
 import { SystemTaskType } from "@prisma/client";
 
-const GRADUATION_LAMBDA =
-  process.env.MILESTONE_GRADUATION_LAMBDA_NAME ?? "spoon-milestone-graduation";
-const BASE_WEBHOOK = `${
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://spoonacademy.com"
-}/api/webhooks/system-tasks`;
+const GRADUATION_LAMBDA = "spoon-milestone-graduation";
+const BASE_WEBHOOK = "https://spoonacademy.com/api/webhooks/system-tasks"
 
 export async function generateMilestoneGraduation({
   userId,
