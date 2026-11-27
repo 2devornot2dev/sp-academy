@@ -1,3 +1,4 @@
+// components/foundation/foundation-chat.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +14,6 @@ import {
   ArrowRight,
   Lightbulb,
   Timer,
-  Mic,
   Check,
   Target,
   Volume2,
@@ -92,6 +92,9 @@ function LiveKitChatInner({
 
   const partnerName = spriteName || "Vox";
   const partnerAvatarUrl = avatarSrc || session?.aiAvatarUrl;
+  const isFemalePartner =
+    partnerName.toLowerCase() === "vivi" ||
+    partnerName.toLowerCase() === "deva";
 
   const [liveHint, setLiveHint] = useState<{
     starter: string;
@@ -158,7 +161,7 @@ function LiveKitChatInner({
       text,
       session?.targetLanguage || "fr-FR",
       0.95,
-      partnerName.toLowerCase() === "vivi" ? "female" : "male",
+      isFemalePartner ? "female" : "male",
     );
   };
 
@@ -394,7 +397,7 @@ function LiveKitChatInner({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingUserTurn, agentState, activeReaction, liveHint]);
+  }, [messages, streamingUserTurn, agentState, activeReaction]);
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = String(secondsLeft % 60).padStart(2, "0");
@@ -403,12 +406,12 @@ function LiveKitChatInner({
     liveHint.starter || nextUnmatchedChunk || starterHintTarget || "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-between gap-2.5 sm:gap-3">
+    <div className="flex min-h-0 flex-1 flex-col justify-between gap-2 sm:gap-3">
       <RoomAudioRenderer />
 
       {/* 1. COMPACT SINGLE-LINE GOAL + TIMER STRIP */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 sm:px-4 sm:py-2.5 ring-1 ring-slate-200/80">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      <div className="flex shrink-0 items-center justify-between gap-2 rounded-2xl bg-slate-50 px-2.5 py-1.5 sm:px-4 sm:py-2.5 ring-1 ring-slate-200/80">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto sm:flex-wrap [&::-webkit-scrollbar]:hidden">
           {requiredChunks.map((chunk) => {
             const hit = completedChunks.has(chunk);
             return (
@@ -417,7 +420,7 @@ function LiveKitChatInner({
                 type="button"
                 onClick={() => handlePlayPhraseAudio(chunk)}
                 title="Tap to hear pronunciation"
-                className={`inline-flex items-center gap-1 rounded-lg border-b-2 px-2.5 py-1 text-[11px] font-black transition-all active:translate-y-0.5 ${
+                className={`inline-flex shrink-0 items-center gap-1 rounded-lg border-b-2 px-2.5 py-1 text-[11px] font-black whitespace-nowrap transition-all active:translate-y-0.5 ${
                   hit
                     ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-xs"
                     : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100/70"
@@ -439,12 +442,12 @@ function LiveKitChatInner({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <div className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-black text-indigo-700">
+          <div className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-black text-indigo-700">
             <Sparkles size={11} className="text-indigo-500" />
             <span>{Math.min(userTurnCount, 3)}/3</span>
           </div>
 
-          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-800 shadow-2xs">
+          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] font-black text-slate-800 shadow-2xs">
             <Timer size={12} className="text-blue-600" />
             <span>
               {mins}:{secs}
@@ -453,8 +456,8 @@ function LiveKitChatInner({
         </div>
       </div>
 
-      {/* 2. EXPANSIVE CHAT STREAM (Suggestion lives INSIDE the thread!) */}
-      <div className="relative min-h-[270px] flex-1 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-slate-200/80 bg-slate-50/60 shadow-inner">
+      {/* 2. EXPANSIVE CHAT STREAM + DOCKED BOTTOM SUGGESTION */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-slate-200/80 bg-slate-50/60 shadow-inner">
         {activeReaction && (
           <div
             key={activeReaction.id}
@@ -469,8 +472,8 @@ function LiveKitChatInner({
           </div>
         )}
 
-        <div className="h-full overflow-y-auto p-3.5 sm:p-6">
-          <div className="space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
+          <div className="space-y-3 sm:space-y-4">
             {messages.length === 0 && !streamingUserTurn && (
               <div className="flex min-h-[120px] flex-col items-center justify-center text-center">
                 <p className="text-xs sm:text-sm font-bold text-slate-400">
@@ -512,99 +515,102 @@ function LiveKitChatInner({
               />
             )}
 
-            {/* Inline Reply Suggestion right inside the chat thread */}
-            {displaySuggestion && !streamingUserTurn && (
-              <div className="flex items-start gap-2.5 rounded-2xl border border-sky-200/90 bg-white/95 px-3.5 py-2.5 shadow-2xs">
-                <Lightbulb
-                  size={15}
-                  className="mt-0.5 shrink-0 text-amber-500"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
-                      {liveHint.coachingTip || "Try saying"}
-                    </span>
-                    {isHintLoading && (
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs sm:text-sm font-black text-slate-900">
+            <div ref={messagesEndRef} className="h-1" />
+          </div>
+        </div>
+
+        {/* Docked Bottom Suggestion Strip (Pinned above Mic bar, outside scrolling messages!) */}
+        {displaySuggestion && !streamingUserTurn && (
+          <div className="flex shrink-0 items-center justify-between gap-2.5 border-t border-sky-200/80 bg-white/95 px-3 py-2 sm:px-4 sm:py-2.5">
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              <Lightbulb
+                size={15}
+                className="mt-0.5 shrink-0 text-amber-500"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[10px] font-black tracking-wider text-blue-600 uppercase">
+                    {liveHint.coachingTip || "Try saying"}
+                  </span>
+                  {isHintLoading && (
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-blue-500" />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-baseline gap-1.5">
+                  <p className="text-xs sm:text-sm font-black text-slate-900">
                     &ldquo;{displaySuggestion}&rdquo;
                   </p>
                   {liveHint.translation && (
-                    <p className="text-[11px] font-semibold text-slate-400">
+                    <span className="truncate text-[11px] font-semibold text-slate-400">
                       ({liveHint.translation})
-                    </p>
+                    </span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handlePlayPhraseAudio(displaySuggestion)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-black text-blue-600 hover:bg-sky-100"
-                >
-                  <Volume2 size={12} />
-                  <span>Hear</span>
-                </button>
               </div>
-            )}
-
-            <div ref={messagesEndRef} className="h-2" />
+            </div>
+            <button
+              type="button"
+              onClick={() => handlePlayPhraseAudio(displaySuggestion)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-black text-blue-600 hover:bg-sky-100"
+            >
+              <Volume2 size={12} />
+              <span>Hear</span>
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* 3. BOTTOM LIVE STATUS & 3D ACTION BAR */}
-      <div className="flex shrink-0 flex-col gap-2.5 sm:flex-row">
-        <div className="flex min-w-0 flex-1 items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-2.5 sm:px-5 sm:py-3.5 ring-1 ring-slate-200/80">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                agentState === "listening"
-                  ? "animate-ping bg-emerald-500"
-                  : agentState === "speaking"
-                    ? "animate-pulse bg-blue-500"
-                    : "bg-amber-400"
-              }`}
-            />
-            <span className="truncate text-xs font-black text-slate-800 sm:text-sm">
-              {streamingUserTurn && !streamingUserTurn.isFinal
-                ? `Hearing: "${streamingUserTurn.text}"`
-                : agentState === "listening"
-                  ? `Listening (${partnerName})...`
-                  : agentState === "speaking"
-                    ? `${partnerName} Speaking...`
-                    : "Connecting voice..."}
-            </span>
-          </div>
-
-          <TrackToggle
-            source={Track.Source.Microphone}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-100"
-          >
-            <Mic size={13} className="text-blue-600" />
-            <span>Mic</span>
-          </TrackToggle>
+      {/* 3. SINGLE-ROW BOTTOM LIVE STATUS & 3D ACTION BAR */}
+      <div className="flex shrink-0 items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 sm:px-4 sm:py-2.5 ring-1 ring-slate-200/80">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+              agentState === "listening"
+                ? "animate-ping bg-emerald-500"
+                : agentState === "speaking"
+                  ? "animate-pulse bg-blue-500"
+                  : "bg-amber-400"
+            }`}
+          />
+          <span className="truncate text-xs font-black text-slate-800 sm:text-sm">
+            {streamingUserTurn && !streamingUserTurn.isFinal
+              ? `Hearing: "${streamingUserTurn.text}"`
+              : agentState === "listening"
+                ? `Listening (${partnerName})...`
+                : agentState === "speaking"
+                  ? `${partnerName} Speaking...`
+                  : "Connecting..."}
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleFinishSession}
-          disabled={isEnding}
-          className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-b-4 px-6 py-3 sm:px-8 sm:py-4 text-sm sm:text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:w-auto ${
-            allChunksCompleted
-              ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
-              : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25"
-          }`}
-        >
-          <span>
-            {isEnding
-              ? "Saving..."
-              : allChunksCompleted
-                ? "Mission Complete!"
-                : "Finish Mission"}
-          </span>
-          <ArrowRight size={17} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          <TrackToggle
+            source={Track.Source.Microphone}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-slate-200 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+          >
+            <span>Mic</span>
+          </TrackToggle>
+
+          <button
+            type="button"
+            onClick={handleFinishSession}
+            disabled={isEnding}
+            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-b-4 px-3.5 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-md transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 ${
+              allChunksCompleted
+                ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-emerald-500/25"
+                : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 shadow-blue-500/25"
+            }`}
+          >
+            <span>
+              {isEnding
+                ? "Saving..."
+                : allChunksCompleted
+                  ? "Mission Complete!"
+                  : "Finish Mission"}
+            </span>
+            <ArrowRight size={15} />
+          </button>
+        </div>
       </div>
     </div>
   );

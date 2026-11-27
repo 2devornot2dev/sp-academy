@@ -13,6 +13,7 @@ import {
 import FoundationChat from "./foundation-chat";
 import { useSprite } from "@/context/sprite-context";
 import { useSpeak } from "@/hooks/use-speak";
+import { getLockedVoiceId } from "@/lib/sprites/voices";
 
 export function FreestyleStep({
   data,
@@ -26,9 +27,10 @@ export function FreestyleStep({
   const { speak, isPlaying: isTtsPlaying } = useSpeak();
 
   const partnerName = spriteName || "Vox";
-  const isVivi =
-    profile?.sprite?.slug === "vivi" || partnerName.toLowerCase() === "vivi";
-  const voiceGender: "male" | "female" = isVivi ? "female" : "male";
+  const spriteSlug =
+    profile?.sprite?.slug || partnerName.toLowerCase() || "vox";
+  const isFemaleSprite = spriteSlug === "vivi" || spriteSlug === "deva";
+  const voiceGender: "male" | "female" = isFemaleSprite ? "female" : "male";
 
   const userId = data.userId || (data as any).meta?.userId || "usr_Paul";
   const nativeLanguage =
@@ -45,7 +47,7 @@ export function FreestyleStep({
   const [activeSession, setActiveSession] = useState<any>(null);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Build speakable mission targets (ensuring the learner isn't stuck with only 1-word fragments)
+  // Filter out 1-word fragments that are already substrings of another phrase (e.g. "reste" inside "on reste dedans")
   const requiredChunks: string[] = useMemo(() => {
     const raw: string[] =
       freestyle?.requiredChunks ||
@@ -57,21 +59,56 @@ export function FreestyleStep({
     const validReply: string | undefined =
       visualContent?.constraint?.validReplies?.[0];
 
-    const list = [...raw].filter(Boolean);
-    const allSingleWords =
-      list.length > 0 &&
-      list.every((c) => c.trim().split(/\s+/).length === 1);
+    const cleaned = raw
+      .map((c) => (typeof c === "string" ? c.split("=")[0].trim() : ""))
+      .filter(Boolean);
 
-    // If all chunks are 1-word fragments, append the full speakable reply/sentence so they have a real sentence goal too
-    const fullSentenceGoal = validReply || anchorSentence;
-    if (
-      allSingleWords &&
-      fullSentenceGoal &&
-      !list.some((c) => c.toLowerCase() === fullSentenceGoal.toLowerCase())
-    ) {
-      return [...list.slice(0, 2), fullSentenceGoal];
+    // Deduplicate case-insensitively
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const c of cleaned) {
+      const low = c.toLowerCase();
+      if (!seen.has(low)) {
+        seen.add(low);
+        unique.push(c);
+      }
     }
-    return list.slice(0, 3);
+
+    // Drop any 1-word token that already appears inside a multi-word chunk
+    const multiWordChunks = unique.filter(
+      (c) => c.split(/\s+/).filter(Boolean).length >= 2,
+    );
+
+    let filtered = unique.filter((c) => {
+      const words = c.split(/\s+/).filter(Boolean);
+      if (words.length > 1) return true;
+      const wordLow = c.toLowerCase().replace(/[.,!?;:]/g, "");
+      const isSubstringOfMulti = multiWordChunks.some((m) =>
+        m
+          .toLowerCase()
+          .replace(/[.,!?;:]/g, "")
+          .split(/\s+/)
+          .includes(wordLow),
+      );
+      return !isSubstringOfMulti;
+    });
+
+    const fullSentenceGoal = validReply || anchorSentence;
+    const allSingleWords =
+      filtered.length > 0 &&
+      filtered.every((c) => c.trim().split(/\s+/).length === 1);
+
+    if (
+      (allSingleWords || filtered.length < 2) &&
+      fullSentenceGoal &&
+      !filtered.some(
+        (c) => c.toLowerCase() === fullSentenceGoal.toLowerCase(),
+      )
+    ) {
+      filtered = [...filtered.slice(0, 2), fullSentenceGoal];
+    }
+
+    return filtered.slice(0, 3);
   }, [
     freestyle?.requiredChunks,
     freestyle?.targetPhrases,
@@ -87,18 +124,20 @@ export function FreestyleStep({
     requiredChunks[0] ||
     "";
 
-  const handlePlayPreview = (text?: string) => {
+  const targetOpenerLine =
+    freestyle?.aiOpeningTarget || visualContent?.npcLine || "";
+  const nativeBriefingLine = freestyle?.openingLine || "";
+
+  const handlePlayPreview = (text?: string, lang = targetLanguage) => {
     if (!text || isTtsPlaying) return;
-    void speak(text, targetLanguage, 0.95, voiceGender);
+    void speak(text, lang, 0.95, voiceGender);
   };
 
   const handleStartSimulation = async () => {
     setIsStarting(true);
     try {
       const aiAvatarUrl =
-        avatarSrc ||
-        profile?.sprite?.avatarUrl ||
-        "/sprite-m.png";
+        avatarSrc || profile?.sprite?.avatarUrl || "/sprite-m.png";
 
       const roleDescription = freestyle?.persona
         ? `${partnerName} roleplaying as ${freestyle.persona}`
@@ -116,6 +155,9 @@ export function FreestyleStep({
         npcLine: visualContent?.npcLine,
       };
 
+      const targetVoiceId =
+        profile?.targetVoiceId || getLockedVoiceId(spriteSlug, targetLanguage);
+
       const config = {
         userId,
         mode: freestyle?.mode || "FOCUSED",
@@ -123,7 +165,7 @@ export function FreestyleStep({
         topic: freestyle?.topic || lessonHandoff?.theme || "Roleplay Mission",
         nativeLanguage,
         targetLanguage,
-        targetVoiceId: `${targetLanguage}-${isVivi ? "girl-01" : "boy-01"}`,
+        targetVoiceId,
         voiceGender,
         freestyleData,
       };
@@ -170,55 +212,56 @@ export function FreestyleStep({
   };
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-10 animate-in fade-in duration-500">
       {!activeSession ? (
         <>
           {/* 1. Header */}
-          <div className="mb-5 text-center">
-            <span className="inline-flex items-center gap-1.5 text-xs font-black tracking-widest text-blue-600 uppercase">
+          <div className="mb-4 text-center">
+            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-black tracking-widest text-blue-600 uppercase">
               <Sparkles className="h-3.5 w-3.5" />
               Final Mission • 3-Turn Roleplay with {partnerName}
             </span>
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">
+            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 sm:text-4xl">
               {freestyle?.topic ||
                 lessonHandoff?.theme ||
                 "Live Roleplay Mission"}
             </h2>
-            <p className="mx-auto mt-1.5 max-w-xl text-xs font-semibold text-slate-500 sm:text-sm">
+            <p className="mx-auto mt-1 max-w-xl text-xs font-semibold text-slate-500 sm:text-sm">
               {freestyle?.persona
                 ? `${partnerName} is stepping into character as: ${freestyle.persona}`
                 : `Complete 3 quick spoken turns with ${partnerName} using today's phrases!`}
             </p>
           </div>
 
-          {/* 2. 3D Pre-Launch Roleplay Card with Vox/Vivi */}
-          <div className="my-auto flex flex-col items-center justify-center rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-gradient-to-b from-sky-50/50 via-white to-indigo-50/30 p-7 text-center shadow-sm sm:p-9">
-            {/* 3D Vox/Vivi Avatar Pedestal */}
-            <div className="relative mb-5">
-              <div className="h-24 w-24 overflow-hidden rounded-[2rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl">
+          {/* 2. 3D Pre-Launch Roleplay Card */}
+          <div className="my-auto flex flex-col items-center justify-center rounded-3xl border-2 border-b-[6px] border-slate-200 border-b-slate-300 bg-gradient-to-b from-sky-50/50 via-white to-indigo-50/30 p-5 text-center shadow-sm sm:p-9">
+            <div className="relative mb-4">
+              <div className="h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-[1.75rem] sm:rounded-[2rem] border-2 border-b-[6px] border-sky-400 border-b-blue-800 bg-slate-900 shadow-xl">
                 <img
                   src={avatarSrc || "/sprite-m.png"}
                   alt={partnerName}
                   className="h-full w-full object-cover object-top"
                 />
               </div>
-              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border-b-2 border-emerald-800 bg-emerald-400 px-3 py-0.5 text-[10px] font-black tracking-wider text-slate-950 uppercase shadow">
+              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-b-2 border-emerald-800 bg-emerald-400 px-3 py-0.5 text-[10px] font-black tracking-wider text-slate-950 uppercase shadow">
                 {partnerName} Ready
               </span>
             </div>
 
-            {freestyle?.openingLine || visualContent?.npcLine ? (
-              <div className="mt-2 max-w-lg rounded-2xl border-2 border-sky-100 bg-white px-5 py-3.5 shadow-2xs">
+            {targetOpenerLine || nativeBriefingLine ? (
+              <div className="mt-2 max-w-lg rounded-2xl border-2 border-sky-100 bg-white px-4 py-3 sm:px-5 sm:py-3.5 shadow-2xs">
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
-                    {partnerName}&apos;s Opening Line
+                    {targetOpenerLine
+                      ? `${partnerName}'s Opening Line`
+                      : "Mission Briefing"}
                   </p>
                   <button
                     type="button"
                     onClick={() =>
-                      handlePlayPreview(
-                        freestyle?.openingLine || visualContent?.npcLine,
-                      )
+                      targetOpenerLine
+                        ? handlePlayPreview(targetOpenerLine, targetLanguage)
+                        : handlePlayPreview(nativeBriefingLine, nativeLanguage)
                     }
                     className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-0.5 text-[10px] font-black text-blue-600 hover:bg-sky-100"
                   >
@@ -226,16 +269,21 @@ export function FreestyleStep({
                     <span>Hear</span>
                   </button>
                 </div>
-                <p className="mt-1 text-base font-black text-slate-900 sm:text-lg">
-                  &ldquo;{freestyle?.openingLine || visualContent?.npcLine}&rdquo;
+                <p className="mt-1 text-sm font-black text-slate-900 sm:text-lg">
+                  &ldquo;{targetOpenerLine || nativeBriefingLine}&rdquo;
                 </p>
+                {targetOpenerLine && nativeBriefingLine && (
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {nativeBriefingLine}
+                  </p>
+                )}
               </div>
             ) : null}
 
             {/* Tap-to-Hear Required Chunks Preview */}
             {requiredChunks.length > 0 && (
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                <span className="mr-1 inline-flex items-center gap-1 text-xs font-black tracking-wider text-slate-400 uppercase">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-400 uppercase">
                   <Target className="h-3.5 w-3.5 text-amber-500" />
                   Say These + 3 Turns:
                 </span>
@@ -243,7 +291,7 @@ export function FreestyleStep({
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => handlePlayPreview(chunk)}
+                    onClick={() => handlePlayPreview(chunk, targetLanguage)}
                     title="Tap to hear pronunciation"
                     className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-900 transition hover:bg-amber-100/70 active:translate-y-0.5"
                   >
@@ -259,28 +307,28 @@ export function FreestyleStep({
               type="button"
               onClick={handleStartSimulation}
               disabled={isStarting}
-              className="mt-7 inline-flex w-full items-center justify-center gap-3 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-10 py-4 text-base font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:w-auto sm:text-lg"
+              className="mt-5 sm:mt-7 inline-flex w-full items-center justify-center gap-2.5 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-3.5 sm:px-10 sm:py-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:w-auto sm:text-lg"
             >
               {isStarting ? (
                 <>
-                  <Loader2 className="animate-spin" size={22} />
+                  <Loader2 className="animate-spin" size={20} />
                   <span>Starting Roleplay with {partnerName}...</span>
                 </>
               ) : (
                 <>
-                  <Play size={20} className="fill-current" />
+                  <Play size={18} className="fill-current" />
                   <span>Start 3-Turn Roleplay with {partnerName}</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* 3. Footer Skip Button */}
-          <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+          {/* 3. Sticky Footer Skip Button */}
+          <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-4 flex justify-end border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-md sm:static sm:mx-0 sm:mb-0 sm:mt-5 sm:bg-transparent sm:px-0 sm:pt-4 sm:pb-0">
             <button
               type="button"
               onClick={onNext}
-              className="inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-6 py-3 text-sm font-black text-slate-600 transition-all hover:-translate-y-0.5 hover:text-slate-900 active:translate-y-0.5 active:border-b-2"
+              className="inline-flex items-center gap-2 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-5 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-black text-slate-600 transition-all hover:-translate-y-0.5 hover:text-slate-900 active:translate-y-0.5 active:border-b-2"
             >
               <span>Skip Roleplay</span>
               <ArrowRight size={16} />
@@ -289,25 +337,23 @@ export function FreestyleStep({
         </>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col animate-in fade-in zoom-in-95 duration-300">
-          <div className="mb-3 flex shrink-0 items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 overflow-hidden rounded-xl border-2 border-b-[3px] border-sky-400 bg-slate-900">
+          <div className="mb-2.5 flex shrink-0 items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="h-8 w-8 shrink-0 overflow-hidden rounded-xl border-2 border-b-[3px] border-sky-400 bg-slate-900">
                 <img
                   src={avatarSrc || "/sprite-m.png"}
                   alt={partnerName}
                   className="h-full w-full object-cover object-top"
                 />
               </div>
-              <div>
-                <h2 className="text-base font-black text-slate-900 sm:text-lg">
-                  {freestyle?.topic ||
-                    lessonHandoff?.theme ||
-                    `Roleplay with ${partnerName}`}
-                </h2>
-              </div>
+              <h2 className="truncate text-sm font-black text-slate-900 sm:text-lg">
+                {freestyle?.topic ||
+                  lessonHandoff?.theme ||
+                  `Roleplay with ${partnerName}`}
+              </h2>
             </div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
-              Auto-finishes at 3 turns + all phrases!
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] sm:text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
+              3 turns + phrases
             </span>
           </div>
 

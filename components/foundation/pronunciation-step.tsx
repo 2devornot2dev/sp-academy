@@ -28,7 +28,7 @@ type VoicePhase = "waiting" | "speaking" | "wrapping_up";
 
 const PASSING_SCORE = 60;
 const MAX_REQUIRED_ATTEMPTS = 2;
-const AUTO_ADVANCE_DELAY_MS = 1400; // Gives user 1.4s to see their green score before flowing to next chunk
+const AUTO_ADVANCE_DELAY_MS = 1400;
 
 const tone = (score: number, omitted: boolean) => {
   if (omitted || score < 60)
@@ -334,7 +334,6 @@ export function PronunciationStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentText]);
 
-  // Reset state & AUTO-PLAY audio when moving to a new chunk!
   useEffect(() => {
     clearAutoAdvance();
     reset();
@@ -365,7 +364,6 @@ export function PronunciationStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
 
-  // Score tracking + SFX + AUTO-ADVANCE on pass (or max attempts)
   useEffect(() => {
     if (!score || score === lastTrackedScore.current) return;
     if (assessedText !== currentText) return;
@@ -393,7 +391,6 @@ export function PronunciationStep({
       playSfx("wrong");
     }
 
-    // Auto-advance to the next chunk seamlessly when passed (on non-final chunks)
     if (passed && !isFullSentenceStep) {
       clearAutoAdvance();
       setIsAutoAdvancing(true);
@@ -461,8 +458,8 @@ export function PronunciationStep({
     hasPassedStep || stepAttempts >= MAX_REQUIRED_ATTEMPTS;
 
   const ScoreBar = ({ label, value }: { label: string; value: number }) => (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-xs font-black tracking-wider uppercase">
+    <div className="flex flex-col gap-1 rounded-2xl bg-white p-2.5 sm:p-3 ring-1 ring-slate-200/70">
+      <div className="flex items-center justify-between text-[10px] sm:text-xs font-black tracking-wider uppercase">
         <span className="text-slate-500">{label}</span>
         <span
           className={
@@ -476,7 +473,7 @@ export function PronunciationStep({
           {Math.round(value)}%
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
+      <div className="h-1.5 sm:h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
         <div
           className={`h-full rounded-full transition-all duration-700 ease-out ${
             value >= 80
@@ -492,16 +489,16 @@ export function PronunciationStep({
   );
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-10 animate-in fade-in duration-500">
       {/* 1. Header & Clickable Segmented Progress */}
-      <div className="mb-6 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between shrink-0">
+      <div className="mb-4 sm:mb-6 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div>
           <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">
             {isFullSentenceStep
               ? "Final Step • Full Sentence"
               : `Chunk ${currentIndex + 1} of ${totalSteps - 1} • Auto-Flows on Pass`}
           </span>
-          <h2 className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+          <h2 className="mt-0.5 text-xl sm:text-3xl font-black tracking-tight text-slate-900">
             Pronunciation Lab
           </h2>
         </div>
@@ -528,10 +525,10 @@ export function PronunciationStep({
                 }
                 className={`h-2.5 rounded-full transition-all duration-300 ${
                   idx === currentIndex
-                    ? "w-9 bg-gradient-to-r from-sky-400 to-blue-600"
+                    ? "w-8 sm:w-9 bg-gradient-to-r from-sky-400 to-blue-600"
                     : idx < currentIndex
-                      ? "w-5 cursor-pointer bg-emerald-500 hover:bg-emerald-600"
-                      : "w-5 cursor-not-allowed bg-slate-200"
+                      ? "w-4 sm:w-5 cursor-pointer bg-emerald-500 hover:bg-emerald-600"
+                      : "w-4 sm:w-5 cursor-not-allowed bg-slate-200"
                 }`}
               />
             );
@@ -542,7 +539,7 @@ export function PronunciationStep({
       {/* 2. 3D Target Flashcard Stage */}
       <div
         key={currentIndex}
-        className={`relative mb-6 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-8 sm:p-10 text-center transition-all duration-300 animate-in fade-in slide-in-from-right-3 ${
+        className={`relative mb-4 sm:mb-5 overflow-hidden rounded-3xl border-2 border-b-[6px] bg-white p-5 sm:p-10 text-center transition-all duration-300 animate-in fade-in slide-in-from-right-3 ${
           isListening
             ? "border-indigo-500 ring-4 ring-indigo-500/10"
             : isAnalyzing
@@ -555,10 +552,10 @@ export function PronunciationStep({
         }`}
       >
         <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-100/70">
-          <Mic size={150} />
+          <Mic size={130} />
         </div>
 
-        <p className="relative z-10 mb-3 flex flex-wrap justify-center gap-x-2.5 gap-y-2 text-3xl sm:text-5xl font-black leading-snug tracking-tight text-slate-900">
+        <p className="relative z-10 mb-2.5 flex flex-wrap justify-center gap-x-2 gap-y-1.5 text-2xl sm:text-5xl font-black leading-snug tracking-tight text-slate-900">
           {tokens.map((token, i) => {
             const r = scoreIsForThisStep ? resultFor(token) : null;
             return (
@@ -577,7 +574,7 @@ export function PronunciationStep({
                       : `${Math.round(r.score)}% — tap to hear`
                     : "Tap to hear"
                 }
-                className={`cursor-pointer rounded-xl px-2.5 py-1 transition-all hover:scale-105 ${
+                className={`cursor-pointer rounded-xl px-2 py-0.5 sm:px-2.5 sm:py-1 transition-all hover:scale-105 ${
                   r
                     ? `${tone(r.score, r.omitted)} ${
                         r.omitted ? "line-through decoration-2" : ""
@@ -592,35 +589,64 @@ export function PronunciationStep({
         </p>
 
         {currentPhonetic && (
-          <p className="relative z-10 mb-5 font-mono text-base sm:text-lg font-bold text-slate-400">
+          <p className="relative z-10 mb-3.5 font-mono text-sm sm:text-lg font-bold text-slate-400">
             /{currentPhonetic}/
           </p>
         )}
 
-        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2.5">
+        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2">
           {activeFocusSound && (
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-1.5 text-xs sm:text-sm font-black text-purple-700">
-              <Ear size={15} /> Focus: {activeFocusSound.sound}
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3 py-1 text-xs sm:text-sm font-black text-purple-700">
+              <Ear size={14} /> Focus: {activeFocusSound.sound}
             </div>
           )}
           {currentHint && (
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-1.5 text-xs sm:text-sm font-bold text-blue-800">
-              <Activity size={15} /> {currentHint}
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-xs sm:text-sm font-bold text-blue-800">
+              <Activity size={14} /> {currentHint}
             </div>
           )}
         </div>
       </div>
 
-      {/* 3. Interactive 3D Recorder & Replay Controls */}
-      <div className="mb-6 flex flex-col items-center">
+      {/* 3. Compact 3-Column Voice Telemetry Strip (Right under card so no scrolling needed!) */}
+      {scoreIsForThisStep && score && !isBusy && (
+        <div className="mb-4 sm:mb-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-slate-50/90 p-3 sm:p-4 animate-in slide-in-from-bottom-2">
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Activity className="text-blue-600" size={16} />
+              <h3 className="text-xs font-black text-slate-900 uppercase">
+                Voice Telemetry
+              </h3>
+            </div>
+            {hasPassedStep ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">
+                <CheckCircle2 size={12} />{" "}
+                {isAutoAdvancing ? "Passed! Next chunk..." : "Great job!"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-black text-amber-900">
+                Aim for {PASSING_SCORE}%+ ({stepAttempts}/{MAX_REQUIRED_ATTEMPTS})
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:gap-3.5">
+            <ScoreBar label="Overall" value={score.pronunciationScore} />
+            <ScoreBar label="Accuracy" value={score.accuracyScore} />
+            <ScoreBar label="Fluency" value={score.fluencyScore} />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Interactive 3D Recorder & Replay Controls (Side-by-side on mobile too!) */}
+      <div className="mb-4 sm:mb-6 flex flex-col items-center">
         {!isListening && !isAnalyzing && (
-          <div className="flex w-full max-w-2xl flex-col items-center gap-2.5">
-            <div className="flex w-full flex-col gap-3.5 sm:flex-row">
-              {/* Primary Speak / Retry Button (Front & Center) */}
+          <div className="flex w-full max-w-2xl flex-col items-center gap-2">
+            <div className="flex w-full flex-row gap-2.5 sm:gap-3.5">
               <button
                 type="button"
                 onClick={handleStartRecording}
-                className={`flex-[1.5] inline-flex items-center justify-center gap-2.5 rounded-2xl border-b-4 px-6 py-4 text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
+                className={`flex-[1.4] inline-flex items-center justify-center gap-2 rounded-2xl border-b-4 px-4 py-3.5 sm:px-6 sm:py-4 text-sm sm:text-base font-black text-white shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-0 ${
                   scoreIsForThisStep && !hasPassedStep
                     ? "border-orange-700 bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25"
                     : scoreIsForThisStep
@@ -630,10 +656,10 @@ export function PronunciationStep({
               >
                 {scoreIsForThisStep || error ? (
                   <>
-                    <RotateCcw size={20} />
+                    <RotateCcw size={18} />
                     <span>
                       {isAutoAdvancing
-                        ? "Stay & Practice Again"
+                        ? "Practice Again"
                         : hasPassedStep
                           ? "Practice Again"
                           : "Try Again"}
@@ -641,33 +667,32 @@ export function PronunciationStep({
                   </>
                 ) : (
                   <>
-                    <Mic size={22} />
+                    <Mic size={20} />
                     <span>Tap to Speak</span>
                   </>
                 )}
               </button>
 
-              {/* Secondary Replay Audio Button */}
               <button
                 type="button"
                 onClick={handlePlayAudio}
                 disabled={isBusy}
-                className={`flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-b-4 px-5 py-4 text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${
+                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 px-3.5 py-3.5 sm:px-5 sm:py-4 text-xs sm:text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${
                   isAudioActive
                     ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-md"
                     : "border-slate-200 border-b-slate-300 bg-white text-slate-700 hover:border-sky-400 hover:bg-sky-50/40"
                 }`}
               >
                 {isAudioActive ? (
-                  <Square size={18} className="fill-current" />
+                  <Square size={16} className="fill-current" />
                 ) : (
-                  <Volume2 size={20} className="text-blue-600" />
+                  <Volume2 size={18} className="text-blue-600" />
                 )}
-                <span>{isAudioActive ? "Playing..." : "Replay Audio"}</span>
+                <span>{isAudioActive ? "Playing..." : "Replay"}</span>
               </button>
             </div>
 
-            <p className="text-center text-xs font-semibold text-slate-400">
+            <p className="text-center text-[11px] sm:text-xs font-semibold text-slate-400">
               {isAutoAdvancing
                 ? "Great pronunciation! Moving to next chunk automatically..."
                 : "Audio plays automatically • Tap to Speak and pause when finished"}
@@ -677,10 +702,10 @@ export function PronunciationStep({
 
         {/* LISTENING WAVEFORM */}
         {isListening && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-indigo-200 bg-indigo-50/60 px-6 py-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-indigo-200 bg-indigo-50/60 px-5 py-4 animate-in fade-in zoom-in-95 duration-200">
             <LiveWaveform onPhaseChange={setVoicePhase} />
 
-            <div className="mt-3 flex items-center gap-2 text-sm font-extrabold">
+            <div className="mt-2.5 flex items-center gap-2 text-xs sm:text-sm font-extrabold">
               {voicePhase === "waiting" && (
                 <>
                   <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-indigo-500" />
@@ -717,7 +742,7 @@ export function PronunciationStep({
             <button
               type="button"
               onClick={cancelAssessment}
-              className="mt-3 inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold text-slate-500 hover:bg-slate-200/60 hover:text-slate-800"
+              className="mt-2.5 inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold text-slate-500 hover:bg-slate-200/60 hover:text-slate-800"
             >
               <X size={14} /> Cancel
             </button>
@@ -726,9 +751,9 @@ export function PronunciationStep({
 
         {/* ANALYZING */}
         {isAnalyzing && (
-          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-amber-200 bg-amber-50/60 px-6 py-6 text-center animate-in fade-in duration-200">
-            <Loader2 size={30} className="mb-2 animate-spin text-amber-600" />
-            <p className="text-base font-extrabold text-slate-900">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-amber-200 bg-amber-50/60 px-5 py-5 text-center animate-in fade-in duration-200">
+            <Loader2 size={28} className="mb-2 animate-spin text-amber-600" />
+            <p className="text-sm sm:text-base font-extrabold text-slate-900">
               Analyzing your pronunciation...
             </p>
             <p className="mt-0.5 text-xs font-medium text-slate-500">
@@ -740,9 +765,9 @@ export function PronunciationStep({
 
       {/* Error Banner */}
       {error && !isBusy && (
-        <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
-          <div className="flex items-center gap-2.5">
-            <AlertCircle className="shrink-0" size={18} />
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs sm:text-sm font-bold text-rose-700">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="shrink-0" size={16} />
             <p>{error}</p>
           </div>
           <button
@@ -755,44 +780,13 @@ export function PronunciationStep({
         </div>
       )}
 
-      {/* 4. Score Breakdown Card */}
-      {scoreIsForThisStep && score && !isBusy && (
-        <div className="mb-6 rounded-3xl border border-slate-200/80 bg-slate-50/80 p-5 animate-in slide-in-from-bottom-3">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="text-blue-600" size={20} />
-              <h3 className="text-sm font-black text-slate-900 uppercase">
-                Voice Telemetry
-              </h3>
-            </div>
-            {hasPassedStep ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
-                <CheckCircle2 size={14} />{" "}
-                {isAutoAdvancing ? "Passed! Next chunk..." : "Great job!"}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900">
-                Aim for {PASSING_SCORE}%+ (Attempt {stepAttempts}/
-                {MAX_REQUIRED_ATTEMPTS})
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <ScoreBar label="Overall" value={score.pronunciationScore} />
-            <ScoreBar label="Accuracy" value={score.accuracyScore} />
-            <ScoreBar label="Fluency" value={score.fluencyScore} />
-          </div>
-        </div>
-      )}
-
-      {/* 5. Footer Navigation */}
-      <div className="mt-auto flex justify-end border-t border-slate-100 pt-5">
+      {/* 5. Sticky Floating Bottom CTA on Mobile */}
+      <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-auto flex justify-end border-t border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur-md sm:static sm:mx-0 sm:mb-0 sm:bg-transparent sm:px-0 sm:pt-5 sm:pb-0">
         <button
           type="button"
           onClick={handleNextWord}
           disabled={isBusy || !canContinue}
-          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-3.5 sm:py-4 text-sm sm:text-base font-black transition-all ${
             !isBusy && canContinue
               ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               : "cursor-not-allowed bg-slate-200/80 text-slate-400"
