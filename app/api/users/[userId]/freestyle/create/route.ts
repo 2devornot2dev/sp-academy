@@ -198,7 +198,7 @@ Output ONLY a JSON object with 4 keys:
     // ========================================================================
     const entitlements = await getUserEntitlements(userId);
 
-    if (entitlements.isTrial || entitlements.dailyFreestyleMax <= 0) {
+    if (entitlements.dailyFreestyleMax <= 0) {
       return NextResponse.json(
         {
           error:
@@ -209,23 +209,45 @@ Output ONLY a JSON object with 4 keys:
       );
     }
 
-    const startOfToday = getStartOfToday();
-    const todayUsedCount = await prisma.freestyleSession.count({
-      where: {
-        userId,
-        status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-        createdAt: { gte: startOfToday },
-      },
-    });
-
-    if (todayUsedCount >= entitlements.dailyFreestyleMax) {
-      return NextResponse.json(
-        {
-          error: `You've reached today's limit of ${entitlements.dailyFreestyleMax} AI conversations. Come back tomorrow!`,
-          requiresUpgrade: entitlements.plan === "FOUNDER",
+    if (entitlements.isTrial) {
+      const trialUsedCount = await prisma.freestyleSession.count({
+        where: {
+          userId,
+          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+          isFoundation: false,
         },
-        { status: 429 },
-      );
+      });
+
+      if (trialUsedCount >= 1) {
+        return NextResponse.json(
+          {
+            error:
+              "You've used your 1 free Trial AI conversation! Upgrade to Beta Founder for 5 daily live sprints.",
+            requiresUpgrade: true,
+          },
+          { status: 403 },
+        );
+      }
+    } else {
+      const startOfToday = getStartOfToday();
+      const todayUsedCount = await prisma.freestyleSession.count({
+        where: {
+          userId,
+          status: { in: ["REVIEW_PENDING", "REVIEWED"] },
+          createdAt: { gte: startOfToday },
+          isFoundation: false,
+        },
+      });
+
+      if (todayUsedCount >= entitlements.dailyFreestyleMax) {
+        return NextResponse.json(
+          {
+            error: `You've reached today's limit of ${entitlements.dailyFreestyleMax} AI conversations. Come back tomorrow!`,
+            requiresUpgrade: entitlements.plan === "FOUNDER",
+          },
+          { status: 429 },
+        );
+      }
     }
 
     const {
@@ -365,7 +387,10 @@ Output ONLY a JSON object with 4 keys:
         }
       }
     } catch (e) {
-      console.warn("[freestyle/create] Could not resolve milestone phrases:", e);
+      console.warn(
+        "[freestyle/create] Could not resolve milestone phrases:",
+        e,
+      );
     }
 
     const tutorConfig = getFreestyleTutor(voiceGender);
@@ -381,11 +406,7 @@ Output ONLY a JSON object with 4 keys:
           "Muchas gracias por todo",
         ]
       : targetLanguage.startsWith("en")
-        ? [
-            "I would like a coffee",
-            "I work every day",
-            "Thank you very much",
-          ]
+        ? ["I would like a coffee", "I work every day", "Thank you very much"]
         : [
             "Je voudrais un café",
             "Je travaille chaque jour",
@@ -473,8 +494,7 @@ CRITICAL RULES:
               level,
               persona,
               topic: topic || null,
-              primaryPerSpoon:
-                mode === "FOCUSED" ? primaryPerSpoon : undefined,
+              primaryPerSpoon: mode === "FOCUSED" ? primaryPerSpoon : undefined,
               speakablePhrases:
                 mode === "FOCUSED" ? speakablePhrases.slice(0, 9) : undefined,
               nativeLanguage,
@@ -510,7 +530,7 @@ CRITICAL RULES:
       console.warn("[freestyle/create] Qwen fallback used:", e);
     }
 
-    const session = await prisma.freestyleSession.create({
+   const session = await prisma.freestyleSession.create({
       data: {
         userId,
         mode: mode,
@@ -520,6 +540,7 @@ CRITICAL RULES:
         status: "IN_PROGRESS",
         duration: 0,
         milestoneIndex: currentMilestoneIndex,
+        isFoundation: false,
       },
     });
 

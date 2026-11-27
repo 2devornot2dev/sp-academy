@@ -53,10 +53,10 @@ export async function getUserReviews(
   userId: string,
 ): Promise<UserReviewListItem[]> {
   const sessions = await prisma.freestyleSession.findMany({
-    where: {
+   where: {
       userId,
       status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-      OR: [{ isFoundation: false }, { isFoundation: null }],
+      isFoundation: false,
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -126,10 +126,10 @@ export async function getConversationReview(
   data: ReviewApiResponse | null;
 }> {
   const session = await prisma.freestyleSession.findFirst({
-    where: {
+   where: {
       id: sessionId,
       userId,
-      OR: [{ isFoundation: false }, { isFoundation: null }],
+      isFoundation: false,
     },
     include: { review: true },
   });

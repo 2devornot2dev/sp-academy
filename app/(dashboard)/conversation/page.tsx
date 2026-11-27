@@ -27,7 +27,7 @@ export default async function ConversationPage() {
         userId: user.id,
         status: { in: ["REVIEW_PENDING", "REVIEWED"] },
         createdAt: { gte: startOfToday },
-        OR: [{ isFoundation: false }, { isFoundation: null }],
+        isFoundation: false,
       },
       orderBy: { createdAt: "desc" },
       select: {
@@ -40,7 +40,7 @@ export default async function ConversationPage() {
       where: {
         userId: user.id,
         status: { in: ["REVIEW_PENDING", "REVIEWED"] },
-        OR: [{ isFoundation: false }, { isFoundation: null }],
+        isFoundation: false,
       },
     }),
   ]);
@@ -77,10 +77,7 @@ export default async function ConversationPage() {
     }
   }
 
-  const dailySessionsUsed = Math.max(
-    redisState.dailyUsed,
-    todaySessions.length,
-  );
+  const dailySessionsUsed = todaySessions.length;
 
   return (
     <div className="flex h-full min-h-0 flex-1 w-full flex-col bg-slate-100">
