@@ -41,7 +41,7 @@ export const LOGO_URL =
   process.env.EMAIL_LOGO_URL || "PASTE_YOUR_CLOUDINARY_LOGO_URL_HERE";
 
 export const EMAIL_FROM =
-  process.env.EMAIL_FROM || "Spoon Academy <hello@spoonacademy.com>";
+  process.env.EMAIL_FROM || "Spoon Academy <hello@updates.spoonacademy.com>";
 
 export const DEFAULT_REPLY_TO =
   process.env.EMAIL_REPLY_TO || "hello@spoonacademy.com";
