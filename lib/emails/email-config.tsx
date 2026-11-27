@@ -38,7 +38,7 @@ export {
 export type ProgramTier = "TRIAL" | "FOUNDER" | "UNLIMITED";
 
 export const LOGO_URL =
-  process.env.EMAIL_LOGO_URL || "PASTE_YOUR_CLOUDINARY_LOGO_URL_HERE";
+  process.env.EMAIL_LOGO_URL || "https://res.cloudinary.com/dmllgn0t7/image/upload/v1795740188/logo1-nobg.png";
 
 export const EMAIL_FROM =
   process.env.EMAIL_FROM || "Spoon Academy <hello@updates.spoonacademy.com>";
