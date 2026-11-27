@@ -1,3 +1,4 @@
+// components/foundation/visual-step.tsx
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -41,7 +42,6 @@ export function VisualStep({
   const hasTrackedSeen = useRef(false);
   const hasTrackedHeard = useRef(false);
 
-  // Support both nativeNpcLine (from VisualGen) and npcLineNative fallback
   const npcNativeLine: string | undefined =
     data.nativeNpcLine || data.npcLineNative || undefined;
 
@@ -102,20 +102,20 @@ export function VisualStep({
   };
 
   return (
-    <div className="flex h-full flex-col justify-between overflow-y-auto p-6 sm:p-10 animate-in fade-in duration-500">
+    <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-10 animate-in fade-in duration-500">
       {/* 1. Header & Scene Location Pill */}
-      <div className="mb-5 shrink-0 space-y-3">
+      <div className="mb-4 sm:mb-5 shrink-0 space-y-2.5 sm:space-y-3">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+          <h2 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900">
             Setting the Scene
           </h2>
-          <p className="mt-1 text-sm sm:text-base font-medium text-slate-500">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-base font-medium text-slate-500">
             Listen to the NPC and choose your response using the target chunk.
           </p>
         </div>
 
         {data.sceneDescription && (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-slate-50 px-4 py-3 text-slate-700 ring-1 ring-slate-200/80">
+          <div className="flex items-start gap-2.5 rounded-2xl bg-slate-50 px-3.5 py-2.5 sm:px-4 sm:py-3 text-slate-700 ring-1 ring-slate-200/80">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
             <p className="text-xs sm:text-sm font-semibold leading-snug">
               {data.sceneDescription}
@@ -124,38 +124,41 @@ export function VisualStep({
         )}
       </div>
 
-      {/* 2. 16:9 Scene Image & Floating 3D NPC Dialogue Dock */}
-      <div className="relative mb-6 flex aspect-[16/10] sm:aspect-[16/9] w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-slate-900 shadow-lg ring-1 ring-slate-200">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={data.altText}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            {isMediaLoading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-            ) : (
-              <span className="text-sm font-semibold text-slate-400">
-                Image not found
-              </span>
-            )}
-          </div>
-        )}
+      {/* 2. Scene Image + NPC Dialogue Dock (Stacked below image on mobile/iPad < lg, overlaid on lg+) */}
+      <div className="relative mb-5 sm:mb-6 flex w-full shrink-0 flex-col overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-200 lg:aspect-[16/9] lg:bg-slate-900">
+        {/* Artwork Area: unobstructed on mobile/tablet (< lg), full bleed on lg+ */}
+        <div className="relative flex aspect-[16/10] sm:aspect-[16/9] w-full items-center justify-center overflow-hidden bg-slate-900 lg:absolute lg:inset-0 lg:aspect-auto">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={data.altText}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              {isMediaLoading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              ) : (
+                <span className="text-sm font-semibold text-slate-400">
+                  Image not found
+                </span>
+              )}
+            </div>
+          )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+          <div className="pointer-events-none hidden lg:block absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+        </div>
 
-        {/* Floating 3D NPC Dialogue Dock */}
+        {/* NPC Dialogue Dock: stacked cleanly below art on mobile/iPad (< lg), floating dock on lg+ */}
         <div
-          className={`absolute inset-x-3 bottom-3 sm:inset-x-5 sm:bottom-4 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 ${
+          className={`relative z-10 border-t border-slate-200/80 p-3.5 sm:p-4 transition-all duration-300 lg:absolute lg:inset-x-5 lg:bottom-4 lg:rounded-2xl lg:border-0 ${
             isPlaying
-              ? "bg-white/98 shadow-2xl ring-2 ring-sky-400"
-              : "bg-white/92 hover:bg-white/96 shadow-xl backdrop-blur-md"
+              ? "bg-sky-50/90 lg:bg-white/98 lg:shadow-2xl lg:ring-2 lg:ring-sky-400"
+              : "bg-white lg:bg-white/92 lg:hover:bg-white/96 lg:shadow-xl lg:backdrop-blur-md"
           }`}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3.5">
+          <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               {/* 3D Play Button */}
               <button
                 type="button"
@@ -209,21 +212,21 @@ export function VisualStep({
       </div>
 
       {/* 3. Required Chunk & 3D Response Options */}
-      <div className="mb-6 shrink-0 space-y-3">
+      <div className="mb-4 sm:mb-6 shrink-0 space-y-2.5 sm:space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm sm:text-base font-black text-slate-900">
+          <div className="flex items-center gap-1.5 text-xs sm:text-base font-black text-slate-900">
             <User className="h-4 w-4 text-blue-600" />
             <span>Choose your response:</span>
           </div>
 
           {data.constraint?.requiredChunk && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black tracking-wide text-amber-800 uppercase">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] sm:text-xs font-black tracking-wide text-amber-800 uppercase">
               Target Chunk: &ldquo;{data.constraint.requiredChunk}&rdquo;
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:gap-3">
           {data.constraint?.validReplies?.map((reply: string, idx: number) => {
             const isSelected = selectedReply === reply;
             return (
@@ -231,7 +234,7 @@ export function VisualStep({
                 key={idx}
                 type="button"
                 onClick={() => handleSelectReply(reply)}
-                className={`flex items-center justify-between gap-3 rounded-2xl border-2 border-b-[5px] px-5 py-3.5 text-left text-sm sm:text-base font-black transition-all duration-150 ${
+                className={`flex items-center justify-between gap-3 rounded-2xl border-2 border-b-[5px] px-4 py-3 sm:px-5 sm:py-3.5 text-left text-xs sm:text-base font-black transition-all duration-150 ${
                   isSelected
                     ? "border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-md shadow-emerald-500/20"
                     : "border-slate-200 border-b-slate-300 bg-white text-slate-800 shadow-2xs hover:-translate-y-0.5 hover:border-sky-400 hover:bg-sky-50/40 active:translate-y-0.5 active:border-b-2"
@@ -257,13 +260,13 @@ export function VisualStep({
         </div>
       </div>
 
-      {/* 4. Footer 3D CTA */}
-      <div className="mt-auto flex shrink-0 justify-end border-t border-slate-100 pt-5">
+      {/* 4. Sticky Floating Bottom CTA on Mobile */}
+      <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-auto flex shrink-0 justify-end border-t border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur-md sm:static sm:mx-0 sm:mb-0 sm:bg-transparent sm:px-0 sm:pt-5 sm:pb-0">
         <button
           type="button"
           onClick={handleNext}
           disabled={!selectedReply}
-          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-black transition-all ${
+          className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl px-8 py-3.5 sm:py-4 text-sm sm:text-base font-black transition-all ${
             selectedReply
               ? "border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
               : "cursor-not-allowed bg-slate-200/80 text-slate-400"
