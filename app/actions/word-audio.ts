@@ -1,32 +1,51 @@
+// app/actions/word-audio.ts
 "use server";
 
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const s3 = new S3Client({ region: process.env.AWS_REGION });
-const BUCKET = process.env.AWS_BUCKET_NAME!;
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
 
-// s3 keys in -> { [s3Key]: signedUrl } out
 export async function getWordAudioUrls(
-  keys: string[]
+  keys: string[],
 ): Promise<Record<string, string>> {
+  const bucketName =
+    process.env.AWS_BUCKET_NAME ||
+    process.env.AWS_S3_BUCKET_NAME ||
+    process.env.S3_BUCKET;
+
+  if (!bucketName) {
+    console.error("[getWordAudioUrls] Missing S3 bucket env var");
+    return {};
+  }
+
   const safeKeys = keys.filter(
-    (k) =>
-      typeof k === "string" &&
-      k.startsWith("foundation/words/") &&
-      !k.includes("..")
+    (k): k is string =>
+      typeof k === "string" && k.trim().length > 0 && !k.includes(".."),
   );
 
   const entries = await Promise.all(
-    safeKeys.map(async (key) => [
-      key,
-      await getSignedUrl(
-        s3,
-        new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-        { expiresIn: 3600 }
-      ),
-    ])
+    safeKeys.map(async (rawKey) => {
+      const cleanKey = rawKey.replace(/^\/+/, "");
+      try {
+        const url = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({ Bucket: bucketName, Key: cleanKey }),
+          { expiresIn: 3600 },
+        );
+        return [rawKey, url] as const;
+      } catch (err) {
+        console.error(`[getWordAudioUrls] failed for ${rawKey}:`, err);
+        return [rawKey, ""] as const;
+      }
+    }),
   );
 
-  return Object.fromEntries(entries);
+  return Object.fromEntries(entries.filter(([, url]) => Boolean(url)));
 }
