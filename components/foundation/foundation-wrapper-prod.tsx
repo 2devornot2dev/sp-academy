@@ -232,8 +232,8 @@ function FoundationContent({ foundation }: FoundationContentProps) {
                   }).catch((err) =>
                     console.error(
                       "Failed to trigger milestone boss & next spoon:",
-                      err
-                    )
+                      err,
+                    ),
                   );
                 }
 
@@ -254,14 +254,20 @@ function FoundationContent({ foundation }: FoundationContentProps) {
   };
 
   const progressPct = Math.round(
-    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100
+    ((step - 1) / (STEPS_CONFIG.length - 1)) * 100,
   );
 
   return (
     <WordAudioProvider wordAudio={wordAudio} targetLang={targetLang}>
       <AudioStepGuard step={step} />
 
-      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-3 p-3 sm:gap-5 sm:p-5 md:flex-row md:gap-8 md:p-8">
+      <div
+        className={`mx-auto flex max-w-7xl flex-col gap-3 p-3 sm:gap-5 sm:p-5 md:flex-row md:gap-8 md:p-8 ${
+          step === 7
+            ? "h-[calc(100dvh-3rem)] md:h-dvh overflow-hidden"
+            : "min-h-full"
+        }`}
+      >
         {/* =================================================================
             MOBILE-ONLY SLIM TOP PROGRESS HEADER (< md)
             ================================================================= */}

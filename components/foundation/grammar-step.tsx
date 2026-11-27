@@ -226,7 +226,7 @@ export function GrammarStep({
 
         <div className="relative rounded-2xl border border-slate-200/80 bg-slate-50/50 p-2.5">
           <ScrollArea className="h-[260px] pr-4">
-            <div className="grid grid-cols-1 gap-3 pb-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 pt-1.5 pb-6 md:grid-cols-2">
               {data.words.map((wordObj: any, idx: number) => {
                 const isThisWordPlaying =
                   isWordPlaying && activeWord === wordObj.word;
