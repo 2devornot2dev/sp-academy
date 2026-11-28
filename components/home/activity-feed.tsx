@@ -15,6 +15,7 @@ import {
 import type { FeedActivityItem } from "@/app/api/shared-activity/route";
 import { UserProfileData } from "@/app/actions/get-home-dashboard";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+import { Skeleton } from "../ui/skeleton";
 import { playSfx } from "@/lib/sfx";
 
 const ACTIVITY_THEME_MAP: Record<
@@ -62,6 +63,55 @@ const ACTIVITY_THEME_MAP: Record<
     cardHover: "hover:border-amber-300",
   },
 };
+
+/**
+ * Skeleton that mirrors the real activity card layout (same borders, padding,
+ * avatar row, emblem, text lines and like button) so nothing jumps when the
+ * feed + like counts finish loading.
+ */
+function ActivityCardSkeleton() {
+  return (
+    <div className="rounded-2xl border-2 border-b-4 border-slate-200/80 border-b-slate-300/80 bg-white p-2.5 sm:p-3">
+      {/* Top Row: avatar + username + time + badge */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Skeleton className="h-6 w-6 shrink-0 rounded-lg" />
+          <Skeleton className="h-3 w-20 rounded-md" />
+          <Skeleton className="h-2.5 w-12 rounded-md" />
+        </div>
+        <Skeleton className="h-4 w-14 shrink-0 rounded-lg" />
+      </div>
+
+      {/* Bottom Row: emblem + title/detail + like button */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <Skeleton className="h-10 w-10 shrink-0 rounded-xl sm:h-11 sm:w-11" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Skeleton className="h-3 w-3/4 rounded-md" />
+            <Skeleton className="h-2.5 w-1/2 rounded-md" />
+          </div>
+        </div>
+        <Skeleton className="h-7 w-12 shrink-0 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+function ActivityFeedSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+      className="min-h-0 flex-1 space-y-2.5 overflow-hidden pr-1"
+    >
+      <span className="sr-only">Loading activity feed…</span>
+      {Array.from({ length: count }).map((_, n) => (
+        <ActivityCardSkeleton key={n} />
+      ))}
+    </div>
+  );
+}
 
 function LikeButton({ item }: { item: FeedActivityItem }) {
   const [liked, setLiked] = useState(Boolean(item.liked));
@@ -170,16 +220,7 @@ export default function ActivityFeed({
   }, [userId]);
 
   if (loading) {
-    return (
-      <div className="space-y-2.5">
-        {[1, 2, 3, 4].map((n) => (
-          <div
-            key={n}
-            className="h-20 animate-pulse rounded-2xl border-2 border-b-4 border-slate-100 bg-slate-50/70 p-3"
-          />
-        ))}
-      </div>
-    );
+    return <ActivityFeedSkeleton />;
   }
 
   if (activities.length === 0) {
