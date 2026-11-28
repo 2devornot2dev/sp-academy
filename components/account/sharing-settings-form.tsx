@@ -83,23 +83,23 @@ export function SharingSettingsForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8"
+      className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-sm sm:p-8"
     >
-      <div className="mb-6 flex items-center gap-3.5 border-b border-slate-100 pb-5">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
+      <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-4 sm:mb-6 sm:pb-5">
+        <span className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
           <Share2 className="h-5 w-5" />
         </span>
         <div>
-          <h2 className="text-lg font-black text-slate-900">
+          <h2 className="text-base sm:text-lg font-black text-slate-900">
             Privacy &amp; Community Feed Sharing
           </h2>
-          <p className="text-xs font-semibold text-slate-500">
+          <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
             Control which milestones and wins appear on the live Spoon Feed.
           </p>
         </div>
       </div>
 
-      <div className="space-y-3.5">
+      <div className="space-y-3">
         {items.map((item) => {
           const Icon = item.icon;
           const active = sharing[item.key];
@@ -121,32 +121,32 @@ export function SharingSettingsForm({
                   }));
                 }
               }}
-              className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border-2 border-b-4 p-4 transition-all select-none ${
+              className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 border-b-4 p-3.5 sm:p-4 transition-all select-none ${
                 active
                   ? "border-sky-300 border-b-sky-400 bg-sky-50/40"
                   : "border-slate-200 border-b-slate-300 bg-white hover:bg-slate-50/70"
               }`}
             >
-              <div className="flex items-center gap-3.5">
+              <div className="flex min-w-0 items-center gap-3">
                 <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${item.iconColor}`}
+                  className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border ${item.iconColor}`}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </span>
-                <div>
-                  <span className="block text-sm font-black text-slate-900">
+                <div className="min-w-0">
+                  <span className="block text-xs sm:text-sm font-black text-slate-900">
                     {item.title}
                   </span>
-                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                  <p className="mt-0.5 text-[11px] sm:text-xs font-medium text-slate-500">
                     {item.description}
                   </p>
                 </div>
               </div>
 
               {/* High-Contrast 3D Tactile Toggle Switch */}
-              <div className="flex shrink-0 items-center gap-2.5">
+              <div className="flex shrink-0 items-center gap-2">
                 <span
-                  className={`text-[10px] font-black tracking-wider uppercase ${
+                  className={`hidden sm:inline text-[10px] font-black tracking-wider uppercase ${
                     active ? "text-blue-600" : "text-slate-400"
                   }`}
                 >
@@ -171,11 +171,11 @@ export function SharingSettingsForm({
         })}
       </div>
 
-      <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
+      <div className="mt-5 flex justify-end border-t border-slate-100 pt-4 sm:mt-6 sm:pt-5">
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-xs font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:text-sm"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-xs font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:text-sm"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
