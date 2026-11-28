@@ -184,7 +184,6 @@ export default function FreestyleSetup({
   dailyMax = 5,
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
-  // Unselected by default so users don't accidentally waste a daily 3-min session
   const [mode, setMode] = useState<string | null>(null);
   const [level, setLevel] = useState<"ZERO" | "EASY" | "MEDIUM" | "FLUENT" | null>(
     null
@@ -241,7 +240,7 @@ export default function FreestyleSetup({
       {/* =====================================================================
           1. HEADER BANNER
           ===================================================================== */}
-      <header className="relative shrink-0 overflow-hidden animate-bg pt-4 pb-12 sm:pt-6 sm:pb-16 text-white shadow-lg">
+      <header className="relative shrink-0 overflow-hidden animate-bg pt-3.5 pb-10 sm:pt-6 sm:pb-16 text-white shadow-lg">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/15 to-slate-950/35 backdrop-blur-[2px]" />
         <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[850px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 
@@ -277,39 +276,41 @@ export default function FreestyleSetup({
       {/* =====================================================================
           2. MAIN STAGE GRID
           ===================================================================== */}
-      <main className="relative z-20 mx-auto -mt-8 sm:-mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-4 pb-8 sm:px-6 lg:px-8 lg:pb-5">
-        <div className="grid h-full min-h-0 w-full grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
+      <main className="relative z-20 mx-auto -mt-7 sm:-mt-10 flex min-h-0 w-full max-w-7xl flex-1 px-3.5 pb-24 sm:px-6 lg:px-8 lg:pb-5">
+        <div className="grid h-full min-h-0 w-full grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
           {/* LEFT COLUMN (8 Cols) */}
           <div className="flex min-h-0 flex-col gap-4 sm:gap-5 lg:col-span-8">
             {/* ===============================================================
-                CARD 1: 3D HERO ARENA CARD (THE SINGLE PRIMARY LAUNCH CTA!)
+                CARD 1: VIBRANT GRADIENT HERO ARENA CARD
                 =============================================================== */}
-            <div className="group relative shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
+            <div className="group relative shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl border-b-[6px] border-indigo-950/40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]">
+              <div className="pointer-events-none absolute -top-16 -left-10 h-52 w-52 rounded-full bg-cyan-400/30 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 right-4 h-56 w-56 rounded-full bg-fuchsia-400/25 blur-3xl" />
+
               <img
                 src="/freestyle-cover.png"
                 alt="Freestyle Arena"
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-45 transition-transform duration-700 group-hover:scale-105"
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-luminosity transition-transform duration-700 group-hover:scale-105"
               />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-indigo-950/45" />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-700/85 via-indigo-700/70 to-purple-800/50" />
 
               <div className="relative z-10 p-4 sm:p-6 sm:px-7">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/35 bg-indigo-500/20 px-3 py-1 text-[10px] sm:text-[11px] font-black tracking-wide text-indigo-200 uppercase backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[10px] sm:text-[11px] font-black tracking-wide text-white uppercase backdrop-blur-md">
                     <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                     Freestyle Speaking Mode
                   </span>
 
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-slate-200 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-white backdrop-blur-md">
                     <span>
                       {selectedModeObj
                         ? `${selectedModeObj.icon} ${selectedModeObj.label}`
                         : "Pick a Mode"}
                     </span>
-                    <span className="text-white/30">•</span>
+                    <span className="text-white/40">•</span>
                     <span
                       className={
-                        selectedLevelObj ? "text-emerald-300" : "text-slate-400"
+                        selectedLevelObj ? "text-emerald-200" : "text-white/75"
                       }
                     >
                       {selectedLevelObj
@@ -319,9 +320,9 @@ export default function FreestyleSetup({
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3.5 sm:flex-row sm:items-center sm:gap-4">
+                <div className="mt-4 flex items-center gap-3.5 sm:gap-4">
                   <div className="relative w-fit shrink-0">
-                    <div className="h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border-2 border-b-4 border-indigo-400/80 bg-slate-900 shadow-lg shadow-indigo-500/25">
+                    <div className="h-14 w-14 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border-2 border-b-4 border-white/80 border-b-sky-300 bg-slate-900 shadow-lg">
                       <img
                         src={previewAvatarUrl}
                         alt="AI Tutor Avatar"
@@ -333,15 +334,15 @@ export default function FreestyleSetup({
                     </span>
                   </div>
 
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <span className="text-[10px] sm:text-[11px] font-black tracking-wider text-sky-300 uppercase">
+                  <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                    <span className="text-[10px] sm:text-[11px] font-black tracking-wider text-sky-200 uppercase">
                       Your AI Conversation Partner
                     </span>
-                    <h2 className="truncate text-xl font-black tracking-tight text-white sm:text-3xl">
+                    <h2 className="truncate text-lg font-black tracking-tight text-white drop-shadow-xs sm:text-3xl">
                       {voiceGender === "female" ? "Sophie" : "Antoine"} —{" "}
                       {selectedPersonaObj.icon} {selectedPersonaObj.label} Tutor
                     </h2>
-                    <p className="line-clamp-1 max-w-xl text-xs sm:text-sm font-medium text-slate-300">
+                    <p className="line-clamp-1 max-w-xl text-xs sm:text-sm font-medium text-sky-100">
                       {!selectedModeObj || !selectedLevelObj
                         ? "Choose a conversation type and difficulty below to unlock start."
                         : mode === "SPECIFIC" && topic
@@ -351,20 +352,20 @@ export default function FreestyleSetup({
                   </div>
                 </div>
 
-                <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-t border-white/10 pt-3.5 sm:pt-4">
-                  <div className="flex items-center gap-2 text-[11px] sm:text-xs font-bold text-slate-300">
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+                <div className="mt-4 sm:mt-5 hidden sm:flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-t border-white/20 pt-3.5 sm:pt-4">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-xs font-bold text-white/90">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" />
                     <span>
                       Includes full grammar, vocab &amp; pronunciation report
                     </span>
                   </div>
 
-                  {/* THE ONLY LAUNCH BUTTON ON THE PAGE */}
+                  {/* Desktop Launch CTA */}
                   <button
                     type="button"
                     onClick={handleStart}
                     disabled={isStarting || !canStart || isDailyCapReached}
-                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-7 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-slate-700 disabled:bg-slate-800 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-400 disabled:shadow-none"
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 px-7 py-3.5 text-xs sm:text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-white/15 disabled:bg-white/15 disabled:from-transparent disabled:to-transparent disabled:text-white/60 disabled:shadow-none"
                   >
                     {isDailyCapReached ? (
                       <span>
@@ -461,7 +462,6 @@ export default function FreestyleSetup({
               <div className="flex min-h-0 flex-1 flex-col justify-between px-4 py-3.5 sm:px-6 sm:py-4">
                 {step === 1 ? (
                   <div className="flex h-full flex-col justify-between gap-3">
-                    {/* 4 Tactile 3D Mode Cards (Icon + Title only on mobile) */}
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
                       {MODES.map((m) => {
                         const isSelected = mode === m.id;
@@ -508,7 +508,7 @@ export default function FreestyleSetup({
                     </div>
 
                     {/* Fixed-Height Scenario Briefing Dock */}
-                    <div className="flex min-h-[76px] sm:h-[84px] shrink-0 flex-col justify-center rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
+                    <div className="flex min-h-[72px] sm:h-[84px] shrink-0 flex-col justify-center rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
                       {mode === "SPECIFIC" ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -564,7 +564,6 @@ export default function FreestyleSetup({
                     </div>
                   </div>
                 ) : (
-                  /* STEP 2: 4 Tactile 3D Difficulty Cards + Matching Briefing Dock */
                   <div className="flex h-full flex-col justify-between gap-3">
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-4">
                       {LEVELS.map((l) => {
@@ -605,8 +604,7 @@ export default function FreestyleSetup({
                       })}
                     </div>
 
-                    {/* Matching Difficulty Briefing Dock */}
-                    <div className="flex min-h-[76px] sm:h-[84px] shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
+                    <div className="flex min-h-[72px] sm:h-[84px] shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 sm:px-4">
                       <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-b-2 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-2xs">
                         <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
@@ -668,7 +666,7 @@ export default function FreestyleSetup({
                       {isDailyCapReached
                         ? "Daily limit reached"
                         : canStart
-                          ? "Ready — Click Start Above"
+                          ? "Ready — Start Session!"
                           : "Pick a Difficulty Tier"}
                     </span>
                   </span>
@@ -682,9 +680,9 @@ export default function FreestyleSetup({
               ================================================================= */}
           <div className="flex min-h-0 flex-col lg:col-span-4">
             <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-2xl sm:rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 sm:p-6 shadow-sm">
-              <div className="space-y-5">
+              <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
                     Session Preferences
                   </h3>
                   <p className="mt-0.5 text-xs font-medium text-slate-500">
@@ -705,7 +703,7 @@ export default function FreestyleSetup({
                           key={gender}
                           type="button"
                           onClick={() => setVoiceGender(gender)}
-                          className={`flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 py-3 text-xs font-black capitalize transition-all duration-150 ${
+                          className={`flex items-center justify-center gap-2 rounded-2xl border-2 border-b-4 py-2.5 sm:py-3 text-xs font-black capitalize transition-all duration-150 ${
                             active
                               ? "border-blue-700 bg-gradient-to-b from-sky-50 to-white text-blue-700 shadow-2xs"
                               : "border-slate-200 border-b-slate-300 bg-slate-50/60 text-slate-600 hover:bg-white"
@@ -758,7 +756,7 @@ export default function FreestyleSetup({
               </div>
 
               {/* 3. Bottom Live Configuration Summary Card */}
-              <div className="mt-5 space-y-2 rounded-2xl border-2 border-slate-200/80 bg-slate-50/80 p-4 text-xs">
+              <div className="mt-4 sm:mt-5 space-y-2 rounded-2xl border-2 border-slate-200/80 bg-slate-50/80 p-3.5 sm:p-4 text-xs">
                 <div className="mb-1 flex items-center justify-between border-b border-slate-200/70 pb-2">
                   <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">
                     Active Arena Config
@@ -802,6 +800,42 @@ export default function FreestyleSetup({
           </div>
         </div>
       </main>
+
+      {/* =====================================================================
+          3. STICKY MOBILE LAUNCH BAR (Always within thumb reach on mobile!)
+          ===================================================================== */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/90 bg-white/95 px-3.5 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md sm:hidden">
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={isStarting || !canStart || isDailyCapReached}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3 text-xs font-black text-white shadow-md shadow-emerald-500/25 transition-all active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-slate-300 disabled:bg-slate-200 disabled:from-transparent disabled:to-transparent disabled:text-slate-400 disabled:shadow-none"
+        >
+          {isDailyCapReached ? (
+            <span>
+              Daily Limit Reached ({dailyUsed}/{dailyMax})
+            </span>
+          ) : isStarting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Preparing Arena...</span>
+            </>
+          ) : !canStart ? (
+            <span>
+              {step === 1
+                ? "Select Mode & Continue"
+                : "Select Difficulty to Start"}
+            </span>
+          ) : (
+            <>
+              <Play className="h-4 w-4 fill-current" />
+              <span>
+                Start 3-Min Session ({remainingToday}/{dailyMax} left)
+              </span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
