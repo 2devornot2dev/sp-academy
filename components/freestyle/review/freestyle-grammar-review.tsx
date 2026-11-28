@@ -49,7 +49,7 @@ export function FreestyleGrammarReview({
 
   if (!cards.length) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5 rounded-3xl border-2 border-b-[6px] border-emerald-200 border-b-emerald-300 bg-white p-8 text-center shadow-sm animate-in fade-in">
+      <div className="mx-auto max-w-2xl space-y-5 rounded-3xl border-2 border-b-[6px] border-emerald-200 border-b-emerald-300 bg-white p-6 sm:p-8 text-center shadow-sm animate-in fade-in">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 text-3xl text-white shadow-md">
           🎉
         </div>
@@ -66,7 +66,7 @@ export function FreestyleGrammarReview({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-4 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-3.5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
@@ -74,7 +74,7 @@ export function FreestyleGrammarReview({
           )}
           <button
             onClick={onComplete}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-lg transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3.5 text-sm font-black text-white shadow-lg transition hover:brightness-105 active:translate-y-0.5 active:border-b-0"
           >
             <span>Continue to Speaking Drills</span>
             <ArrowRight className="h-4 w-4" />
@@ -98,7 +98,10 @@ export function FreestyleGrammarReview({
   };
 
   const handleSpeakWord = async (rawWord: string, wIdx: number) => {
-    const clean = rawWord.replace(/^[^\p{L}\p{N}'’-]+|[^\p{L}\p{N}'’-]+$/gu, "");
+    const clean = rawWord.replace(
+      /^[^\p{L}\p{N}'’-]+|[^\p{L}\p{N}'’-]+$/gu,
+      "",
+    );
     if (!clean) return;
     setActiveWordIdx(wIdx);
     try {
@@ -111,11 +114,11 @@ export function FreestyleGrammarReview({
   };
 
   return (
-    <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 animate-in fade-in">
+    <div className="grid grid-cols-1 items-stretch gap-4 sm:gap-6 lg:grid-cols-12 animate-in fade-in">
       {/* =====================================================================
-          LEFT (5 Cols): MASTER LIST OF ALL FIXES & UPGRADES
+          LEFT (5 Cols, Desktop lg+ only): MASTER LIST OF ALL FIXES & UPGRADES
           ===================================================================== */}
-      <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm lg:col-span-5">
+      <div className="hidden lg:flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm lg:col-span-5">
         <div>
           <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div>
@@ -126,15 +129,6 @@ export function FreestyleGrammarReview({
                 All Fixes &amp; Upgrades ({seenIds.size}/{cards.length})
               </h3>
             </div>
-
-            {/* <button
-              type="button"
-              onClick={onComplete}
-              className="inline-flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-blue-600 transition hover:bg-sky-100"
-            >
-              <span>Step 3: Speak</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button> */}
           </div>
 
           <div className="mt-3 max-h-[380px] space-y-2 overflow-y-auto pr-1">
@@ -213,15 +207,48 @@ export function FreestyleGrammarReview({
       </div>
 
       {/* =====================================================================
-          RIGHT (7 Cols): ACTIVE INTERACTIVE REPAIR STAGE
+          RIGHT (7 Cols): ACTIVE INTERACTIVE REPAIR STAGE (First on mobile!)
           ===================================================================== */}
-      <div className="flex flex-col justify-between space-y-5 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-7 lg:col-span-7">
-        <div className="space-y-4">
+      <div className="flex flex-col justify-between space-y-4 sm:space-y-5 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-sm sm:p-7 lg:col-span-7">
+        <div className="space-y-3.5 sm:space-y-4">
+          {/* Mobile-Only Compact Horizontal Card Selector Pills (< lg) */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 lg:hidden">
+            <div className="flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+              {cards.map((item, i) => {
+                const isSelected = i === index;
+                const isSeen = seenIds.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectCard(i)}
+                    className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-xl border-b-2 px-2.5 text-xs font-black transition ${
+                      isSelected
+                        ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                        : isSeen
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isSeen && !isSelected ? (
+                      <Check className="h-3.5 w-3.5 stroke-[3]" />
+                    ) : (
+                      <span>#{i + 1}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="shrink-0 text-[11px] font-black text-slate-400">
+              {index + 1}/{cards.length}
+            </span>
+          </div>
+
           {/* Card Header */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span
-                className={`rounded-xl border px-3 py-1 text-[10px] font-black tracking-wider uppercase ${
+                className={`rounded-xl border px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] font-black tracking-wider uppercase ${
                   current.kind === "FIX"
                     ? "border-rose-200 bg-rose-50 text-rose-700"
                     : "border-indigo-200 bg-indigo-50 text-indigo-700"
@@ -230,34 +257,34 @@ export function FreestyleGrammarReview({
                 {current.badge}
               </span>
               {current.severity && (
-                <span className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black tracking-wider text-amber-800 uppercase">
+                <span className="rounded-xl border border-amber-200 bg-amber-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] font-black tracking-wider text-amber-800 uppercase">
                   {current.severity}
                 </span>
               )}
             </div>
 
-            <span className="text-xs font-black text-slate-400">
+            <span className="hidden lg:inline text-xs font-black text-slate-400">
               Card {index + 1} of {cards.length}
             </span>
           </div>
 
           {/* What You Said */}
-          <div className="rounded-2xl border-2 border-rose-200/80 bg-rose-50/50 px-5 py-3.5">
+          <div className="rounded-2xl border-2 border-rose-200/80 bg-rose-50/50 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-rose-500 uppercase">
               <XCircle className="h-3.5 w-3.5" />
               <span>What You Said</span>
             </div>
-            <p className="mt-1 text-base font-bold text-rose-900 line-through decoration-rose-400/70">
+            <p className="mt-1 text-sm sm:text-base font-bold text-rose-900 line-through decoration-rose-400/70">
               &ldquo;{current.original}&rdquo;
             </p>
           </div>
 
-          {/* Native Way with Unified 3D Tactile Word Buttons (Plays S3 MP3s!) */}
-          <div className="rounded-3xl border-2 border-b-4 border-emerald-300 border-b-emerald-400 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 p-5">
+          {/* Native Way with Unified 3D Tactile Word Buttons */}
+          <div className="rounded-2xl sm:rounded-3xl border-2 border-b-4 border-emerald-300 border-b-emerald-400 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 p-3.5 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-emerald-700 uppercase">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>Native Way • Tap any word to hear its MP3</span>
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span>Native Way • Tap any word</span>
               </div>
 
               <button
@@ -266,14 +293,14 @@ export function FreestyleGrammarReview({
                 onClick={() =>
                   void speak(current.improved, targetLanguage, 0.92)
                 }
-                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3.5 py-1.5 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-2xs transition hover:brightness-105 active:translate-y-0.5 disabled:opacity-60"
               >
                 <Volume2 className="h-3.5 w-3.5" />
                 <span>Hear Full Phrase</span>
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2.5">
+            <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-2">
               {words.map((word, wIdx) => {
                 const isActive = activeWordIdx === wIdx;
                 return (
@@ -282,7 +309,7 @@ export function FreestyleGrammarReview({
                     type="button"
                     onClick={() => void handleSpeakWord(word, wIdx)}
                     title="Tap to hear word audio"
-                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-3.5 py-2 text-base font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-lg ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl border-2 border-b-4 px-3 py-1.5 sm:px-3.5 sm:py-2 text-sm font-black transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-lg ${
                       isActive
                         ? "border-blue-700 border-b-blue-900 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-sm"
                         : "border-emerald-200 border-b-emerald-400 bg-white text-emerald-950 hover:border-sky-400 hover:bg-sky-50"
@@ -301,7 +328,7 @@ export function FreestyleGrammarReview({
           </div>
 
           {/* Why Box */}
-          <div className="rounded-2xl border-2 border-amber-200/80 bg-amber-50/60 px-5 py-3.5">
+          <div className="rounded-2xl border-2 border-amber-200/80 bg-amber-50/60 px-4 py-3 sm:px-5 sm:py-3.5">
             <div className="flex items-center gap-1.5 text-[10px] font-black tracking-wider text-amber-700 uppercase">
               <Lightbulb className="h-3.5 w-3.5" />
               <span>Why Natives Say This</span>
@@ -313,7 +340,7 @@ export function FreestyleGrammarReview({
         </div>
 
         {/* Bottom Prev / Next Controls */}
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-3 pt-1">
           <button
             type="button"
             onClick={() => {
@@ -338,7 +365,7 @@ export function FreestyleGrammarReview({
                 selectCard(index + 1);
               }
             }}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:flex-none sm:px-8"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:flex-none sm:px-8"
           >
             {isLast ? (
               <>

@@ -44,11 +44,13 @@ export const PLAN_FREE_MILESTONE: Plan = {
   price: "$0",
   originalPrice: "",
   period: "Free trial",
-  description: "Test-drive the complete 3–3–1 voice engine through Milestone 1.",
+  description:
+    "Test-drive the complete 3–3–1 voice engine and a live AI call through Milestone 1.",
   features: [
     "Spoons 1–3 (8 voice & listening stages each)",
     "Vocab Bridges 1–3 with 5s video spotlights",
-    "Boss Stage 1 with live Azure speech scoring",
+    "1 Live 3-min AI Conversation + AI Review & Workout",
+    "Boss Stage 1 + Personalized Video Graduation",
     "Personal Neural Word Matrix tracking",
   ],
   cta: {
@@ -70,14 +72,15 @@ export const PLAN_CORE_FOUNDER: Plan = {
   annualPrice: "$29",
   annualTotal: "$348 CAD billed annually",
   annualSavingsLabel: "2 months free (Save $72)",
-  description: "15 full learning cycles per month + daily live AI speaking sprints.",
+  description:
+    "15 full learning cycles per month + daily live AI speaking sprints & Story Books.",
   features: [
     "45 Spoons + 45 Video Vocab Bridges /mo",
-    "15 lip-synced Boss Stage gauntlets /mo",
+    "15 lip-synced Boss gauntlets + Video Graduations /mo",
     "5 daily 3-min AI Conversation sprints + Live Notepad",
-    "3-Round Repair Arcades for your mistakes",
+    "3-Round Repair Arcades & Interactive Story Books",
     "Vocab Ladders (unlocks at Spoon 15) + Hard Mode",
-    "Lifetime Founder rate lock ($35 CAD/mo)",
+    "Private Skool Founder Community & $35 rate lock",
   ],
   cta: {
     label: "Become a founder",
@@ -98,14 +101,15 @@ export const PLAN_UNLIMITED_PLUS: Plan = {
   annualPrice: "$99",
   annualTotal: "$1,188 CAD billed annually",
   annualSavingsLabel: "Save $312/year",
-  description: "Maximum monthly Spoon volume and zero cooldowns between AI calls.",
+  description:
+    "Maximum monthly Spoon volume and zero cooldowns between AI calls.",
   features: [
     "180 Spoons + 180 Video Vocab Bridges /mo",
-    "60 cinematic video Boss Stage assessments /mo",
-    "15 daily 3-min AI Conversations (no cooldown)",
-    "Unlimited Sprite Energy (⚡)",
+    "60 cinematic Boss Stage assessments + Graduations /mo",
+    "15 daily 3-min AI Conversations (zero cooldown)",
+    "Unlimited Sprite Energy (⚡) & All Multi-Lang Books",
     "Full Hard Mode Spiral (Parts IV–IX) + Vocab Ladders",
-    "Early access to Interactive Audio Books",
+    "VIP Private Skool Community access",
   ],
   cta: {
     label: "Go Unlimited+",

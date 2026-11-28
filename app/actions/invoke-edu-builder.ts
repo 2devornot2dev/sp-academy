@@ -87,6 +87,9 @@ function normalizeGender(g?: string | null): "M" | "F" | "N" {
 // ---------------------------------------------------------------------------
 // HELPER 1: Stripe Subscription Transfer / Claiming
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// HELPER 1: Stripe Subscription Transfer / Claiming
+// ---------------------------------------------------------------------------
 async function claimSubscriptionForUser(userId: string, sessionId?: string) {
   if (!sessionId) return;
 
@@ -131,17 +134,56 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
         console.log(`✅ Subscription transferred from ${oldUserId} to ${userId}`);
       }
     } else {
-      let interval = BillingInterval.MONTHLY;
+      let interval: BillingInterval = BillingInterval.MONTHLY;
       let nextBillingDate: Date | null = null;
       let cancelAtPeriodEnd = false;
-      let resolvedPlan: Billing = Billing.PRO_MONTHLY;
+      let resolvedPlan: Billing = Billing.FOUNDER_MONTHLY;
 
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
         const subItem = sub.items.data[0];
+        const priceId = subItem?.price?.id;
+        const isAnnual = subItem?.price?.recurring?.interval === "year";
 
-        if (subItem?.price?.id === process.env.STRIPE_FOUNDER_MONTHLY_PRICE_ID) {
-          resolvedPlan = Billing.FOUNDER_MONTHLY;
+        interval = isAnnual
+          ? BillingInterval.ANNUALLY
+          : BillingInterval.MONTHLY;
+
+        const founderIds = [
+          process.env.STRIPE_FOUNDER_PRICE_ID,
+          process.env.STRIPE_FOUNDER_MONTHLY_PRICE_ID,
+          process.env.STRIPE_FOUNDER_YEARLY_PRICE_ID,
+        ].filter(Boolean);
+
+        const unlimitedIds = [
+          process.env.STRIPE_UNLIMITED_PRICE_ID,
+          process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+          process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID,
+        ].filter(Boolean);
+
+        const metaPlan = (
+          sub.metadata?.planId ||
+          session.metadata?.planId ||
+          ""
+        ).toLowerCase();
+
+        if (
+          (priceId && unlimitedIds.includes(priceId)) ||
+          metaPlan === "unlimited" ||
+          metaPlan === "pro"
+        ) {
+          resolvedPlan = isAnnual ? Billing.PRO_ANNUALLY : Billing.PRO_MONTHLY;
+        } else if (
+          (priceId && founderIds.includes(priceId)) ||
+          metaPlan === "founder"
+        ) {
+          resolvedPlan = isAnnual
+            ? Billing.FOUNDER_ANNUALLY
+            : Billing.FOUNDER_MONTHLY;
+        } else {
+          resolvedPlan = isAnnual
+            ? Billing.FOUNDER_ANNUALLY
+            : Billing.FOUNDER_MONTHLY;
         }
 
         const periodEnd =
@@ -149,8 +191,6 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
           (subItem as any)?.current_period_end;
 
         if (periodEnd) nextBillingDate = new Date(periodEnd * 1000);
-        if (subItem?.price.recurring?.interval === "year")
-          interval = BillingInterval.MONTHLY;
         cancelAtPeriodEnd = sub.cancel_at_period_end;
       }
 
@@ -172,6 +212,7 @@ async function claimSubscriptionForUser(userId: string, sessionId?: string) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
           currentPlan: resolvedPlan,
+          billingInterval: interval,
           isActive: true,
         },
       });

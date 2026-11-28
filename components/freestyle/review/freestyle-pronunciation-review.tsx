@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   Flame,
   Mic,
   RotateCcw,
@@ -47,7 +46,10 @@ export function FreestylePronunciationReview({
   const [activeWordKey, setActiveWordKey] = useState<string | null>(null);
 
   const handleSpeakWord = async (rawWord: string, key: string) => {
-    const clean = rawWord.replace(/^[^\p{L}\p{N}'’-]+|[^\p{L}\p{N}'’-]+$/gu, "");
+    const clean = rawWord.replace(
+      /^[^\p{L}\p{N}'’-]+|[^\p{L}\p{N}'’-]+$/gu,
+      "",
+    );
     if (!clean) return;
     setActiveWordKey(key);
     try {
@@ -61,7 +63,7 @@ export function FreestylePronunciationReview({
 
   if (!phrases.length) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-8 text-center shadow-sm animate-in fade-in">
+      <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-6 sm:p-8 text-center shadow-sm animate-in fade-in">
         <p className="text-sm font-bold text-slate-600">
           Your pronunciation was super crisp — ready to claim your completion!
         </p>
@@ -70,7 +72,7 @@ export function FreestylePronunciationReview({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-4 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-slate-200 bg-white px-5 py-3.5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
@@ -78,7 +80,7 @@ export function FreestylePronunciationReview({
           )}
           <button
             onClick={onComplete}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-8 py-4 text-sm font-black text-white shadow-lg transition hover:brightness-105"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3.5 text-sm font-black text-white shadow-lg transition hover:brightness-105"
           >
             <span>Finish Review &amp; Hear Sprite Outro</span>
             <ArrowRight className="h-4 w-4" />
@@ -130,11 +132,11 @@ export function FreestylePronunciationReview({
   };
 
   return (
-    <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 animate-in fade-in">
+    <div className="grid grid-cols-1 items-stretch gap-4 sm:gap-6 lg:grid-cols-12 animate-in fade-in">
       {/* =====================================================================
-          LEFT (5 Cols): SPEAKING DRILL QUEUE (Shows all 3 phrases & grades!)
+          LEFT (5 Cols, Desktop lg+ only): SPEAKING DRILL QUEUE
           ===================================================================== */}
-      <div className="flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm lg:col-span-5">
+      <div className="hidden lg:flex flex-col justify-between rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-5 shadow-sm lg:col-span-5">
         <div>
           <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
             <div>
@@ -226,18 +228,55 @@ export function FreestylePronunciationReview({
       </div>
 
       {/* =====================================================================
-          RIGHT (7 Cols): SPEAKING STAGE WITH UNIFIED 3D WORD BUTTONS
+          RIGHT (7 Cols): SPEAKING STAGE (Immediately above the fold on mobile!)
           ===================================================================== */}
-      <div className="flex flex-col justify-between space-y-5 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 text-center shadow-sm sm:p-7 lg:col-span-7">
-        <div className="flex items-center justify-between">
-          <span className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-black tracking-wider text-blue-700 uppercase">
+      <div className="flex flex-col justify-between space-y-4 sm:space-y-5 rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 text-center shadow-sm sm:p-7 lg:col-span-7">
+        {/* Mobile-Only Compact Horizontal Phrase Pills (< lg) */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 lg:hidden">
+          <div className="flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+            {phrases.map((p, i) => {
+              const isSelected = i === index;
+              const savedScore =
+                i === index && score?.pronunciationScore
+                  ? score.pronunciationScore
+                  : completedScores[i];
+              const g =
+                savedScore !== undefined ? getAlphaGrade(savedScore) : null;
+
+              return (
+                <button
+                  key={`${p}-${i}`}
+                  type="button"
+                  onClick={() => selectPhrase(i)}
+                  className={`inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl border-b-2 px-3 text-xs font-black transition ${
+                    isSelected
+                      ? "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-2xs"
+                      : g
+                        ? g.pill
+                        : "border-slate-200 bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  <span>Phrase {i + 1}</span>
+                  {g && <span className="ml-0.5 font-black">• {g.letter}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="shrink-0 text-[11px] font-black text-slate-400">
+            {index + 1}/{totalPhrases}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1 sm:px-3 text-[10px] font-black tracking-wider text-blue-700 uppercase">
             Speak It Back • Phrase {index + 1} of {totalPhrases}
           </span>
           <button
             type="button"
             disabled={isPlaying}
             onClick={() => void speak(current, targetLanguage, 0.9)}
-            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-sky-200 border-b-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-black text-blue-600 transition hover:bg-sky-100 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-sky-200 border-b-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-black text-blue-600 transition hover:bg-sky-100 disabled:opacity-50"
           >
             <Volume2 className="h-3.5 w-3.5" />
             <span>{isPlaying ? "Playing..." : "Hear Full Phrase"}</span>
@@ -246,7 +285,7 @@ export function FreestylePronunciationReview({
 
         {/* Context Strip if from a mistake/upgrade */}
         {matchedCard && (
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-left text-xs">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-3.5 py-2 sm:px-4 sm:py-2.5 text-left text-xs">
             <span className="font-bold text-slate-400">Instead of: </span>
             <span className="font-bold text-rose-500 line-through">
               &ldquo;{matchedCard.original}&rdquo;
@@ -255,13 +294,13 @@ export function FreestylePronunciationReview({
         )}
 
         {/* Unified 3D Tactile Word Buttons Stage */}
-        <div className="rounded-3xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-gradient-to-br from-slate-50 via-white to-sky-50/40 px-6 py-7">
+        <div className="rounded-2xl sm:rounded-3xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-gradient-to-br from-slate-50 via-white to-sky-50/40 px-4 py-5 sm:px-6 sm:py-7">
           <span className="block text-[10px] font-black tracking-widest text-slate-400 uppercase">
             Tap any word to hear its MP3, then record the full phrase
           </span>
 
           {score?.words?.length ? (
-            <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+            <div className="mt-3.5 sm:mt-4 flex flex-wrap justify-center gap-2">
               {score.words.map((w: any, idx: number) => {
                 const acc = w.accuracyScore ?? 0;
                 const key = `scored-${idx}`;
@@ -280,16 +319,16 @@ export function FreestylePronunciationReview({
                     type="button"
                     onClick={() => void handleSpeakWord(w.word, key)}
                     title={`Grade: ${getAlphaGrade(acc).letter} — Tap to hear word`}
-                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-lg font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${tileStyle}`}
+                    className={`inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl border-2 border-b-4 px-3 py-1.5 sm:px-4 sm:py-2 text-base font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${tileStyle}`}
                   >
-                    <Volume2 className="h-4 w-4 opacity-70" />
+                    <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 opacity-70" />
                     <span>{w.word}</span>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+            <div className="mt-3.5 sm:mt-4 flex flex-wrap justify-center gap-2">
               {phraseWords.map((word, wIdx) => {
                 const key = `prompt-${wIdx}`;
                 const isActive = activeWordKey === key;
@@ -299,14 +338,14 @@ export function FreestylePronunciationReview({
                     type="button"
                     onClick={() => void handleSpeakWord(word, key)}
                     title="Tap to hear word audio"
-                    className={`inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 px-4 py-2 text-lg font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl sm:rounded-2xl border-2 border-b-4 px-3 py-1.5 sm:px-4 sm:py-2 text-base font-black shadow-2xs transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:border-b-2 sm:text-xl ${
                       isActive
                         ? "border-blue-700 border-b-blue-900 bg-gradient-to-b from-sky-400 to-blue-600 text-white"
                         : "border-slate-200 border-b-slate-300 bg-white text-slate-900 hover:border-sky-400 hover:bg-sky-50"
                     }`}
                   >
                     <Volume2
-                      className={`h-4 w-4 ${
+                      className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
                         isActive ? "text-white" : "text-blue-600"
                       }`}
                     />
@@ -320,7 +359,7 @@ export function FreestylePronunciationReview({
 
         {/* Bottom Recorder / Score Row */}
         {!score ? (
-          <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center justify-between gap-2.5 sm:gap-3 pt-1">
             <button
               type="button"
               onClick={() => {
@@ -330,23 +369,23 @@ export function FreestylePronunciationReview({
                   onBack?.();
                 }
               }}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>{index > 0 ? "Previous" : "Back"}</span>
             </button>
 
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <button
                 onClick={handlePractice}
                 disabled={isRecording}
-                className={`flex h-16 w-16 items-center justify-center rounded-3xl border-b-[5px] text-white shadow-lg transition-all ${
+                className={`flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl sm:rounded-3xl border-b-[5px] text-white shadow-lg transition-all ${
                   isRecording
                     ? "scale-110 animate-pulse border-rose-800 bg-gradient-to-b from-rose-500 to-red-600 ring-4 ring-rose-200"
                     : "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-2"
                 }`}
               >
-                <Mic className="h-7 w-7" />
+                <Mic className="h-6 w-6 sm:h-7 sm:w-7" />
               </button>
               <span className="text-[11px] font-extrabold text-slate-500">
                 {isRecording
@@ -358,14 +397,14 @@ export function FreestylePronunciationReview({
             <button
               type="button"
               onClick={handleContinue}
-              className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-4 py-3 text-xs font-black text-slate-500 transition hover:bg-white hover:text-slate-800"
+              className="inline-flex items-center gap-1 rounded-2xl border-2 border-b-4 border-slate-200 border-b-slate-300 bg-slate-50 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs font-black text-slate-500 transition hover:bg-white hover:text-slate-800"
             >
               <span>Skip</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-3 sm:flex-row animate-in fade-in duration-200">
+          <div className="flex flex-col items-center justify-between gap-3.5 border-t border-slate-100 pt-3 sm:flex-row animate-in fade-in duration-200">
             {(() => {
               const g = getAlphaGrade(score.pronunciationScore);
               const accG = getAlphaGrade(score.accuracyScore);
@@ -373,7 +412,7 @@ export function FreestylePronunciationReview({
               return (
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-b-4 text-xl font-black ${g.pill}`}
+                    className={`flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl border-2 border-b-4 text-lg sm:text-xl font-black ${g.pill}`}
                   >
                     {g.letter}
                   </div>
@@ -413,7 +452,7 @@ export function FreestylePronunciationReview({
 
               <button
                 onClick={handleContinue}
-                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-6 py-3 text-xs sm:text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:flex-none"
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-b-4 border-emerald-700 bg-gradient-to-b from-emerald-400 to-emerald-600 px-5 py-3 text-xs sm:text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 sm:flex-none"
               >
                 {isLast ? (
                   <>
