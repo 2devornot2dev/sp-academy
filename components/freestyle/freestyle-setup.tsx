@@ -167,11 +167,14 @@ const STEPS = [
 function normalizeLangCode(raw: string | undefined, fallback: string): string {
   if (!raw) return fallback;
   const upper = raw.toUpperCase();
-  if (upper === "ENGLISH" || upper === "EN" || upper === "EN-US") return "en-US";
+  if (upper === "ENGLISH" || upper === "EN" || upper === "EN-US")
+    return "en-US";
   if (upper === "FRENCH" || upper === "FR" || upper === "FR-FR") return "fr-FR";
-  if (upper === "SPANISH" || upper === "ES" || upper === "ES-ES") return "es-ES";
+  if (upper === "SPANISH" || upper === "ES" || upper === "ES-ES")
+    return "es-ES";
   if (upper === "GERMAN" || upper === "DE" || upper === "DE-DE") return "de-DE";
-  if (upper === "ITALIAN" || upper === "IT" || upper === "IT-IT") return "it-IT";
+  if (upper === "ITALIAN" || upper === "IT" || upper === "IT-IT")
+    return "it-IT";
   return SUPPORTED_CODES.includes(raw) ? raw : fallback;
 }
 
@@ -185,9 +188,9 @@ export default function FreestyleSetup({
 }: any) {
   const [step, setStep] = useState<1 | 2>(1);
   const [mode, setMode] = useState<string | null>(null);
-  const [level, setLevel] = useState<"ZERO" | "EASY" | "MEDIUM" | "FLUENT" | null>(
-    null
-  );
+  const [level, setLevel] = useState<
+    "ZERO" | "EASY" | "MEDIUM" | "FLUENT" | null
+  >(null);
   const [topic, setTopic] = useState("");
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("female");
   const [persona, setPersona] = useState<
@@ -198,9 +201,11 @@ export default function FreestyleSetup({
   const nativeLang = normalizeLangCode(defaultNative, "en-US");
   const targetLang = normalizeLangCode(defaultTarget, "fr-FR");
 
-  const selectedModeObj = mode ? MODES.find((m) => m.id === mode) ?? null : null;
+  const selectedModeObj = mode
+    ? (MODES.find((m) => m.id === mode) ?? null)
+    : null;
   const selectedLevelObj = level
-    ? LEVELS.find((l) => l.id === level) ?? null
+    ? (LEVELS.find((l) => l.id === level) ?? null)
     : null;
   const selectedPersonaObj =
     PERSONAS.find((p) => p.id === persona) ?? PERSONAS[0];
@@ -212,6 +217,8 @@ export default function FreestyleSetup({
   const remainingToday = Math.max(0, dailyMax - dailyUsed);
 
   const previewAvatarUrl = getTutorAvatarByMood(voiceGender, "default");
+  const IMAGE_PANEL_MASK =
+    "md:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.55)_22%,black_55%)] md:[-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.55)_22%,black_55%)]";
 
   const handleStart = async () => {
     if (isDailyCapReached || !canStart || !mode || !level) return;
@@ -281,18 +288,25 @@ export default function FreestyleSetup({
           {/* LEFT COLUMN (8 Cols) */}
           <div className="flex min-h-0 flex-col gap-4 sm:gap-5 lg:col-span-8">
             {/* ===============================================================
-                CARD 1: VIBRANT GRADIENT HERO ARENA CARD
-                =============================================================== */}
+    CARD 1: VIBRANT GRADIENT HERO ARENA CARD
+    =============================================================== */}
             <div className="group relative shrink-0 overflow-hidden rounded-2xl sm:rounded-3xl border-b-[6px] border-indigo-950/40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]">
               <div className="pointer-events-none absolute -top-16 -left-10 h-52 w-52 rounded-full bg-cyan-400/30 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-16 right-4 h-56 w-56 rounded-full bg-fuchsia-400/25 blur-3xl" />
 
-              <img
-                src="/freestyle-cover.png"
-                alt="Freestyle Arena"
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-luminosity transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-blue-700/85 via-indigo-700/70 to-purple-800/50" />
+              {/* Cover image panel: fades into the card on md+, light tints on top */}
+              <div
+                className={`pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[62%] ${IMAGE_PANEL_MASK}`}
+              >
+                <img
+                  src="/freestyle-cover.png"
+                  alt="Freestyle Arena"
+                  className="h-full w-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                />
+                {/* Stronger on mobile for text contrast, subtle on md+ */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-700/70 via-indigo-700/45 to-indigo-700/10 md:from-blue-700/25 md:via-indigo-700/10 md:to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/45 via-transparent to-transparent" />
+              </div>
 
               <div className="relative z-10 p-4 sm:p-6 sm:px-7">
                 <div className="flex flex-wrap items-center justify-between gap-2">
