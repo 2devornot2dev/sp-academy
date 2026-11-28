@@ -1,173 +1,421 @@
+// app/pricing/page.tsx
 "use client";
 
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { 
-  Check, 
-  Sparkles, 
-  MessageSquare, 
-  BookOpen, 
-  Mic, 
-  Activity, 
-  ArrowRight,
-  Globe2
-} from "lucide-react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  ArrowRight,
+  Building2,
+  Check,
+  Crown,
+  Infinity as InfinityIcon,
+  Info,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
+
+import { Reveal } from "@/components/ui/misc/reveal";
+import { Button } from "@/components/ui/button";
+import {
+  PRICING_DATA as pricingData,
+  PRICING_PLANS_PAID_ONLY,
+  type Plan,
+  type PlanAccent,
+  type BillingIntervalOption,
+} from "@/components/ui/site/pricing-data";
+import Image from "next/image";
+
+const PLANS = PRICING_PLANS_PAID_ONLY;
+
+const PLAN_ICONS: Record<string, LucideIcon> = {
+  founder: Sparkles,
+  unlimited: InfinityIcon,
+  enterprise: Building2,
+};
+
+const BADGE_ICONS: Record<string, LucideIcon> = {
+  founder: Lock,
+  unlimited: Crown,
+};
+
+const SOLID_PLANS = ["founder", "unlimited"];
+
+const ACCENTS: Record<
+  PlanAccent,
+  {
+    text: string;
+    chip: string;
+    featured: string;
+    focus: string;
+    solid: string;
+    solidButtonText: string;
+  }
+> = {
+  primary: {
+    text: "text-primary",
+    chip: "bg-primary/15 text-primary",
+    featured:
+      "border-primary/40 shadow-[0_0_0_4px_hsl(var(--primary)/0.1),0_1px_2px_hsl(var(--foreground)/0.06),0_24px_60px_hsl(var(--foreground)/0.07)]",
+    focus: "focus-visible:outline-primary",
+    solid: "bg-primary border-primary shadow-2xl",
+    solidButtonText: "text-primary",
+  },
+  secondary: {
+    text: "text-secondary",
+    chip: "bg-secondary/15 text-secondary",
+    featured:
+      "border-secondary/40 shadow-[0_0_0_4px_hsl(var(--secondary)/0.1),0_1px_2px_hsl(var(--foreground)/0.06),0_24px_60px_hsl(var(--foreground)/0.07)]",
+    focus: "focus-visible:outline-secondary",
+    solid: "bg-secondary border-secondary shadow-2xl",
+    solidButtonText: "text-secondary",
+  },
+  tertiary: {
+    text: "text-tertiary",
+    chip: "bg-tertiary/15 text-tertiary",
+    featured:
+      "border-tertiary/40 shadow-[0_0_0_4px_hsl(var(--tertiary)/0.1),0_1px_2px_hsl(var(--foreground)/0.06),0_24px_60px_hsl(var(--foreground)/0.07)]",
+    focus: "focus-visible:outline-tertiary",
+    solid: "bg-tertiary border-tertiary shadow-2xl",
+    solidButtonText: "text-tertiary",
+  },
+};
+
+const CARD_BASE =
+  "relative isolate flex w-full overflow-hidden rounded-[1.25rem] border p-6 md:p-9";
+const CARD_DEFAULT =
+  "border-border/75 shadow-[0_1px_1px_hsl(var(--foreground)/0.03),0_18px_50px_hsl(var(--foreground)/0.04)]";
+
+const CTA_BASE =
+  "h-[2.85rem] w-fit gap-2 rounded-full border px-5 font-semibold shadow-none transition-all duration-200 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-60 motion-reduce:transition-none";
 
 export default function PricingPage() {
-  const [isHovered, setIsHovered] = useState(false);
+  const [billingInterval, setBillingInterval] =
+    useState<BillingIntervalOption>("monthly");
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [wasCanceled, setWasCanceled] = useState(false);
 
-  // We will plug Stripe into this button next!
-  const handleCheckout = () => {
-    console.log("Redirecting to Stripe...");
-  };
+  const isAnnual = billingInterval === "annual";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("canceled") === "true") {
+      setWasCanceled(true);
+    }
+  }, []);
+
+  async function startCheckout(plan: Plan) {
+    setError(null);
+    setLoadingId(plan.id);
+
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: plan.id,
+          interval: billingInterval,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Checkout failed");
+      }
+
+      window.location.href = data.url;
+    } catch {
+      setError("We couldn't start checkout. Please try again.");
+      setLoadingId(null);
+    }
+  }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F8F9FC] font-sans selection:bg-violet-200">
-      
-      {/* Decorative Background Blobs */}
-      <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-violet-400/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -left-40 top-40 -z-10 h-[400px] w-[400px] rounded-full bg-teal-400/10 blur-[100px]" />
-      <div className="pointer-events-none absolute -right-40 top-80 -z-10 h-[500px] w-[500px] rounded-full bg-indigo-400/10 blur-[100px]" />
+    <div className="relative isolate min-h-screen overflow-clip bg-background font-sans text-foreground">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(circle_at_12%_30%,hsl(var(--primary)/0.08),transparent_32rem),radial-gradient(circle_at_88%_30%,hsl(var(--tertiary)/0.08),transparent_30rem),linear-gradient(180deg,transparent,hsl(var(--muted)/0.22)_50%,transparent)]"
+      />
 
-      <div className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:pt-16">
-        
-        {/* Header Section */}
-        <div className="mx-auto max-w-3xl text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <span className="mb-4 inline-flex items-center gap-2 rounded-full bg-violet-100 px-4 py-1.5 text-sm font-bold text-violet-700">
-              <Sparkles className="h-4 w-4" /> The Ultimate Language Experience
-            </span>
-            <h1 className="mb-6 text-5xl font-extrabold tracking-tight text-gray-900 lg:text-6xl">
-              Master a new language. <br />
-              <span className="animate-gradient bg-linear-to-r from-violet-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent bg-size-[200%_auto]">
-                Faster than ever.
+      <main className="mx-auto w-full max-w-6xl px-4 py-[clamp(3rem,6vh,5rem)]">
+        {wasCanceled && (
+          <div className="mx-auto mb-6 max-w-xl">
+            <div className="flex items-center justify-center gap-2 rounded-full border border-border/80 bg-muted/50 px-4 py-2 text-center text-xs font-medium text-muted-foreground backdrop-blur-md">
+              <Info className="size-3.5 shrink-0 text-primary" />
+              <span>
+                Checkout paused &mdash; no charge was made. Choose a plan below
+                whenever you&apos;re ready.
               </span>
-            </h1>
-            <p className="mb-10 text-lg font-medium text-gray-600 lg:text-xl">
-              Traditional tutors cost $40 an hour. Get 24/7 access to immersive AI conversations, personalized reviews, and bilingual books for less than a cup of coffee a week.
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Pricing Layout */}
-        <div className="mx-auto mt-8 grid max-w-6xl gap-12 lg:grid-cols-12 lg:gap-8 items-center">
-          
-          {/* Left Side: Value Breakdown */}
-          <motion.div 
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="lg:col-span-7 grid gap-6 sm:grid-cols-2"
-          >
-            <FeatureCard 
-              icon={<MessageSquare className="h-6 w-6 text-indigo-600" />}
-              title="Structured AI Conversations"
-              description="Roleplay real-world scenarios. Order food, navigate airports, or ace a job interview in your target language."
-              color="bg-indigo-50"
-            />
-            <FeatureCard 
-              icon={<Mic className="h-6 w-6 text-violet-600" />}
-              title="Freestyle Speaking"
-              description="Ditch the script. Have open-ended, natural chats with AI native speakers that adapt to your specific level."
-              color="bg-violet-50"
-            />
-            <FeatureCard 
-              icon={<BookOpen className="h-6 w-6 text-teal-600" />}
-              title="Bilingual Books"
-              description="Perfect for beginners. Read engaging stories with side-by-side translations to build vocabulary naturally."
-              color="bg-teal-50"
-            />
-            <FeatureCard 
-              icon={<Activity className="h-6 w-6 text-emerald-600" />}
-              title="Deep-Dive Analytics"
-              description="Your personal Learning Hub tracks grammar mistakes, pronunciation scores, and fluency progress."
-              color="bg-emerald-50"
-            />
-          </motion.div>
-
-          {/* Right Side: The Pricing Card */}
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="lg:col-span-5"
-          >
-            <div className="relative rounded-3xl bg-white p-8 shadow-2xl shadow-violet-500/10 border border-gray-100 xl:p-10">
-              {/* Badge */}
-              <div className="absolute -top-5 left-0 right-0 mx-auto w-fit rounded-full bg-linear-to-r from-violet-500 to-fuchsia-500 px-4 py-1.5 text-sm font-bold text-white shadow-md">
-                Launch Special 🚀
-              </div>
-
-              <div className="text-center mb-8 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">Pro Learner</h3>
-                <p className="mt-2 text-sm text-gray-500 font-medium">Everything you need to reach fluency.</p>
-                <div className="mt-6 flex items-center justify-center gap-1">
-                  <span className="text-3xl font-bold text-gray-400">$</span>
-                  <span className="text-6xl font-extrabold text-gray-900 tracking-tighter">20</span>
-                  <span className="text-lg font-medium text-gray-500 self-end mb-2">/mo</span>
-                </div>
-              </div>
-
-              <ul className="mb-8 space-y-4">
-                {[
-                  "Unlimited AI Conversations",
-                  "Unlimited Freestyle Sessions",
-                  "Access to all Bilingual Books",
-                  "Advanced Grammar & Accent Review",
-                  "Progress tracking in Learning Hub",
-                  "Cancel anytime, no questions asked"
-                ].map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 mt-0.5">
-                      <Check className="h-4 w-4 text-violet-600 stroke-3" />
-                    </div>
-                    <span className="text-gray-700 font-medium">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <button 
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                onClick={handleCheckout}
-                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gray-900 px-8 py-4 text-lg font-bold text-white transition-all hover:bg-gray-800 hover:shadow-xl hover:shadow-gray-900/20 active:scale-[0.98]"
-              >
-                <span className="relative z-10 flex items-center gap-2">
-                  Unlock Full Access
-                  <ArrowRight className={`h-5 w-5 transition-transform duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
-                </span>
-                {/* Subtle button gradient shine effect */}
-                <div className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
-              </button>
-
-              <div className="mt-6 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
-                <Globe2 className="h-4 w-4" /> Join learners from 50+ countries
-              </div>
             </div>
-          </motion.div>
+          </div>
+        )}
+        <Image
+          src="/logo1-nobg.png"
+          alt="Spoon Academy Logo"
+          priority
+          className="mx-auto mb-6 block h-14 w-auto"
+          height={1000}
+          width={1000}
+        />
 
+        <Reveal className="mx-auto max-w-[44rem] text-center" y={18}>
+          <span className="inline-flex min-h-8 items-center rounded-full border border-border/80 bg-background/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-foreground/70 backdrop-blur-md">
+            {pricingData.eyebrow}
+          </span>
+
+          <h1 className="mt-4 text-balance text-[clamp(2.15rem,4vw,3.65rem)] font-bold leading-[1.02] tracking-[-0.045em] text-foreground">
+            {pricingData.heading}{" "}
+            <span className="text-foreground/55">
+              {pricingData.headingAccent}
+            </span>
+          </h1>
+
+          <p className="mx-auto mt-3.5 max-w-[37rem] text-balance text-[clamp(1rem,1.5vw,1.1rem)] leading-relaxed text-muted-foreground">
+            {pricingData.intro}
+          </p>
+
+          <div className="mt-7 inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/50 p-1.5 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setBillingInterval("monthly")}
+              className={`rounded-full px-5 py-2 text-sm font-bold transition-all ${
+                !isAnnual
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingInterval("annual")}
+              className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all ${
+                isAnnual
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span>Annual</span>
+              <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide text-emerald-600 uppercase">
+                2 Months Free
+              </span>
+            </button>
+          </div>
+        </Reveal>
+
+        <div className="mx-auto mt-[clamp(2rem,4vh,3rem)] grid max-w-6xl grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
+          {PLANS.map((plan, index) => {
+            const Icon = PLAN_ICONS[plan.id] ?? Sparkles;
+            const BadgeIcon = BADGE_ICONS[plan.id] ?? ShieldCheck;
+            const accent = ACCENTS[plan.accent];
+            const isLoading = loadingId === plan.id;
+            const isSolid = SOLID_PLANS.includes(plan.id);
+            const usesCheckout =
+              plan.id === "founder" || plan.id === "unlimited";
+
+            const displayPrice =
+              isAnnual && plan.annualPrice ? plan.annualPrice : plan.price;
+            const displayOriginalPrice =
+              isAnnual && plan.annualPrice ? plan.price : plan.originalPrice;
+
+            return (
+              <Reveal
+                key={plan.id}
+                className="flex"
+                delay={0.08 + index * 0.08}
+                y={16}
+              >
+                <article
+                  aria-labelledby={`plan-${plan.id}-name`}
+                  className={`${CARD_BASE} ${
+                    isSolid
+                      ? accent.solid
+                      : `bg-card/90 backdrop-blur-xl ${
+                          plan.featured ? accent.featured : CARD_DEFAULT
+                        }`
+                  }`}
+                >
+                  <Icon
+                    aria-hidden="true"
+                    strokeWidth={1.15}
+                    className={`pointer-events-none absolute -right-12 top-6 -z-10 size-44 -rotate-[7deg] md:-right-8 md:size-52 ${
+                      isSolid
+                        ? "text-white opacity-[0.15]"
+                        : `${accent.text} opacity-[0.055]`
+                    }`}
+                  />
+
+                  <div className="relative z-10 flex w-full flex-col">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`inline-flex items-center gap-2.5 text-xs font-bold uppercase tracking-widest before:h-px before:w-7 before:bg-current before:content-[''] ${
+                          isSolid ? "text-white" : accent.text
+                        }`}
+                      >
+                        {plan.label}
+                      </span>
+
+                      {isAnnual && plan.annualSavingsLabel && (
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide uppercase ${
+                            isSolid
+                              ? "bg-white/20 text-white"
+                              : "bg-emerald-500/15 text-emerald-600"
+                          }`}
+                        >
+                          {plan.annualSavingsLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    <h2
+                      id={`plan-${plan.id}-name`}
+                      className={`mt-3.5 text-balance text-[clamp(1.75rem,2.6vw,2.25rem)] font-bold leading-[1.03] tracking-[-0.04em] ${
+                        isSolid ? "text-white" : "text-foreground"
+                      }`}
+                    >
+                      {plan.name}
+                    </h2>
+
+                    <div className="mt-5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                      {displayOriginalPrice && (
+                        <span
+                          className={`text-xl font-semibold line-through decoration-2 ${
+                            isSolid ? "text-white/60" : "text-muted-foreground"
+                          }`}
+                        >
+                          <span className="sr-only">Regular price </span>
+                          {displayOriginalPrice}
+                        </span>
+                      )}
+
+                      <span
+                        className={`text-[clamp(2.5rem,4.5vw,3.5rem)] font-bold leading-none tracking-[-0.05em] ${
+                          isSolid ? "text-white" : "text-foreground"
+                        }`}
+                      >
+                        {displayPrice}
+                      </span>
+
+                      {plan.period && (
+                        <span
+                          className={`text-base font-medium ${
+                            isSolid ? "text-white/80" : "text-muted-foreground"
+                          }`}
+                        >
+                          {plan.period}
+                        </span>
+                      )}
+                    </div>
+
+                    {plan.badge && (
+                      <span
+                        className={`mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold ${
+                          isSolid
+                            ? "border-white/30 bg-white/20 text-white"
+                            : "border-emerald-500/30 bg-emerald-500/15 text-emerald-600"
+                        }`}
+                      >
+                        <BadgeIcon
+                          className="size-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        {plan.badge}
+                      </span>
+                    )}
+
+                    {isAnnual && plan.annualTotal && (
+                      <p
+                        className={`mt-1.5 text-xs font-semibold ${
+                          isSolid ? "text-white/75" : "text-muted-foreground"
+                        }`}
+                      >
+                        {plan.annualTotal}
+                      </p>
+                    )}
+
+                    <p
+                      className={`mt-4 text-[clamp(1rem,1.35vw,1.05rem)] leading-[1.7] ${
+                        isSolid ? "text-white/90" : "text-muted-foreground"
+                      }`}
+                    >
+                      {plan.description}
+                    </p>
+
+                    <ul
+                      className={`mt-6 grid gap-3 border-t pt-6 ${
+                        isSolid ? "border-white/20" : "border-border/80"
+                      }`}
+                    >
+                      {plan.features.map((feature) => (
+                        <li
+                          key={feature}
+                          className={`flex items-start gap-3 text-[0.95rem] font-medium leading-snug ${
+                            isSolid ? "text-white/90" : "text-foreground/85"
+                          }`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`mt-0.5 inline-grid size-5 flex-none place-items-center rounded-full ${
+                              isSolid ? "bg-white/20 text-white" : accent.chip
+                            }`}
+                          >
+                            <Check className="size-3" strokeWidth={3} />
+                          </span>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-auto pt-8">
+                      {usesCheckout ? (
+                        <Button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => startCheckout(plan)}
+                          className={
+                            isSolid
+                              ? `${CTA_BASE} border-white bg-white ${accent.solidButtonText} hover:bg-white/90 focus-visible:outline-white`
+                              : `${CTA_BASE} border-purple-600 bg-purple-600 text-white hover:bg-purple-700 ${accent.focus}`
+                          }
+                        >
+                          {isLoading ? "Redirecting…" : plan.cta.label}
+                          {!isLoading && (
+                            <ArrowRight className="size-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          nativeButton={false}
+                          render={<Link href={plan.cta.href} />}
+                          className={`${CTA_BASE} border-purple-600 bg-purple-600 text-white hover:bg-purple-700 ${accent.focus}`}
+                        >
+                          {plan.cta.label}
+                          <ArrowRight className="size-4" aria-hidden="true" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              </Reveal>
+            );
+          })}
         </div>
-      </div>
-    </div>
-  );
-}
 
-// Reusable micro-component for the features grid
-function FeatureCard({ icon, title, description, color }) {
-  return (
-    <div className="rounded-2xl bg-white p-6 shadow-xs border border-gray-100 transition-all hover:-translate-y-1 hover:shadow-md">
-      <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl ${color}`}>
-        {icon}
-      </div>
-      <h4 className="mb-2 text-lg font-bold text-gray-900">{title}</h4>
-      <p className="text-sm font-medium text-gray-500 leading-relaxed">
-        {description}
-      </p>
+        {error && (
+          <p role="alert" className="mt-5 text-center text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
+        <p className="mx-auto mt-7 max-w-[37rem] text-balance text-center text-sm leading-relaxed text-muted-foreground">
+          {pricingData.footnote}
+        </p>
+      </main>
     </div>
   );
 }
