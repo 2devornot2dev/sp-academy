@@ -24,36 +24,39 @@ type Lesson = LearningTrack["lessons"][number];
 const BOSS_THEMES = [
   {
     name: "neon-fuchsia",
-    scrim: "from-slate-950 via-slate-950/80 to-fuchsia-950/40",
-    glow: "radial-gradient(circle at 85% 20%, rgba(217, 70, 239, 0.28), transparent 60%)",
-    badge: "border-fuchsia-400/35 bg-fuchsia-500/20 text-fuchsia-200",
-    icon: "text-fuchsia-300",
-    accentText: "text-fuchsia-300",
-    avatarBorder: "border-fuchsia-400/80 border-b-4 shadow-fuchsia-500/30",
+    cardBg: "border-purple-950/40 bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 shadow-[0_12px_30px_rgba(147,51,234,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]",
+    scrim: "from-indigo-950/90 via-purple-950/70 to-fuchsia-900/30",
+    glow: "radial-gradient(circle at 85% 20%, rgba(244, 114, 182, 0.35), transparent 60%)",
+    badge: "border-white/30 bg-white/15 text-white",
+    icon: "text-amber-300",
+    accentText: "text-amber-200",
+    avatarBorder: "border-white/80 border-b-4 shadow-purple-900/40",
     button3D:
-      "border-purple-950 bg-gradient-to-b from-violet-500 via-purple-600 to-fuchsia-600 text-white shadow-purple-500/30",
+      "border-amber-700 bg-gradient-to-b from-amber-300 via-amber-400 to-orange-500 text-slate-950 shadow-amber-500/30",
   },
   {
     name: "cyber-emerald",
-    scrim: "from-slate-950 via-slate-950/80 to-teal-950/40",
-    glow: "radial-gradient(circle at 85% 20%, rgba(16, 185, 129, 0.28), transparent 60%)",
-    badge: "border-emerald-400/35 bg-emerald-500/20 text-emerald-200",
-    icon: "text-emerald-300",
-    accentText: "text-emerald-300",
-    avatarBorder: "border-emerald-400/80 border-b-4 shadow-emerald-500/30",
+    cardBg: "border-teal-950/40 bg-gradient-to-br from-blue-600 via-teal-600 to-emerald-600 shadow-[0_12px_30px_rgba(16,185,129,0.26),inset_0_2px_0_rgba(255,255,255,0.3)]",
+    scrim: "from-slate-900/85 via-teal-950/65 to-emerald-900/25",
+    glow: "radial-gradient(circle at 85% 20%, rgba(52, 211, 153, 0.35), transparent 60%)",
+    badge: "border-white/30 bg-white/15 text-white",
+    icon: "text-amber-300",
+    accentText: "text-emerald-200",
+    avatarBorder: "border-white/80 border-b-4 shadow-emerald-900/40",
     button3D:
-      "border-emerald-800 bg-gradient-to-b from-teal-400 to-emerald-600 text-white shadow-emerald-500/30",
+      "border-amber-700 bg-gradient-to-b from-amber-300 via-amber-400 to-orange-500 text-slate-950 shadow-amber-500/30",
   },
   {
     name: "electric-cyan",
-    scrim: "from-slate-950 via-slate-950/80 to-cyan-950/40",
-    glow: "radial-gradient(circle at 85% 20%, rgba(6, 182, 212, 0.28), transparent 60%)",
-    badge: "border-cyan-400/35 bg-cyan-500/20 text-cyan-200",
-    icon: "text-cyan-300",
-    accentText: "text-cyan-300",
-    avatarBorder: "border-cyan-400/80 border-b-4 shadow-cyan-500/30",
+    cardBg: "border-blue-950/40 bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]",
+    scrim: "from-blue-950/85 via-indigo-950/65 to-sky-900/25",
+    glow: "radial-gradient(circle at 85% 20%, rgba(56, 189, 248, 0.35), transparent 60%)",
+    badge: "border-white/30 bg-white/15 text-white",
+    icon: "text-amber-300",
+    accentText: "text-sky-200",
+    avatarBorder: "border-white/80 border-b-4 shadow-blue-900/40",
     button3D:
-      "border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-blue-500/30",
+      "border-emerald-800 bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 text-slate-950 shadow-emerald-500/30",
   },
 ] as const;
 
@@ -123,13 +126,16 @@ export function PrimaryHeroCard({
       : `Spoon ${spoonNum}`;
 
     return (
-      <div className="relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 p-5 text-white shadow-xl sm:p-8">
-        <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-sky-500/15 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl border-b-[6px] border-indigo-950/40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-5 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)] sm:p-8">
+        <div className="pointer-events-none absolute -top-16 -left-10 h-52 w-52 rounded-full bg-cyan-400/30 blur-3xl animate-pulse" />
+        <div
+          className="pointer-events-none absolute -bottom-16 right-4 h-56 w-56 rounded-full bg-fuchsia-400/25 blur-3xl animate-pulse"
+          style={{ animationDelay: "0.8s" }}
+        />
 
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-xl border-b-2 border-indigo-800 bg-indigo-500/25 px-3.5 py-1 text-xs font-black tracking-wide text-indigo-200 uppercase">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-300" />
+          <div className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/15 px-3.5 py-1 text-xs font-black tracking-wide text-white uppercase backdrop-blur-md">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
             {waitingOnSpoon
               ? `Crafting ${waitingSpoonTitle}`
               : waitingOnBoss
@@ -137,7 +143,7 @@ export function PrimaryHeroCard({
                 : `Building Vocab Bridge ${spoonNum}`}
           </div>
 
-          <h3 className="mt-4 text-xl font-black tracking-tight text-white sm:text-3xl">
+          <h3 className="mt-4 text-xl font-black tracking-tight text-white drop-shadow-xs sm:text-3xl">
             {waitingOnSpoon
               ? `Personalizing ${waitingSpoonTitle} for you...`
               : waitingOnBoss
@@ -145,17 +151,17 @@ export function PrimaryHeroCard({
                 : "Synthesizing Your Vocab Bridge..."}
           </h3>
 
-          <p className="mt-2 max-w-xl text-xs sm:text-sm font-medium leading-relaxed text-slate-300">
+          <p className="mt-2 max-w-xl text-xs sm:text-sm font-medium leading-relaxed text-sky-100">
             {waitingOnSpoon
               ? "Our language engine is generating your custom audio, speaking drills, and visual scene. This takes about 20–30 seconds."
               : "Preparing your interactive checkpoint. Ready in just a moment..."}
           </p>
 
-          <div className="mt-5 sm:mt-6 flex items-center gap-3 border-t border-white/10 pt-4 sm:pt-5">
-            <div className="h-2.5 w-40 sm:w-48 overflow-hidden rounded-full bg-white/10 p-0.5">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" />
+          <div className="mt-5 sm:mt-6 flex items-center gap-3 border-t border-white/20 pt-4 sm:pt-5">
+            <div className="h-2.5 w-40 sm:w-48 overflow-hidden rounded-full bg-white/20 p-0.5">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-amber-300 to-emerald-300" />
             </div>
-            <span className="text-xs font-extrabold text-sky-300">
+            <span className="text-xs font-extrabold text-amber-200">
               Auto-updating when ready...
             </span>
           </div>
@@ -197,13 +203,15 @@ export function PrimaryHeroCard({
     const totalEx = scenario?.rules?.totalExercises ?? 10;
 
     return (
-      <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-purple-950/90 bg-slate-950 text-white shadow-xl transition-colors duration-700">
+      <div
+        className={`group relative overflow-hidden rounded-3xl border-b-[6px] text-white transition-colors duration-700 ${theme.cardBg}`}
+      >
         {coverUrl && (
           <img
             src={coverUrl}
             alt={bossName}
             className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${
-              isFreestyleUnlocked ? "opacity-55" : "opacity-30 grayscale-[45%]"
+              isFreestyleUnlocked ? "opacity-45" : "opacity-25 grayscale-[40%]"
             }`}
           />
         )}
@@ -216,13 +224,12 @@ export function PrimaryHeroCard({
           style={{ background: theme.glow }}
         />
 
-        {/* Rubber-Stamp LOCKED Overlay when Boss requires 3-min AI chat */}
         {!isFreestyleUnlocked && (
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-16 right-4 z-20 -rotate-12 select-none sm:top-10 sm:right-8"
           >
-            <div className="flex items-center gap-2 rounded-2xl border-4 border-rose-500/85 bg-slate-950/75 px-4 py-1.5 shadow-[0_0_25px_rgba(244,63,94,0.35)] backdrop-blur-xs sm:px-6 sm:py-2">
+            <div className="flex items-center gap-2 rounded-2xl border-4 border-rose-400 bg-slate-950/75 px-4 py-1.5 shadow-[0_0_25px_rgba(244,63,94,0.35)] backdrop-blur-xs sm:px-6 sm:py-2">
               <Lock className="h-4 w-4 sm:h-6 sm:w-6 text-rose-400" strokeWidth={3} />
               <span className="text-base sm:text-2xl font-black tracking-[0.22em] text-rose-400 uppercase">
                 LOCKED
@@ -240,11 +247,11 @@ export function PrimaryHeroCard({
               Milestone {milestoneNum} Boss Stage
             </span>
 
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-slate-200 backdrop-blur-md">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-extrabold text-white backdrop-blur-md">
               <span>🎯 Spoons {startSpoon}–{bossDue.orderIndex}</span>
               {scenario?.rules?.passingScore && (
                 <>
-                  <span className="text-white/30">•</span>
+                  <span className="text-white/40">•</span>
                   <span className={theme.accentText}>
                     Pass: {scenario.rules.passingScore}/{totalEx}
                   </span>
@@ -290,32 +297,32 @@ export function PrimaryHeroCard({
               >
                 Milestone Challenger
               </span>
-              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+              <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-xs sm:text-3xl">
                 {bossName}
               </h2>
-              <p className="line-clamp-2 max-w-2xl text-xs sm:text-sm font-medium leading-relaxed text-slate-200">
+              <p className="line-clamp-2 max-w-2xl text-xs sm:text-sm font-medium leading-relaxed text-white/90">
                 {bossPersona}
               </p>
             </div>
           </div>
 
           {boss?.introMessage && (
-            <div className="mt-4 sm:mt-5 rounded-2xl border border-white/10 bg-white/[0.08] p-3.5 sm:p-4 backdrop-blur-md">
+            <div className="mt-4 sm:mt-5 rounded-2xl border border-white/20 bg-white/10 p-3.5 sm:p-4 backdrop-blur-md">
               <div className="flex items-start gap-2.5 sm:gap-3">
                 <Quote
                   className={`mt-0.5 h-4 w-4 shrink-0 rotate-180 ${theme.icon}`}
                 />
-                <p className="text-xs font-medium leading-relaxed text-slate-100 italic sm:text-sm">
+                <p className="text-xs font-medium leading-relaxed text-white italic sm:text-sm">
                   &ldquo;{boss.introMessage}&rdquo;
                 </p>
               </div>
             </div>
           )}
 
-          <div className="mt-5 sm:mt-6 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/10 pt-4 sm:pt-5">
+          <div className="mt-5 sm:mt-6 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/20 pt-4 sm:pt-5">
             {isFreestyleUnlocked ? (
               <>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                <div className="flex items-center gap-2 text-xs font-bold text-white/90">
                   <Swords className={`h-4 w-4 ${theme.icon}`} />
                   <span>Live AI Checkpoint • {totalEx} Challenges</span>
                 </div>
@@ -330,8 +337,8 @@ export function PrimaryHeroCard({
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
-                  <Lock className="h-4 w-4 shrink-0 text-rose-400" />
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-200">
+                  <Lock className="h-4 w-4 shrink-0 text-amber-300" />
                   <span>
                     Complete 1 Live 3-Min AI Conversation to Unlock Boss
                   </span>
@@ -339,7 +346,7 @@ export function PrimaryHeroCard({
 
                 <Link
                   href="/conversation"
-                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-rose-900 bg-gradient-to-b from-rose-500 to-pink-600 px-7 py-3.5 text-sm font-black text-white shadow-xl shadow-rose-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-amber-700 bg-gradient-to-b from-amber-300 via-amber-400 to-orange-500 px-7 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/30 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
                 >
                   <Mic className="h-4 w-4 shrink-0" />
                   <span>Unlock Boss: Start 3-Min AI Chat</span>
@@ -374,37 +381,40 @@ export function PrimaryHeroCard({
       `Spoon ${vocabDue.orderIndex}`;
 
     return (
-      <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
+      <div className="group relative overflow-hidden rounded-3xl border-b-[6px] border-indigo-950/40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]">
+        <div className="pointer-events-none absolute -top-16 -left-10 h-52 w-52 rounded-full bg-amber-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 left-20 h-48 w-48 rounded-full bg-cyan-400/25 blur-3xl" />
+
         {vocabDue.imageUrl && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[56%]">
             <img
               src={vocabDue.imageUrl}
               alt={vocabDue.title ?? "Vocab Image"}
-              className="h-full w-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/30" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700/80 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/80 via-transparent to-indigo-900/20" />
           </div>
         )}
 
         <div className="relative z-10 flex flex-col justify-between p-5 sm:p-9">
           <div className="max-w-xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/20 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-amber-300 uppercase backdrop-blur-md">
-                <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/50 bg-amber-400/25 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-amber-200 uppercase backdrop-blur-md">
+                <Zap className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
                 Vocab Bridge {vocabDue.orderIndex} Ready
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-slate-200 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-bold text-white backdrop-blur-md">
                 🔓 Unlocks {unlockTargetText}
               </span>
             </div>
 
-            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white drop-shadow-xs sm:text-4xl">
               Review: {bridgeTitle}
             </h2>
 
-            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-slate-300">
+            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-sky-100">
               Lock in the {vocabWordCount(vocabDue.bridge.vocabMoment)} core
               scene expressions from Spoon {vocabDue.orderIndex} to unlock{" "}
               <span className="font-black text-amber-300">
@@ -418,12 +428,12 @@ export function PrimaryHeroCard({
                 {words.slice(0, 5).map((w, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-slate-900/85 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-black text-white backdrop-blur-md"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-black text-white backdrop-blur-md"
                   >
-                    <Zap className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    <span className="text-amber-300">{w.word}</span>
+                    <Zap className="h-3 w-3 fill-amber-300 text-amber-300" />
+                    <span className="text-amber-200">{w.word}</span>
                     {w.gloss && (
-                      <span className="font-semibold text-slate-400">
+                      <span className="font-semibold text-white/75">
                         • {w.gloss}
                       </span>
                     )}
@@ -433,9 +443,9 @@ export function PrimaryHeroCard({
             )}
           </div>
 
-          <div className="mt-5 sm:mt-7 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/10 pt-4 sm:pt-5">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-              <Zap className="h-4 w-4 text-amber-400" />
+          <div className="mt-5 sm:mt-7 flex flex-wrap items-center justify-between gap-3.5 sm:gap-4 border-t border-white/20 pt-4 sm:pt-5">
+            <div className="flex items-center gap-2 text-xs font-bold text-white/90">
+              <Zap className="h-4 w-4 text-amber-300" />
               <span>~3 Min Interactive Recall &amp; Pronunciation</span>
             </div>
 
@@ -464,63 +474,66 @@ export function PrimaryHeroCard({
       `Spoon ${nextLesson.orderIndex}`;
 
     return (
-      <div className="group relative overflow-hidden rounded-3xl border-2 border-b-[6px] border-indigo-950/90 bg-slate-950 text-white shadow-xl">
+      <div className="group relative overflow-hidden rounded-3xl border-b-[6px] border-indigo-950/40 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28),inset_0_2px_0_rgba(255,255,255,0.3)]">
+        <div className="pointer-events-none absolute -top-16 -left-10 h-52 w-52 rounded-full bg-cyan-400/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 left-20 h-48 w-48 rounded-full bg-fuchsia-400/25 blur-3xl" />
+
         {nextLesson.imageUrl && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[58%]">
             <img
               src={nextLesson.imageUrl}
               alt={nextLesson.imageAlt ?? "Spoon Image"}
-              className="h-full w-full object-cover opacity-85 transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover opacity-75 transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/70 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/30" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700/75 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/80 via-transparent to-indigo-900/20" />
           </div>
         )}
 
         <div className="relative z-10 flex flex-col justify-between p-5 sm:p-9">
           <div className="max-w-xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/35 bg-sky-500/20 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-sky-300 uppercase backdrop-blur-md">
-                <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-black tracking-wide text-white uppercase backdrop-blur-md">
+                <span className="h-2 w-2 animate-ping rounded-full bg-emerald-300" />
                 Spoon {nextLesson.orderIndex} Ready
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-bold text-slate-200 backdrop-blur-md">
-                <Clock className="h-3.5 w-3.5 text-sky-300" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-bold text-white backdrop-blur-md">
+                <Clock className="h-3.5 w-3.5 text-sky-200" />
                 5–7 min session
               </span>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-[11px] sm:text-xs font-bold text-indigo-200 backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] sm:text-xs font-bold text-amber-200 backdrop-blur-md">
+                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                 Unit {milestoneNum} • Part {stepInMilestone} of 3
               </span>
             </div>
 
-            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-4 sm:mt-5 text-2xl font-black tracking-tight text-white drop-shadow-xs sm:text-4xl">
               Spoon {nextLesson.orderIndex}: {titleToDisplay}
             </h2>
-            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-slate-300">
+            <p className="mt-2 max-w-lg text-xs sm:text-base font-medium leading-relaxed text-sky-100">
               Master essential speech patterns, native pronunciation, and
               interactive listening drills in this bite-sized audio lesson.
             </p>
           </div>
 
-          <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4 sm:pt-5">
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-slate-300">
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-4 sm:pt-5">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-bold text-white/90">
               <span className="inline-flex items-center gap-1.5">
-                <Headphones className="h-4 w-4 text-sky-400" />
+                <Headphones className="h-4 w-4 text-sky-200" />
                 Interactive Audio Lesson
               </span>
-              <span className="hidden sm:inline text-white/20">•</span>
+              <span className="hidden sm:inline text-white/30">•</span>
               <span className="inline-flex items-center gap-1.5">
-                <Mic className="h-4 w-4 text-emerald-400" />
+                <Mic className="h-4 w-4 text-emerald-300" />
                 Live Speech Coaching
               </span>
             </div>
 
             <Link
               href={getLessonHref(nextLesson.id)}
-              className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-8 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-500/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 px-8 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-emerald-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0"
             >
               <span>Start Spoon {nextLesson.orderIndex}</span>
               <ArrowRight className="h-4 w-4" />

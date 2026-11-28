@@ -427,10 +427,10 @@ export function ReviewTable({ reviews }: { reviews: UserReviewListItem[] }) {
             {/* Left Showcase (7 cols) */}
             <div className="space-y-5 lg:col-span-7">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/20 px-3.5 py-1 text-[11px] font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
+                {/* <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/20 px-3.5 py-1 text-[11px] font-black tracking-wider text-sky-300 uppercase backdrop-blur-md">
                   <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                   {isLatest ? "Latest Session Spotlight" : "Selected Spotlight"}
-                </span>
+                </span> */}
 
                 <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black tracking-wider text-slate-200 uppercase">
                   {MODE_LABELS[selectedReview.mode] || selectedReview.mode} •{" "}
