@@ -153,15 +153,16 @@ export default function PricingPage() {
             </div>
           </div>
         )}
-        <Image
-          src="/logo1-nobg.png"
-          alt="Spoon Academy Logo"
-          priority
-          className="mx-auto mb-6 block h-14 w-auto"
-          height={1000}
-          width={1000}
-        />
-
+        <Link href="/">
+          <Image
+            src="/logo1-nobg.png"
+            alt="Spoon Academy Logo"
+            priority
+            className="mx-auto mb-6 block h-14 w-auto"
+            height={1000}
+            width={1000}
+          />
+        </Link>
         <Reveal className="mx-auto max-w-[44rem] text-center" y={18}>
           <span className="inline-flex min-h-8 items-center rounded-full border border-border/80 bg-background/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-foreground/70 backdrop-blur-md">
             {pricingData.eyebrow}

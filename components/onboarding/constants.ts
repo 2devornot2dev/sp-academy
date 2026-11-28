@@ -19,9 +19,9 @@ export const LANGUAGES = [
 ];
 
 export const LEVELS = [
-  { name: "Beginner", description: "I'm just getting started" },
-  { name: "Elementary", description: "I know some basics" },
-  { name: "Intermediate", description: "I can hold simple conversations" },
+  { name: "Zero", value: "zero", description: "I'm starting completely from scratch" },
+  { name: "Beginner", value: "beginner", description: "I know some basic words & phrases" },
+  { name: "Intermediate", value: "intermediate", description: "I can hold simple conversations" },
 ];
 
 export const GOALS = [

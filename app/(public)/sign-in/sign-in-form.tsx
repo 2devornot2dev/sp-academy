@@ -40,8 +40,8 @@ function SignInFormInner({ callbackURL }: { callbackURL: string }) {
 
       const newSearchParams = new URLSearchParams(searchParams.toString());
       newSearchParams.delete("error");
-      const newUrl = newSearchParams.toString() 
-        ? `${window.location.pathname}?${newSearchParams.toString()}` 
+      const newUrl = newSearchParams.toString()
+        ? `${window.location.pathname}?${newSearchParams.toString()}`
         : window.location.pathname;
       router.replace(newUrl, { scroll: false });
     }
@@ -79,33 +79,35 @@ function SignInFormInner({ callbackURL }: { callbackURL: string }) {
   }
 
   return (
-    // Notice how the border, shadow, and bg classes are removed here 
-    // to let the layout naturally frame the form.
-    <form
-      onSubmit={handleSubmit}
-      className="flex w-full flex-col gap-6"
-    >
-      <div className="flex flex-col gap-1 text-center lg:text-left">
-        <div className="flex-col text-center -mt-2">
-        <img 
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-6">
+      {/* Header: logo, "Academy", heading, subtitle — all centered */}
+      <div className="flex flex-col items-center text-center">
+        <img
           src="/logo1-nobg.png"
-          className="object-contain h-24 w-auto"
-          alt="logo"
+          alt="Spoon Academy"
+          className="block h-14 sm:h-24 w-auto object-contain"
         />
-        <p className="tracking-widest text-muted-foreground">Academy</p>
-        </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+        <p className="mt-1 pl-[0.1em] text-sm font-medium uppercase tracking-widest text-muted-foreground">
+          Academy
+        </p>
+
+        <h1 className="mt-6 text-3xl font-semibold tracking-tight text-gray-900">
           Welcome back
         </h1>
-        <p className="text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-500">
           Enter your email to sign in to your account
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 mt-2">
+      <div className="mt-2 flex flex-col gap-4">
         <div className="flex flex-col gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700" htmlFor="email">Email</label>
+            <label
+              className="text-sm font-medium text-gray-700"
+              htmlFor="email"
+            >
+              Email
+            </label>
             <input
               id="email"
               type="email"
@@ -117,7 +119,12 @@ function SignInFormInner({ callbackURL }: { callbackURL: string }) {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700" htmlFor="password">Password</label>
+            <label
+              className="text-sm font-medium text-gray-700"
+              htmlFor="password"
+            >
+              Password
+            </label>
             <input
               id="password"
               type="password"

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +21,19 @@ import {
   Check,
   Phone,
   Bot,
+  Lock,
+  Mail,
+  Send,
+  GraduationCap,
 } from "lucide-react";
 import { updateAccountSettings, type UserDetails } from "@/lib/actions";
+import { updateLanguageLevel } from "@/app/actions/update-language-level";
+import { sendSupportRequest } from "@/app/actions/support-actions";
+import {
+  getLockedSpriteVoices,
+  normalizeSpriteSlug,
+  type SpriteSlug,
+} from "@/lib/sprites/voices";
 
 export interface GeneralSettingsValues {
   displayUsername: string;
@@ -30,9 +42,9 @@ export interface GeneralSettingsValues {
   phone: string;
   nativeLanguage: string;
   targetLanguage: string;
+  levelBand: "zero" | "beginner" | "intermediate";
   gender: string;
-  spriteSlug: string;
-  targetVoiceId: string;
+  spriteSlug: SpriteSlug;
 }
 
 interface SpriteRecord {
@@ -46,9 +58,52 @@ interface SpriteRecord {
 interface GeneralSettingsProps {
   initialSettings: UserDetails;
   initialImageUrl?: string | null;
+  initialLevelBand?: string;
   sprites?: SpriteRecord[];
   userId: string;
 }
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  "fr-FR": "🇫🇷 French (fr-FR)",
+  "es-ES": "🇪🇸 Spanish (es-ES)",
+  "en-US": "🇺🇸 English (en-US)",
+  "de-DE": "🇩🇪 German (de-DE)",
+  "it-IT": "🇮🇹 Italian (it-IT)",
+};
+
+const SPRITE_META: Record<
+  SpriteSlug,
+  { name: string; role: string; fallbackAvatar: string; desc: string; gradient: string }
+> = {
+  vox: {
+    name: "Vox",
+    role: "Playful • Mic Master",
+    fallbackAvatar: "/sprite-m.png",
+    desc: "High-energy pronunciation coach who hypes up every win.",
+    gradient: "from-sky-400 to-blue-600",
+  },
+  vivi: {
+    name: "Vivi",
+    role: "Warm • Expression Guide",
+    fallbackAvatar: "/sprite-f.png",
+    desc: "Calm, clear, audio-focused guide who breaks down tricky phrases.",
+    gradient: "from-fuchsia-400 to-purple-600",
+  },
+  dex: {
+    name: "Dex",
+    role: "Young Adult • Sharp & Chill",
+    fallbackAvatar: "/sprite-dex.png",
+    desc: "Clever, calm strategist who gets you sounding smooth and natural.",
+    gradient: "from-teal-400 to-emerald-600",
+  },
+  deva: {
+    name: "Deva",
+    role: "Young Adult • Bold & Playful",
+    fallbackAvatar: "/sprite-deva.png",
+    desc: "Confident hype coach who makes real-world speaking feel effortless.",
+    gradient: "from-amber-400 to-orange-500",
+  },
+};
 
 function normalizeLanguageSelect(
   raw: string | null | undefined,
@@ -73,9 +128,21 @@ function normalizeGenderSelect(raw: string | null | undefined): string {
   return "PREFER_NOT_TO_SAY";
 }
 
+function normalizeLevelBand(
+  raw?: string | null,
+): "zero" | "beginner" | "intermediate" {
+  const l = (raw || "").trim().toLowerCase();
+  if (l === "zero" || l === "0" || l === "a0") return "zero";
+  if (l === "intermediate" || l === "b1" || l === "b2" || l === "a2") {
+    return "intermediate";
+  }
+  return "beginner";
+}
+
 export function GeneralSettings({
   initialSettings,
   initialImageUrl = null,
+  initialLevelBand = "beginner",
   sprites = [],
   userId,
 }: GeneralSettingsProps) {
@@ -91,8 +158,9 @@ export function GeneralSettings({
       initialSettings?.spriteProfile?.nativeLanguage,
     "en-US",
   );
-  const initSpriteSlug =
-    initialSettings?.spriteProfile?.sprite?.slug === "vivi" ? "vivi" : "vox";
+  const initSpriteSlug = normalizeSpriteSlug(
+    initialSettings?.spriteProfile?.sprite?.slug,
+  );
 
   const [settings, setSettings] = useState<GeneralSettingsValues>({
     displayUsername:
@@ -102,11 +170,9 @@ export function GeneralSettings({
     phone: initialSettings?.phone || "",
     nativeLanguage: initNativeLang,
     targetLanguage: initTargetLang,
+    levelBand: normalizeLevelBand(initialLevelBand),
     gender: normalizeGenderSelect(initialSettings?.gender),
     spriteSlug: initSpriteSlug,
-    targetVoiceId:
-      initialSettings?.spriteProfile?.targetVoiceId ||
-      `${initTargetLang}-${initSpriteSlug === "vivi" ? "girl-01" : "boy-01"}`,
   });
 
   const [imageUrl, setImageUrl] = useState<string | null>(
@@ -125,74 +191,64 @@ export function GeneralSettings({
   const [showAvatarGenerator, setShowAvatarGenerator] =
     useState<boolean>(false);
   const [unsavedAvatar, setUnsavedAvatar] = useState<boolean>(false);
-  const [brokenSprites, setBrokenSprites] = useState<Record<string, boolean>>({});
+  const [brokenSprites, setBrokenSprites] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  // Language change email request modal
+  const [showLangModal, setShowLangModal] = useState(false);
+  const [desiredLanguage, setDesiredLanguage] = useState("es-ES");
+  const [langReason, setLangReason] = useState("");
+  const [langSubmitting, setLangSubmitting] = useState(false);
 
   const spriteProfile = initialSettings?.spriteProfile;
 
-  const voxDb = sprites.find((s) => s.slug === "vox");
-  const viviDb = sprites.find((s) => s.slug === "vivi");
-
-  const spriteOptions = [
-    {
-      slug: "vox" as const,
-      name: voxDb?.name || "Vox",
-      role: "High-Energy Mic Master",
-      avatar: voxDb?.avatarUrl || null,
-      desc:
-        voxDb?.persona ||
-        "Upbeat, punchy pronunciation coach who hypes up every win.",
+  const spriteOptions = (["vox", "vivi", "dex", "deva"] as SpriteSlug[]).map(
+    (slug) => {
+      const dbMatch = sprites.find((s) => s.slug === slug);
+      const meta = SPRITE_META[slug];
+      return {
+        slug,
+        name: dbMatch?.name || meta.name,
+        role: meta.role,
+        avatar: dbMatch?.avatarUrl || meta.fallbackAvatar,
+        desc: dbMatch?.persona || meta.desc,
+        gradient: meta.gradient,
+      };
     },
-    {
-      slug: "vivi" as const,
-      name: viviDb?.name || "Vivi",
-      role: "Warm Expression Guide",
-      avatar: viviDb?.avatarUrl || null,
-      desc:
-        viviDb?.persona ||
-        "Calm, clear, audio-focused guide who breaks down tricky phrases.",
-    },
-  ];
+  );
 
-  const handleSelectSprite = (slug: "vox" | "vivi") => {
-    const suffix = slug === "vivi" ? "girl-01" : "boy-01";
-    const langPrefix = ["fr-FR", "es-ES", "en-US"].includes(
-      settings.targetLanguage,
-    )
-      ? settings.targetLanguage
-      : "fr-FR";
-    setSettings((prev) => ({
-      ...prev,
-      spriteSlug: slug,
-      targetVoiceId: `${langPrefix}-${suffix}`,
-    }));
-  };
-
-  // 1. Handle general settings submit
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const voiceSuffix = settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
-      const nativePrefix = ["fr-FR", "es-ES", "en-US"].includes(
+      const lockedVoices = getLockedSpriteVoices(
+        settings.spriteSlug,
         settings.nativeLanguage,
-      )
-        ? settings.nativeLanguage
-        : "en-US";
+        initTargetLang, // Target language stays locked
+      );
 
-      await updateAccountSettings(userId, {
-        displayUsername: settings.displayUsername.trim(),
-        firstName: settings.firstName.trim(),
-        lastName: settings.lastName.trim(),
-        phone: settings.phone.trim() || null,
-        nativeLanguage: settings.nativeLanguage,
-        targetLanguage: settings.targetLanguage,
-        gender: settings.gender,
-        spriteSlug: settings.spriteSlug,
-        targetVoiceId: settings.targetVoiceId,
-        nativeVoiceId: `${nativePrefix}-${voiceSuffix}`,
-      });
+      await Promise.all([
+        updateAccountSettings(userId, {
+          displayUsername: settings.displayUsername.trim(),
+          firstName: settings.firstName.trim(),
+          lastName: settings.lastName.trim(),
+          phone: settings.phone.trim() || null,
+          nativeLanguage: settings.nativeLanguage,
+          targetLanguage: initTargetLang,
+          gender: settings.gender,
+          spriteSlug: lockedVoices.spriteSlug,
+          nativeVoiceId: lockedVoices.nativeVoiceId,
+          targetVoiceId: lockedVoices.targetVoiceId,
+        }),
+        updateLanguageLevel({
+          languageCode: initTargetLang,
+          levelBand: settings.levelBand,
+        }),
+      ]);
+
       router.refresh();
-      toast.success("Profile & Sprite settings saved!");
+      toast.success("Profile, Sprite & level settings saved!");
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Failed to update settings.";
@@ -202,7 +258,29 @@ export function GeneralSettings({
     }
   };
 
-  // 2. Handle manual photo upload
+  const handleSubmitLanguageRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!langReason.trim() || langSubmitting) return;
+    setLangSubmitting(true);
+    try {
+      const res = await sendSupportRequest({
+        subject: `Language Change Request: ${initTargetLang} → ${desiredLanguage}`,
+        message: `Current target language: ${initTargetLang}\nRequested language: ${desiredLanguage}\n\nWhy they want to switch:\n${langReason.trim()}`,
+      });
+      if (res?.ok) {
+        toast.success("Request sent! We'll follow up by email shortly.");
+        setLangReason("");
+        setShowLangModal(false);
+      } else {
+        toast.error("Could not send request—email hello@spoonacademy.com.");
+      }
+    } catch {
+      toast.error("Could not send request—email hello@spoonacademy.com.");
+    } finally {
+      setLangSubmitting(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -243,7 +321,6 @@ export function GeneralSettings({
     }
   };
 
-  // 3. Handle AI Avatar generation
   const handleGenerateAvatar = async () => {
     if (generationsRemaining <= 0) {
       toast.error("You've reached your monthly generation limit.");
@@ -289,7 +366,6 @@ export function GeneralSettings({
     }
   };
 
-  // 4. Handle saving AI Avatar to user profile
   const handleSaveAvatar = async () => {
     const urlToSave = aiImageUrl;
     if (!urlToSave) return;
@@ -327,31 +403,30 @@ export function GeneralSettings({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* =========================================================
           1. GENERAL PROFILE & SPRITE COMPANION SETTINGS
           ========================================================= */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8"
+        className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-sm sm:p-8"
       >
-        <div className="space-y-6">
-          <div className="flex items-center gap-3.5 border-b border-slate-100 pb-5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
+        <div className="space-y-5 sm:space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4 sm:pb-5">
+            <span className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs">
               <User className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-lg font-black text-slate-900">
-                Profile Identity &amp; Language Track
+              <h2 className="text-base sm:text-lg font-black text-slate-900">
+                Profile Identity &amp; Learning Level
               </h2>
-              <p className="text-xs font-semibold text-slate-500">
-                Update your personal details, grammatical gender, and active
-                languages.
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
+                Update your details, grammatical gender, and difficulty level.
               </p>
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
             {/* First Name */}
             <div className="space-y-1.5">
               <Label
@@ -461,46 +536,74 @@ export function GeneralSettings({
               </select>
             </div>
 
-            {/* Target Language */}
+            {/* Current Level (Zero / Beginner / Intermediate) */}
             <div className="space-y-1.5">
               <Label
-                htmlFor="targetLanguage"
-                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
+                htmlFor="levelBand"
+                className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase"
               >
-                Target Learning Language
+                <GraduationCap className="h-3.5 w-3.5 text-blue-600" />
+                <span>Current Level</span>
               </Label>
               <select
-                id="targetLanguage"
-                value={settings.targetLanguage}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const suffix =
-                    settings.spriteSlug === "vivi" ? "girl-01" : "boy-01";
+                id="levelBand"
+                value={settings.levelBand}
+                onChange={(e) =>
                   setSettings((prev) => ({
                     ...prev,
-                    targetLanguage: val,
-                    targetVoiceId: `${val}-${suffix}`,
-                  }));
-                }}
+                    levelBand: e.target.value as
+                      | "zero"
+                      | "beginner"
+                      | "intermediate",
+                  }))
+                }
                 className="h-11 w-full cursor-pointer rounded-2xl border-2 border-b-4 border-sky-200 border-b-sky-300 bg-sky-50/40 px-3.5 text-xs font-black text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none"
               >
-                <option value="fr-FR">🇫🇷 French (fr-FR)</option>
-                <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
-                <option value="en-US">🇺🇸 English (en-US)</option>
+                <option value="zero">Zero — Starting from scratch</option>
+                <option value="beginner">Beginner — Know some basics</option>
+                <option value="intermediate">
+                  Intermediate — Simple conversations
+                </option>
               </select>
+              <p className="text-[11px] font-semibold text-slate-400">
+                Applies to your upcoming Spoons &amp; AI chats.
+              </p>
+            </div>
+
+            {/* Locked Target Learning Language */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase">
+                <Lock className="h-3 w-3 text-slate-400" />
+                <span>Active Target Language (Locked)</span>
+              </Label>
+              <div className="flex flex-col justify-between gap-2.5 rounded-2xl border-2 border-slate-200 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-slate-800">
+                  <span>
+                    {LANGUAGE_LABELS[initTargetLang] || initTargetLang}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLangModal(true)}
+                  className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-black text-blue-600 shadow-2xs transition hover:bg-sky-50"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Request Language Change</span>
+                </button>
+              </div>
             </div>
           </div>
 
-    {/* =========================================================
-              SPRITE COMPANION 3D SELECTOR
+          {/* =========================================================
+              4-SPRITE COMPANION 3D SELECTOR (Voices locked 1:1!)
               ========================================================= */}
-          <div className="rounded-3xl border-2 border-slate-200/90 bg-slate-50/70 p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="rounded-2xl sm:rounded-3xl border-2 border-slate-200/90 bg-slate-50/70 p-4 sm:p-5">
+            <div className="mb-3.5 sm:mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
-                  AI Sidekick &amp; Voice
+                  AI Sidekick &amp; Locked Voice
                 </span>
-                <h3 className="text-base font-black text-slate-900">
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
                   Choose Your Sprite Companion
                 </h3>
               </div>
@@ -515,18 +618,20 @@ export function GeneralSettings({
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {spriteOptions.map((sp) => {
                 const active = settings.spriteSlug === sp.slug;
                 return (
                   <button
                     key={sp.slug}
                     type="button"
-                    onClick={() => handleSelectSprite(sp.slug)}
-                    className={`flex items-start gap-3.5 rounded-2xl border-2 border-b-4 p-4 text-left transition-all ${
+                    onClick={() =>
+                      setSettings((prev) => ({ ...prev, spriteSlug: sp.slug }))
+                    }
+                    className={`flex items-start gap-3 rounded-2xl border-2 border-b-4 p-3.5 sm:p-4 text-left transition-all ${
                       active
                         ? "border-blue-600 border-b-blue-800 bg-white shadow-sm"
-                        : "border-slate-200 border-b-slate-300 bg-white/70 hover:border-sky-300 hover:bg-white"
+                        : "border-slate-200 border-b-slate-300 bg-white/75 hover:border-sky-300 hover:bg-white"
                     }`}
                   >
                     {sp.avatar && !brokenSprites[sp.slug] ? (
@@ -543,23 +648,19 @@ export function GeneralSettings({
                       />
                     ) : (
                       <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white ${
-                          sp.slug === "vivi"
-                            ? "bg-gradient-to-b from-fuchsia-400 to-purple-600"
-                            : "bg-gradient-to-b from-sky-400 to-blue-600"
-                        }`}
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b text-white ${sp.gradient}`}
                       >
                         <Bot className="h-6 w-6" />
                       </div>
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-black text-slate-900">
                           {sp.name}
                         </span>
                         {active && (
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                             <Check className="h-3 w-3 stroke-[3.5]" />
                           </span>
                         )}
@@ -576,57 +677,31 @@ export function GeneralSettings({
               })}
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="nativeLanguage"
-                  className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
-                >
-                  Explanation / Native Language
-                </Label>
-                <select
-                  id="nativeLanguage"
-                  value={settings.nativeLanguage}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      nativeLanguage: e.target.value,
-                    }))
-                  }
-                  className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="en-US">🇺🇸 English (en-US)</option>
-                  <option value="fr-FR">🇫🇷 French (fr-FR)</option>
-                  <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="targetVoiceId"
-                  className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
-                >
-                  Target Voice Persona
-                </Label>
-                <select
-                  id="targetVoiceId"
-                  value={settings.targetVoiceId}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      targetVoiceId: e.target.value,
-                    }))
-                  }
-                  className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="fr-FR-girl-01">Vivi • French Female</option>
-                  <option value="fr-FR-boy-01">Vox • French Male</option>
-                  <option value="es-ES-girl-01">Vivi • Spanish Female</option>
-                  <option value="es-ES-boy-01">Vox • Spanish Male</option>
-                  <option value="en-US-girl-01">Vivi • English Female</option>
-                  <option value="en-US-boy-01">Vox • English Male</option>
-                </select>
-              </div>
+            <div className="mt-4 max-w-sm space-y-1.5">
+              <Label
+                htmlFor="nativeLanguage"
+                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
+              >
+                Explanation / Native Language
+              </Label>
+              <select
+                id="nativeLanguage"
+                value={settings.nativeLanguage}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    nativeLanguage: e.target.value,
+                  }))
+                }
+                className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
+              >
+                <option value="en-US">🇺🇸 English (en-US)</option>
+                <option value="fr-FR">🇫🇷 French (fr-FR)</option>
+                <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
+              </select>
+              <p className="text-[11px] font-semibold text-slate-400">
+                Voice automatically matches your selected Sprite.
+              </p>
             </div>
           </div>
 
@@ -634,7 +709,7 @@ export function GeneralSettings({
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-xs font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:text-sm"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-xs font-black text-white shadow-lg shadow-blue-500/25 transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:opacity-50 sm:text-sm"
             >
               {isLoading ? (
                 <>
@@ -655,13 +730,13 @@ export function GeneralSettings({
       {/* =========================================================
           2. PROFILE PICTURE & AI AVATAR STUDIO
           ========================================================= */}
-      <div className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-6 shadow-sm sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
+      <div className="rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white p-4 shadow-sm sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 sm:pb-5">
           <div>
-            <h2 className="text-lg font-black text-slate-900">
+            <h2 className="text-base sm:text-lg font-black text-slate-900">
               Profile Avatar &amp; AI Studio
             </h2>
-            <p className="text-xs font-semibold text-slate-500">
+            <p className="text-[11px] sm:text-xs font-semibold text-slate-500">
               Upload your own photo or generate a custom illustrated persona.
             </p>
           </div>
@@ -670,18 +745,18 @@ export function GeneralSettings({
             <button
               type="button"
               onClick={() => setShowAvatarGenerator(true)}
-              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
+              className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-b-[3px] border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Open AI Avatar Studio</span>
+              <span>AI Avatar Studio</span>
             </button>
           )}
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
           {/* Current Avatar & File Upload */}
-          <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6">
-            <div className="relative flex aspect-square w-28 items-center justify-center overflow-hidden rounded-3xl border-2 border-b-4 border-sky-300 bg-white shadow-md">
+          <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-5 sm:p-6">
+            <div className="relative flex aspect-square w-24 sm:w-28 items-center justify-center overflow-hidden rounded-3xl border-2 border-b-4 border-sky-300 bg-white shadow-md">
               {imageUrl ? (
                 <img
                   src={imageUrl}
@@ -720,7 +795,7 @@ export function GeneralSettings({
 
           {/* AI Avatar Studio */}
           {showAvatarGenerator ? (
-            <div className="relative col-span-2 flex flex-col gap-6 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/30 p-5 md:flex-row">
+            <div className="relative flex flex-col gap-5 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/30 p-4 sm:p-5 md:col-span-2 md:flex-row">
               <button
                 type="button"
                 onClick={() => setShowAvatarGenerator(false)}
@@ -808,7 +883,6 @@ export function GeneralSettings({
                 </button>
               </div>
 
-              {/* AI Output Preview */}
               <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 md:w-44">
                 <div className="relative flex aspect-square w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-indigo-200 bg-slate-50 shadow-inner">
                   {aiImageUrl ? (
@@ -844,7 +918,7 @@ export function GeneralSettings({
               </div>
             </div>
           ) : (
-            <div className="col-span-2 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
+            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center md:col-span-2">
               <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border-b-2 border-indigo-800 bg-indigo-600 text-white shadow-xs">
                 <Wand2 className="h-5 w-5" />
               </div>
@@ -867,6 +941,83 @@ export function GeneralSettings({
           )}
         </div>
       </div>
+
+      {/* Language Change Request Modal */}
+      {showLangModal &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl border-2 border-b-[6px] border-slate-200 bg-white p-6 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-base font-black text-slate-900">
+                    Request Language Switch
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLangModal(false)}
+                  className="rounded-xl p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <p className="mb-4 text-xs font-semibold leading-relaxed text-slate-500">
+                Your active track is currently locked to{" "}
+                <strong className="text-slate-800">
+                  {LANGUAGE_LABELS[initTargetLang] || initTargetLang}
+                </strong>
+                . Let us know which language you&apos;d like to switch to and
+                why so we can set up your course cleanly.
+              </p>
+
+              <form onSubmit={handleSubmitLanguageRequest} className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
+                    Desired Language
+                  </Label>
+                  <select
+                    value={desiredLanguage}
+                    onChange={(e) => setDesiredLanguage(e.target.value)}
+                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white px-3 text-xs font-black text-slate-900 focus:border-sky-400 focus:outline-none"
+                  >
+                    <option value="fr-FR">🇫🇷 French (fr-FR)</option>
+                    <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
+                    <option value="en-US">🇺🇸 English (en-US)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
+                    Why do you want to switch?
+                  </Label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="e.g. Picked the wrong language by mistake during signup..."
+                    value={langReason}
+                    onChange={(e) => setLangReason(e.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:border-sky-400 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={langSubmitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 py-3 text-xs font-black text-white disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>
+                    {langSubmitting ? "Sending..." : "Send Switch Request"}
+                  </span>
+                </button>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

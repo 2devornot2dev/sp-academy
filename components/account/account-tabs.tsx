@@ -29,9 +29,9 @@ export function AccountTabs({
   const [activeTab, setActiveTab] = useState<TabId>("general");
 
   return (
-    <div className="w-full space-y-6">
-      {/* 3D Tactile Tab Switcher Bar */}
-      <div className="grid w-full grid-cols-2 gap-2 rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-2 shadow-sm sm:grid-cols-4">
+    <div className="w-full space-y-4 sm:space-y-6">
+      {/* 3D Tactile Single-Row Tab Switcher Bar */}
+      <div className="grid w-full grid-cols-4 gap-1.5 sm:gap-2 rounded-2xl sm:rounded-3xl border-2 border-b-[5px] border-slate-200 border-b-slate-300 bg-white p-1.5 sm:p-2 shadow-sm">
         {TABS.map(({ id, label, Icon }) => {
           const isActive = activeTab === id;
           return (
@@ -39,13 +39,13 @@ export function AccountTabs({
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
-              className={`flex items-center justify-center gap-2 rounded-2xl py-3 text-xs font-black tracking-wide uppercase transition-all ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-2xl py-2 sm:py-3 text-[10px] sm:text-xs font-black tracking-wide uppercase transition-all ${
                 isActive
                   ? "border-b-2 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 text-white shadow-xs"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>{label}</span>
             </button>
           );
