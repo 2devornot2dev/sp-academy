@@ -85,18 +85,18 @@ export function SpriteHeader({ data }: SpriteHeaderProps) {
           </>
         ),
       },
-      {
-        tag: "Coach Energy",
-        content: (
-          <>
-            My battery is charged at{" "}
-            <strong className="text-amber-600">
-              {sprite.energy}/{sprite.maxEnergy} ⚡
-            </strong>
-            —tap your next stage card below whenever you&apos;re ready to roll!
-          </>
-        ),
-      },
+    //   {
+    //     tag: "Coach Energy",
+    //     content: (
+    //       <>
+    //         My battery is charged at{" "}
+    //         <strong className="text-amber-600">
+    //           {sprite.energy}/{sprite.maxEnergy} ⚡
+    //         </strong>
+    //         —tap your next stage card below whenever you&apos;re ready to roll!
+    //       </>
+    //     ),
+    //   },
     ],
     [
       sprite.name,
