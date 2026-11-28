@@ -33,14 +33,7 @@ export default async function ConversationReviewsListPage() {
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/conversation"
-              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/40 px-4 py-1.5 text-xs font-black text-white shadow-sm backdrop-blur-md transition hover:bg-slate-950/60"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 text-cyan-300" />
-              <span>Back to Conversation Arena</span>
-            </Link>
-
+            
             <div className="flex items-center gap-2">
               {avgNumeric !== null && (
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/40 px-3.5 py-1.5 text-xs font-extrabold text-emerald-300 shadow-sm backdrop-blur-md">
