@@ -268,8 +268,8 @@ export function BookWrapper({
   const cameraMotion =
     CAMERA_MOTIONS[(Math.max(1, currentPage) - 1) % CAMERA_MOTIONS.length];
 
-  const AMBIENT_VOLUME = 0.28; // while the page is idle / being read silently
-  const AMBIENT_VOLUME_DUCKED = 0.12; // while narration or mic recording is active
+  const AMBIENT_VOLUME = 0.56; // while the page is idle / being read silently
+  const AMBIENT_VOLUME_DUCKED = 0.28; // while narration or mic recording is active
 
   // 1. Where the audio element is created
   useEffect(() => {
