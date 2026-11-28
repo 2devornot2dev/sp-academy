@@ -99,7 +99,9 @@ export const Sidebar = ({
 
   useEffect(() => {
     if (!user?.id) return;
-    getSupportAccess().then(setSupportAccess).catch(() => {});
+    getSupportAccess()
+      .then(setSupportAccess)
+      .catch(() => {});
   }, [user?.id]);
 
   const userInitials = user?.name
@@ -121,22 +123,28 @@ export const Sidebar = ({
     });
   };
 
-  const handleSendHelp = async (e: React.FormEvent) => {
+const handleSendHelp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!helpSubject.trim() || !helpMessage.trim() || helpSending) return;
     setHelpSending(true);
     setHelpStatus("idle");
-    const res = await sendSupportRequest({
-      subject: helpSubject,
-      message: helpMessage,
-    }).catch(() => ({ ok: false }));
-    setHelpSending(false);
-    if (res?.ok) {
-      setHelpStatus("sent");
-      setHelpSubject("");
-      setHelpMessage("");
-    } else {
+    try {
+      const res = await sendSupportRequest({
+        eyebrow: "Trial Support Request",
+        subject: helpSubject,
+        message: helpMessage,
+      });
+      if (res?.ok) {
+        setHelpStatus("sent");
+        setHelpSubject("");
+        setHelpMessage("");
+      } else {
+        setHelpStatus("error");
+      }
+    } catch {
       setHelpStatus("error");
+    } finally {
+      setHelpSending(false);
     }
   };
 

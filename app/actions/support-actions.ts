@@ -26,9 +26,11 @@ export async function getSupportAccess() {
 export async function sendSupportRequest({
   subject,
   message,
+  eyebrow,
 }: {
   subject: string;
   message: string;
+  eyebrow?: string;
 }) {
   try {
     const user = await requireUser();
@@ -51,6 +53,7 @@ export async function sendSupportRequest({
         userId: user.id,
         subject: cleanSubject,
         message: cleanMessage,
+        eyebrow,
       }),
     });
   } catch (err) {

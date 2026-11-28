@@ -19,12 +19,12 @@ import {
   CheckCircle2,
   Zap,
   Check,
-  Phone,
   Bot,
   Lock,
   Mail,
   Send,
   GraduationCap,
+  ArrowRight,
 } from "lucide-react";
 import { updateAccountSettings, type UserDetails } from "@/lib/actions";
 import { updateLanguageLevel } from "@/app/actions/update-language-level";
@@ -39,9 +39,6 @@ export interface GeneralSettingsValues {
   displayUsername: string;
   firstName: string;
   lastName: string;
-  phone: string;
-  nativeLanguage: string;
-  targetLanguage: string;
   levelBand: "zero" | "beginner" | "intermediate";
   gender: string;
   spriteSlug: SpriteSlug;
@@ -64,16 +61,22 @@ interface GeneralSettingsProps {
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  "fr-FR": "🇫🇷 French (fr-FR)",
-  "es-ES": "🇪🇸 Spanish (es-ES)",
-  "en-US": "🇺🇸 English (en-US)",
-  "de-DE": "🇩🇪 German (de-DE)",
-  "it-IT": "🇮🇹 Italian (it-IT)",
+  "fr-FR": "🇫🇷 French",
+  "es-ES": "🇪🇸 Spanish",
+  "en-US": "🇺🇸 English",
+  "de-DE": "🇩🇪 German",
+  "it-IT": "🇮🇹 Italian",
 };
 
 const SPRITE_META: Record<
   SpriteSlug,
-  { name: string; role: string; fallbackAvatar: string; desc: string; gradient: string }
+  {
+    name: string;
+    role: string;
+    fallbackAvatar: string;
+    desc: string;
+    gradient: string;
+  }
 > = {
   vox: {
     name: "Vox",
@@ -148,12 +151,12 @@ export function GeneralSettings({
 }: GeneralSettingsProps) {
   const router = useRouter();
 
-  const initTargetLang = normalizeLanguageSelect(
+  const lockedTargetLang = normalizeLanguageSelect(
     initialSettings?.targetLanguage ||
       initialSettings?.spriteProfile?.targetLanguage,
     "fr-FR",
   );
-  const initNativeLang = normalizeLanguageSelect(
+  const lockedNativeLang = normalizeLanguageSelect(
     initialSettings?.nativeLanguage ||
       initialSettings?.spriteProfile?.nativeLanguage,
     "en-US",
@@ -167,9 +170,6 @@ export function GeneralSettings({
       initialSettings?.displayUsername || initialSettings?.username || "",
     firstName: initialSettings?.firstName || "",
     lastName: initialSettings?.lastName || "",
-    phone: initialSettings?.phone || "",
-    nativeLanguage: initNativeLang,
-    targetLanguage: initTargetLang,
     levelBand: normalizeLevelBand(initialLevelBand),
     gender: normalizeGenderSelect(initialSettings?.gender),
     spriteSlug: initSpriteSlug,
@@ -195,9 +195,12 @@ export function GeneralSettings({
     {},
   );
 
-  // Language change email request modal
+  // Language change email request modal (covers both native & target)
   const [showLangModal, setShowLangModal] = useState(false);
-  const [desiredLanguage, setDesiredLanguage] = useState("es-ES");
+  const [desiredNative, setDesiredNative] = useState(lockedNativeLang);
+  const [desiredTarget, setDesiredTarget] = useState(
+    lockedTargetLang === "fr-FR" ? "es-ES" : "fr-FR",
+  );
   const [langReason, setLangReason] = useState("");
   const [langSubmitting, setLangSubmitting] = useState(false);
 
@@ -224,8 +227,8 @@ export function GeneralSettings({
     try {
       const lockedVoices = getLockedSpriteVoices(
         settings.spriteSlug,
-        settings.nativeLanguage,
-        initTargetLang, // Target language stays locked
+        lockedNativeLang,
+        lockedTargetLang,
       );
 
       await Promise.all([
@@ -233,16 +236,15 @@ export function GeneralSettings({
           displayUsername: settings.displayUsername.trim(),
           firstName: settings.firstName.trim(),
           lastName: settings.lastName.trim(),
-          phone: settings.phone.trim() || null,
-          nativeLanguage: settings.nativeLanguage,
-          targetLanguage: initTargetLang,
+          nativeLanguage: lockedNativeLang,
+          targetLanguage: lockedTargetLang,
           gender: settings.gender,
           spriteSlug: lockedVoices.spriteSlug,
           nativeVoiceId: lockedVoices.nativeVoiceId,
           targetVoiceId: lockedVoices.targetVoiceId,
         }),
         updateLanguageLevel({
-          languageCode: initTargetLang,
+          languageCode: lockedTargetLang,
           levelBand: settings.levelBand,
         }),
       ]);
@@ -264,8 +266,9 @@ export function GeneralSettings({
     setLangSubmitting(true);
     try {
       const res = await sendSupportRequest({
-        subject: `Language Change Request: ${initTargetLang} → ${desiredLanguage}`,
-        message: `Current target language: ${initTargetLang}\nRequested language: ${desiredLanguage}\n\nWhy they want to switch:\n${langReason.trim()}`,
+        eyebrow: "Language Switch Request",
+        subject: `Language Change Request (${lockedNativeLang}→${lockedTargetLang})`,
+        message: `Current pair: Native ${lockedNativeLang} / Target ${lockedTargetLang}\nRequested pair: Native ${desiredNative} / Target ${desiredTarget}\n\nReason:\n${langReason.trim()}`,
       });
       if (res?.ok) {
         toast.success("Request sent! We'll follow up by email shortly.");
@@ -490,30 +493,7 @@ export function GeneralSettings({
               />
             </div>
 
-            {/* Phone */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="phone"
-                className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase"
-              >
-                <Phone className="h-3 w-3 text-slate-400" />
-                <span>Phone (Optional)</span>
-              </Label>
-              <Input
-                id="phone"
-                value={settings.phone}
-                placeholder="+1 (555) 000-0000"
-                className="h-11 rounded-2xl border-2 border-slate-200 bg-slate-50/60 font-bold text-slate-900 focus:border-blue-500 focus:bg-white"
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    phone: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            {/* Gender */}
+            {/* Grammatical Gender */}
             <div className="space-y-1.5">
               <Label
                 htmlFor="gender"
@@ -537,7 +517,7 @@ export function GeneralSettings({
             </div>
 
             {/* Current Level (Zero / Beginner / Intermediate) */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label
                 htmlFor="levelBand"
                 className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase"
@@ -570,16 +550,22 @@ export function GeneralSettings({
               </p>
             </div>
 
-            {/* Locked Target Learning Language */}
+            {/* Locked Native & Target Language Pair */}
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="flex items-center gap-1 text-[11px] font-black tracking-wider text-slate-500 uppercase">
                 <Lock className="h-3 w-3 text-slate-400" />
-                <span>Active Target Language (Locked)</span>
+                <span>Language Track (Locked)</span>
               </Label>
               <div className="flex flex-col justify-between gap-2.5 rounded-2xl border-2 border-slate-200 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-slate-800">
-                  <span>
-                    {LANGUAGE_LABELS[initTargetLang] || initTargetLang}
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm font-black text-slate-800">
+                  <span className="rounded-lg bg-white px-2.5 py-1 ring-1 ring-slate-200">
+                    Native:{" "}
+                    {LANGUAGE_LABELS[lockedNativeLang] || lockedNativeLang}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
+                  <span className="rounded-lg bg-sky-50 px-2.5 py-1 text-blue-800 ring-1 ring-sky-200">
+                    Learning:{" "}
+                    {LANGUAGE_LABELS[lockedTargetLang] || lockedTargetLang}
                   </span>
                 </div>
                 <button
@@ -588,7 +574,7 @@ export function GeneralSettings({
                   className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-black text-blue-600 shadow-2xs transition hover:bg-sky-50"
                 >
                   <Mail className="h-3.5 w-3.5" />
-                  <span>Request Language Change</span>
+                  <span>Request Change</span>
                 </button>
               </div>
             </div>
@@ -677,32 +663,10 @@ export function GeneralSettings({
               })}
             </div>
 
-            <div className="mt-4 max-w-sm space-y-1.5">
-              <Label
-                htmlFor="nativeLanguage"
-                className="text-[11px] font-black tracking-wider text-slate-500 uppercase"
-              >
-                Explanation / Native Language
-              </Label>
-              <select
-                id="nativeLanguage"
-                value={settings.nativeLanguage}
-                onChange={(e) =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    nativeLanguage: e.target.value,
-                  }))
-                }
-                className="h-10 w-full cursor-pointer rounded-xl border-2 border-b-[3px] border-slate-200 border-b-slate-300 bg-white px-3 text-xs font-black text-slate-900 focus:border-blue-600 focus:outline-none"
-              >
-                <option value="en-US">🇺🇸 English (en-US)</option>
-                <option value="fr-FR">🇫🇷 French (fr-FR)</option>
-                <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
-              </select>
-              <p className="text-[11px] font-semibold text-slate-400">
-                Voice automatically matches your selected Sprite.
-              </p>
-            </div>
+            <p className="mt-3 text-[11px] font-semibold text-slate-400">
+              Each Sprite uses its own matched native &amp; target voice
+              automatically.
+            </p>
           </div>
 
           <div className="flex justify-end border-t border-slate-100 pt-4">
@@ -754,7 +718,6 @@ export function GeneralSettings({
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6">
-          {/* Current Avatar & File Upload */}
           <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-5 sm:p-6">
             <div className="relative flex aspect-square w-24 sm:w-28 items-center justify-center overflow-hidden rounded-3xl border-2 border-b-4 border-sky-300 bg-white shadow-md">
               {imageUrl ? (
@@ -793,7 +756,6 @@ export function GeneralSettings({
             </div>
           </div>
 
-          {/* AI Avatar Studio */}
           {showAvatarGenerator ? (
             <div className="relative flex flex-col gap-5 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-sky-50/30 p-4 sm:p-5 md:col-span-2 md:flex-row">
               <button
@@ -942,7 +904,7 @@ export function GeneralSettings({
         </div>
       </div>
 
-      {/* Language Change Request Modal */}
+      {/* Language Change Request Modal (Covers Native & Target) */}
       {showLangModal &&
         typeof document !== "undefined" &&
         createPortal(
@@ -965,28 +927,45 @@ export function GeneralSettings({
               </div>
 
               <p className="mb-4 text-xs font-semibold leading-relaxed text-slate-500">
-                Your active track is currently locked to{" "}
-                <strong className="text-slate-800">
-                  {LANGUAGE_LABELS[initTargetLang] || initTargetLang}
-                </strong>
-                . Let us know which language you&apos;d like to switch to and
-                why so we can set up your course cleanly.
+                Language tracks are locked after onboarding so your Spoons and
+                Word Matrix stay consistent. Tell us what you&apos;d like to
+                switch to and why, and we&apos;ll help you out.
               </p>
 
-              <form onSubmit={handleSubmitLanguageRequest} className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
-                    Desired Language
-                  </Label>
-                  <select
-                    value={desiredLanguage}
-                    onChange={(e) => setDesiredLanguage(e.target.value)}
-                    className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white px-3 text-xs font-black text-slate-900 focus:border-sky-400 focus:outline-none"
-                  >
-                    <option value="fr-FR">🇫🇷 French (fr-FR)</option>
-                    <option value="es-ES">🇪🇸 Spanish (es-ES)</option>
-                    <option value="en-US">🇺🇸 English (en-US)</option>
-                  </select>
+              <form
+                onSubmit={handleSubmitLanguageRequest}
+                className="space-y-3"
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
+                      Native Language
+                    </Label>
+                    <select
+                      value={desiredNative}
+                      onChange={(e) => setDesiredNative(e.target.value)}
+                      className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white px-2.5 text-xs font-black text-slate-900 focus:border-sky-400 focus:outline-none"
+                    >
+                      <option value="en-US">🇺🇸 English</option>
+                      <option value="fr-FR">🇫🇷 French</option>
+                      <option value="es-ES">🇪🇸 Spanish</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black tracking-wider text-slate-500 uppercase">
+                      Target Language
+                    </Label>
+                    <select
+                      value={desiredTarget}
+                      onChange={(e) => setDesiredTarget(e.target.value)}
+                      className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white px-2.5 text-xs font-black text-slate-900 focus:border-sky-400 focus:outline-none"
+                    >
+                      <option value="fr-FR">🇫🇷 French</option>
+                      <option value="es-ES">🇪🇸 Spanish</option>
+                      <option value="en-US">🇺🇸 English</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">

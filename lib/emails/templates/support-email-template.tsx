@@ -13,6 +13,7 @@ export interface SupportEmailProps {
   userId: string;
   subject: string;
   message: string;
+  eyebrow?: string;
 }
 
 export function SupportEmailTemplate({
@@ -21,10 +22,11 @@ export function SupportEmailTemplate({
   userId,
   subject,
   message,
+  eyebrow = "Spoon Academy Support",
 }: SupportEmailProps) {
   return (
-    <SpoonEmailLayout previewText={`Support message from ${userEmail}`}>
-      <Text style={EMAIL_STYLES.eyebrow}>Trial Support Request</Text>
+    <SpoonEmailLayout previewText={`${eyebrow} from ${userEmail}`}>
+      <Text style={EMAIL_STYLES.eyebrow}>{eyebrow}</Text>
 
       <Heading style={EMAIL_STYLES.h1}>{subject}</Heading>
 
