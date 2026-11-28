@@ -125,7 +125,7 @@ export function SpriteHeader({ data }: SpriteHeaderProps) {
   useEffect(() => {
     const timer = setInterval(() => {
       setMsgIdx((prev) => (prev + 1) % spriteMessages.length);
-    }, 4800);
+    }, 6400);
     return () => clearInterval(timer);
   }, [spriteMessages.length]);
 
