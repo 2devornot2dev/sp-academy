@@ -365,7 +365,7 @@ export default function FreestyleSetup({
                     type="button"
                     onClick={handleStart}
                     disabled={isStarting || !canStart || isDailyCapReached}
-                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 px-7 py-3.5 text-xs sm:text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-white/15 disabled:bg-white/15 disabled:from-transparent disabled:to-transparent disabled:text-white/60 disabled:shadow-none"
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-2xl border-b-4 border-emerald-800 bg-gradient-to-b from-emerald-300 via-emerald-400 to-teal-500 px-7 py-3.5 text-xs sm:text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:pointer-events-none disabled:border-white/25 disabled:bg-white/20 disabled:bg-none disabled:text-white/80 disabled:shadow-none"
                   >
                     {isDailyCapReached ? (
                       <span>
