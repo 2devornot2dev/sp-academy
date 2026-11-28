@@ -21,6 +21,16 @@ import { vocabWordCount } from "@/lib/utils";
 
 type Lesson = LearningTrack["lessons"][number];
 
+/**
+ * Image panel on the right side of the card. The panel itself is masked so the
+ * photo dissolves into the card's own gradient on md+ (no hard seam where the
+ * panel starts), and the tint overlays are semi-transparent so the image stays
+ * vivid. On mobile the panel spans the full card, so a slightly stronger tint
+ * keeps the text readable.
+ */
+const IMAGE_PANEL_MASK =
+  "md:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.55)_22%,black_55%)] md:[-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.55)_22%,black_55%)]";
+
 const BOSS_THEMES = [
   {
     name: "neon-fuchsia",
@@ -386,14 +396,17 @@ export function PrimaryHeroCard({
         <div className="pointer-events-none absolute -bottom-16 left-20 h-48 w-48 rounded-full bg-cyan-400/25 blur-3xl" />
 
         {vocabDue.imageUrl && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[56%]">
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[62%] ${IMAGE_PANEL_MASK}`}
+          >
             <img
               src={vocabDue.imageUrl}
               alt={vocabDue.title ?? "Vocab Image"}
-              className="h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700/80 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/80 via-transparent to-indigo-900/20" />
+            {/* Light tint: stronger on mobile for text contrast, subtle on md+ */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-700/70 via-indigo-700/45 to-indigo-700/10 md:from-blue-700/25 md:via-indigo-700/10 md:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/45 via-transparent to-transparent" />
           </div>
         )}
 
@@ -479,14 +492,17 @@ export function PrimaryHeroCard({
         <div className="pointer-events-none absolute -bottom-16 left-20 h-48 w-48 rounded-full bg-fuchsia-400/25 blur-3xl" />
 
         {nextLesson.imageUrl && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[58%]">
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 w-full overflow-hidden md:w-[62%] ${IMAGE_PANEL_MASK}`}
+          >
             <img
               src={nextLesson.imageUrl}
               alt={nextLesson.imageAlt ?? "Spoon Image"}
-              className="h-full w-full object-cover opacity-75 transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-indigo-700/75 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/80 via-transparent to-indigo-900/20" />
+            {/* Light tint: stronger on mobile for text contrast, subtle on md+ */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-700/70 via-indigo-700/45 to-indigo-700/10 md:from-blue-700/25 md:via-indigo-700/10 md:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/45 via-transparent to-transparent" />
           </div>
         )}
 
