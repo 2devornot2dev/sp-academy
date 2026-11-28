@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { setupFirstLesson } from "@/lib/foundation/setup-first-lesson";
 import { Gender, Languages, PaymentStatus, Prisma } from "@prisma/client";
 import { setLiveTaskState } from "@/app/actions/system-task-actions";
+import { notifyNewTrial } from "@/lib/telegram";
 import type {
   InvokeEduBuilderPayload,
   InvokeEduBuilderResult,
@@ -33,7 +34,8 @@ const CODE_TO_ENUM: Record<string, string> = {
 function toLanguage(v?: string | null): Languages | undefined {
   if (!v) return undefined;
   const raw = v.trim();
-  const candidate = CODE_TO_ENUM[raw.split("-")[0].toLowerCase()] ?? raw.toUpperCase();
+  const candidate =
+    CODE_TO_ENUM[raw.split("-")[0].toLowerCase()] ?? raw.toUpperCase();
   return (Object.values(Languages) as string[]).includes(candidate)
     ? (candidate as Languages)
     : undefined;
@@ -171,6 +173,8 @@ export async function invokeTrialBuilder(
         `Trial lambda failed with status: ${response.StatusCode}`,
       );
     }
+
+    void notifyNewTrial(normalizedPayload.targetLanguage);
 
     return { ok: true, lessonId: dbContext.lessonId, taskId: dbContext.taskId };
   } catch (err) {

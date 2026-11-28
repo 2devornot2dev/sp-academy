@@ -12,22 +12,93 @@ import {
 } from "lucide-react";
 import type { HomeDashboardData } from "@/app/actions/get-home-dashboard";
 
-export function HeroTrophyIllustration() {
+export function HeroTrophyIllustration({
+  milestone = 1,
+}: {
+  milestone?: number;
+}) {
+  const TIER_PALETTES = [
+    {
+      // Gold
+      cup: ["#FEF08A", "#FACC15", "#B45309"],
+      rim: "#FEF9C3",
+      base: "#92400E",
+      podiumTop: ["#38BDF8", "#0284C7"],
+      glowA: "#38BDF8",
+      glowB: "#FACC15",
+      gem: "#10B981",
+    },
+    {
+      // Emerald
+      cup: ["#A7F3D0", "#10B981", "#047857"],
+      rim: "#D1FAE5",
+      base: "#065F46",
+      podiumTop: ["#34D399", "#059669"],
+      glowA: "#10B981",
+      glowB: "#38BDF8",
+      gem: "#FACC15",
+    },
+    {
+      // Sapphire
+      cup: ["#BAE6FD", "#38BDF8", "#1D4ED8"],
+      rim: "#E0F2FE",
+      base: "#1E3A8A",
+      podiumTop: ["#818CF8", "#4F46E5"],
+      glowA: "#38BDF8",
+      glowB: "#818CF8",
+      gem: "#FDE047",
+    },
+    {
+      // Amethyst Royal
+      cup: ["#E9D5FF", "#C084FC", "#6D28D9"],
+      rim: "#F3E8FF",
+      base: "#4C1D95",
+      podiumTop: ["#F472B6", "#DB2777"],
+      glowA: "#C084FC",
+      glowB: "#F472B6",
+      gem: "#38BDF8",
+    },
+    {
+      // Crimson Solar
+      cup: ["#FECDD3", "#FB7185", "#BE123C"],
+      rim: "#FFE4E6",
+      base: "#881337",
+      podiumTop: ["#FBBF24", "#D97706"],
+      glowA: "#FB7185",
+      glowB: "#FACC15",
+      gem: "#FEF08A",
+    },
+    {
+      // Prismatic Diamond
+      cup: ["#FFFFFF", "#67E8F9", "#6366F1"],
+      rim: "#ECFEFF",
+      base: "#312E81",
+      podiumTop: ["#22D3EE", "#4F46E5"],
+      glowA: "#22D3EE",
+      glowB: "#C084FC",
+      gem: "#F43F5E",
+    },
+  ] as const;
+
+  const palette = TIER_PALETTES[(Math.max(1, milestone) - 1) % TIER_PALETTES.length];
+  const hasCrown = milestone >= 3;
+  const hasWings = milestone >= 5;
+
   return (
     <svg
       viewBox="0 0 260 190"
-      className="h-32 w-40 sm:h-36 sm:w-48 shrink-0 select-none drop-shadow-[0_12px_20px_rgba(0,0,0,0.35)]"
+      className="h-28 w-36 sm:h-36 sm:w-48 shrink-0 select-none drop-shadow-[0_12px_20px_rgba(0,0,0,0.38)]"
       fill="none"
     >
       <defs>
         <linearGradient id="goldCup" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FEF08A" />
-          <stop offset="45%" stopColor="#FACC15" />
-          <stop offset="100%" stopColor="#D97706" />
+          <stop offset="0%" stopColor={palette.cup[0]} />
+          <stop offset="45%" stopColor={palette.cup[1]} />
+          <stop offset="100%" stopColor={palette.cup[2]} />
         </linearGradient>
         <linearGradient id="podiumTop" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#38BDF8" />
-          <stop offset="100%" stopColor="#0284C7" />
+          <stop offset="0%" stopColor={palette.podiumTop[0]} />
+          <stop offset="100%" stopColor={palette.podiumTop[1]} />
         </linearGradient>
         <linearGradient id="podiumBody" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#1E293B" />
@@ -35,9 +106,23 @@ export function HeroTrophyIllustration() {
         </linearGradient>
       </defs>
 
-      <circle cx="135" cy="85" r="68" fill="#38BDF8" fillOpacity="0.12" />
-      <circle cx="135" cy="85" r="46" fill="#FACC15" fillOpacity="0.15" />
+      {/* Ambient Aura */}
+      <circle cx="135" cy="85" r="70" fill={palette.glowA} fillOpacity="0.14" />
+      <circle cx="135" cy="85" r="48" fill={palette.glowB} fillOpacity="0.18" />
 
+      {hasWings && (
+        <circle
+          cx="135"
+          cy="82"
+          r="58"
+          stroke={palette.cup[0]}
+          strokeOpacity="0.3"
+          strokeWidth="1.5"
+          strokeDasharray="6 6"
+        />
+      )}
+
+      {/* Confetti Accents */}
       <circle cx="55" cy="36" r="4" fill="#FDE047" />
       <circle cx="215" cy="44" r="5" fill="#4ADE80" />
       <rect
@@ -47,7 +132,7 @@ export function HeroTrophyIllustration() {
         height="5"
         rx="2.5"
         transform="rotate(-25 42 68)"
-        fill="#38BDF8"
+        fill={palette.glowA}
       />
       <rect
         x="200"
@@ -59,14 +144,49 @@ export function HeroTrophyIllustration() {
         fill="#FACC15"
       />
 
+      {/* 3D Podium + Engraved Milestone Badge */}
       <ellipse cx="135" cy="172" rx="74" ry="11" fill="#090D16" />
-      <rect x="75" y="146" width="120" height="24" rx="6" fill="url(#podiumBody)" />
+      <rect
+        x="75"
+        y="146"
+        width="120"
+        height="24"
+        rx="6"
+        fill="url(#podiumBody)"
+        stroke="#334155"
+        strokeWidth="1.5"
+      />
       <ellipse cx="135" cy="146" rx="60" ry="9" fill="url(#podiumTop)" />
 
-      <rect x="110" y="128" width="50" height="14" rx="4" fill="#B45309" />
+      {/* Engraved Milestone Plate on Podium */}
+      <rect
+        x="105"
+        y="151"
+        width="60"
+        height="15"
+        rx="4"
+        fill="#0F172A"
+        stroke={palette.cup[1]}
+        strokeWidth="1.2"
+      />
+      <text
+        x="135"
+        y="162"
+        textAnchor="middle"
+        fill="#FFFFFF"
+        fontSize="10"
+        fontWeight="900"
+        letterSpacing="1"
+      >
+        M{milestone}
+      </text>
+
+      {/* Trophy Base & Stem */}
+      <rect x="110" y="128" width="50" height="14" rx="4" fill={palette.base} />
       <rect x="115" y="122" width="40" height="8" rx="3" fill="url(#goldCup)" />
       <rect x="128" y="96" width="14" height="28" rx="5" fill="url(#goldCup)" />
 
+      {/* Handles */}
       <path
         d="M100 46H84C78 46 75 52 77 59C80 71 91 82 106 82"
         stroke="url(#goldCup)"
@@ -80,16 +200,30 @@ export function HeroTrophyIllustration() {
         strokeLinecap="round"
       />
 
+      {/* Cup Bowl */}
       <path
         d="M96 32H174V60C174 84 157 100 135 100C113 100 96 84 96 60V32Z"
         fill="url(#goldCup)"
       />
-      <ellipse cx="135" cy="32" rx="39" ry="7" fill="#FEF9C3" />
+      <ellipse cx="135" cy="32" rx="39" ry="7" fill={palette.rim} />
 
+      {/* Floating Mini Crown for Milestone 3+ */}
+      {hasCrown && (
+        <path
+          d="M119 22L124 11L135 18L146 11L151 22H119Z"
+          fill="#FACC15"
+          stroke="#FEF08A"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      )}
+
+      {/* Center Star + Gem */}
       <polygon
-        points="135,46 140,57 152,58 143,65 145,77 135,71 125,77 127,65 118,58 130,57"
+        points="135,44 140,55 152,56 143,63 145,75 135,69 125,75 127,63 118,56 130,55"
         fill="#FFFBEB"
       />
+      <circle cx="135" cy="60" r="4.5" fill={palette.gem} />
     </svg>
   );
 }
