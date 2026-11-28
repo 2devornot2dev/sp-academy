@@ -89,8 +89,8 @@ function parseAzurePronunciation(rawResult: any): PagePronResult | null {
         rawResult.overallScore ??
         rawResult.score ??
         rawResult.NBest?.[0]?.PronunciationAssessment?.PronScore ??
-        0
-    )
+        0,
+    ),
   );
 
   const rawWords: any[] =
@@ -108,8 +108,8 @@ function parseAzurePronunciation(rawResult: any): PagePronResult | null {
           w.AccuracyScore ??
           w.score ??
           w.PronunciationAssessment?.AccuracyScore ??
-          overall
-      )
+          overall,
+      ),
     );
     const err =
       w.errorType ??
@@ -185,7 +185,7 @@ export function BookWrapper({
   const [selectedLang, setSelectedLang] = useState<string>(
     book.translations[defaultLang]
       ? defaultLang
-      : availableLanguages[0] || "fr-FR"
+      : availableLanguages[0] || "fr-FR",
   );
 
   const isMultiLangUnlocked =
@@ -208,7 +208,7 @@ export function BookWrapper({
   const [readingMode, setReadingMode] = useState<ReadingMode>("read");
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [completedCheckpoints, setCompletedCheckpoints] = useState<Set<number>>(
-    new Set(initialCompletedCheckpoints)
+    new Set(initialCompletedCheckpoints),
   );
   const [pagePronScores, setPagePronScores] = useState<
     Record<string, PagePronResult>
@@ -221,7 +221,7 @@ export function BookWrapper({
 
   const [isCheckpointDrawerOpen, setIsCheckpointDrawerOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<CheckpointOption | null>(
-    null
+    null,
   );
   const [emojiBurstKey, setEmojiBurstKey] = useState<number>(0);
   const [wrongShakeKey, setWrongShakeKey] = useState<number>(0);
@@ -229,7 +229,7 @@ export function BookWrapper({
   // Audio + 60fps Word Tracking + Ambient Music State
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(0.85);
   const [activeSentenceIdx, setActiveSentenceIdx] = useState<number | null>(
-    null
+    null,
   );
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
   const [isPlayingPage, setIsPlayingPage] = useState<boolean>(false);
@@ -268,13 +268,17 @@ export function BookWrapper({
   const cameraMotion =
     CAMERA_MOTIONS[(Math.max(1, currentPage) - 1) % CAMERA_MOTIONS.length];
 
+  const AMBIENT_VOLUME = 0.28; // while the page is idle / being read silently
+  const AMBIENT_VOLUME_DUCKED = 0.12; // while narration or mic recording is active
+
+  // 1. Where the audio element is created
   useEffect(() => {
     preloadSfx();
 
     const bg = new Audio("/sfx/book-ambient.mp3");
     bg.loop = true;
     bg.preload = "auto";
-    bg.volume = 0.1;
+    bg.volume = AMBIENT_VOLUME; // was 0.1
     ambientAudioRef.current = bg;
 
     return () => {
@@ -301,7 +305,8 @@ export function BookWrapper({
       return;
     }
 
-    bg.volume = isAudioActive ? 0.04 : 0.1;
+    // 2. In the play/pause effect
+    bg.volume = isAudioActive ? AMBIENT_VOLUME_DUCKED : AMBIENT_VOLUME; // was 0.04 : 0.1
     if (bg.paused) {
       void bg.play().catch(() => {});
     }
@@ -353,7 +358,7 @@ export function BookWrapper({
       if (!s3Key) return undefined;
       return book.mediaUrls?.sentenceAudioUrls?.[s3Key] || s3Key;
     },
-    [book.mediaUrls?.sentenceAudioUrls]
+    [book.mediaUrls?.sentenceAudioUrls],
   );
 
   const playSentenceWithWordTracking = useCallback(
@@ -406,7 +411,7 @@ export function BookWrapper({
               audioRef.current.currentTime / audioRef.current.duration;
             const estIdx = Math.min(
               words.length - 1,
-              Math.floor(progress * words.length)
+              Math.floor(progress * words.length),
             );
             setActiveWordIdx(estIdx);
           }
@@ -433,7 +438,7 @@ export function BookWrapper({
         audio.play().catch(cleanupAndResolve);
       });
     },
-    [isAudioMuted, playbackSpeed, resolveAudioUrl]
+    [isAudioMuted, playbackSpeed, resolveAudioUrl],
   );
 
   const playVocabAudio = useCallback(
@@ -447,7 +452,7 @@ export function BookWrapper({
       audioRef.current = audio;
       void audio.play().catch(() => {});
     },
-    [isAudioMuted, playbackSpeed, resolveAudioUrl]
+    [isAudioMuted, playbackSpeed, resolveAudioUrl],
   );
 
   const runPageNarration = useCallback(
@@ -472,7 +477,7 @@ export function BookWrapper({
         setActiveWordIdx(null);
       }
     },
-    [playSentenceWithWordTracking]
+    [playSentenceWithWordTracking],
   );
 
   const handlePlayAllSentences = useCallback(async () => {
@@ -494,7 +499,7 @@ export function BookWrapper({
     (
       page: number,
       checkpoints: Set<number>,
-      scores: Record<string, PagePronResult> = pagePronScores
+      scores: Record<string, PagePronResult> = pagePronScores,
     ) => {
       if (!onSaveProgress) return;
       void onSaveProgress({
@@ -506,7 +511,7 @@ export function BookWrapper({
         pronunciationScores: scores,
       });
     },
-    [book.id, selectedLang, onSaveProgress, outroPage, pagePronScores]
+    [book.id, selectedLang, onSaveProgress, outroPage, pagePronScores],
   );
 
   const handleReadPageAloud = useCallback(async () => {
@@ -642,7 +647,7 @@ export function BookWrapper({
         setActiveWordIdx(null);
       }
     },
-    [isPlayDisabled, playSentenceWithWordTracking, stopAudio]
+    [isPlayDisabled, playSentenceWithWordTracking, stopAudio],
   );
 
   const handleTapVocab = useCallback(
@@ -652,7 +657,7 @@ export function BookWrapper({
       setActiveVocab(defn);
       playVocabAudio(defn.audioS3Key || defn.audioUrl);
     },
-    [playVocabAudio, stopAudio]
+    [playVocabAudio, stopAudio],
   );
 
   const handleNextPage = () => {
@@ -660,8 +665,9 @@ export function BookWrapper({
     const nextPage = currentPage + 1;
     playSfx(nextPage === outroPage ? "victory" : "tap");
 
+    // 3. In handleNextPage
     if (isMusicEnabled && !isAudioMuted && ambientAudioRef.current?.paused) {
-      ambientAudioRef.current.volume = 0.1;
+      ambientAudioRef.current.volume = AMBIENT_VOLUME; // was 0.1
       void ambientAudioRef.current.play().catch(() => {});
     }
 
@@ -889,7 +895,9 @@ export function BookWrapper({
                 : "bg-slate-100 text-slate-400 hover:bg-slate-200"
             }`}
             title={
-              isMusicEnabled ? "Turn reading music off" : "Turn reading music on"
+              isMusicEnabled
+                ? "Turn reading music off"
+                : "Turn reading music on"
             }
           >
             <Music className="h-4 w-4" />
@@ -1267,7 +1275,7 @@ export function BookWrapper({
                                   pageVocabSet.get(cleanToken);
                                 const pronClass = getWordPronClass(
                                   wordToken,
-                                  flatIdx
+                                  flatIdx,
                                 );
 
                                 return (
@@ -1714,13 +1722,16 @@ export function BookWrapper({
                       }
                     >
                       <span className="font-black">
-                        {selectedOption.isCorrect ? "🎉 Spot on! " : "💡 Hint: "}
+                        {selectedOption.isCorrect
+                          ? "🎉 Spot on! "
+                          : "💡 Hint: "}
                       </span>
                       {selectedOption.spriteReaction}
                     </motion.p>
                   ) : isCurrentPageSolved ? (
                     <p className="font-semibold text-emerald-700">
-                      🎉 Challenge complete! You&apos;re ready for the next page.
+                      🎉 Challenge complete! You&apos;re ready for the next
+                      page.
                     </p>
                   ) : (
                     <p className="font-medium text-slate-400">
