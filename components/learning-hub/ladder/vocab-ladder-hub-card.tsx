@@ -162,7 +162,7 @@ export function VocabLadderHubCard({
           <span>
             {activeRung.status === "COMPLETED"
               ? "View Full Ladder"
-              : `Climb Rung ${activeRung.rungOrder}: ${activeRung.title}`}
+              : `Start: ${activeRung.title}`}
           </span>
           <ArrowRight className="h-4 w-4" />
         </Link>
