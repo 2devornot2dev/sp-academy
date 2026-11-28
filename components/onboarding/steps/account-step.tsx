@@ -1,7 +1,7 @@
 "use client";
 
 import { Dices } from "lucide-react";
-import { USERNAME_MAX } from "@/lib/username-validation"; // NEW
+import { USERNAME_MAX } from "@/lib/username-validation";
 import { Gender } from "@prisma/client";
 
 interface AccountStepProps {
@@ -18,7 +18,7 @@ interface AccountStepProps {
   username: string;
   setUsername: (val: string) => void;
   onShuffleUsername: () => void;
-  usernameError?: string | null; // NEW
+  usernameError?: string | null;
   email: string;
   setEmail: (val: string) => void;
   password: string;
@@ -40,7 +40,7 @@ export function AccountStep({
   username,
   setUsername,
   onShuffleUsername,
-  usernameError, // NEW
+  usernameError,
   email,
   setEmail,
   password,
@@ -55,7 +55,7 @@ export function AccountStep({
           <button
             type="button"
             onClick={onGoogleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 font-bold text-gray-900 shadow-xs transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md"
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 font-bold text-gray-900 shadow-xs transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
           >
             <GoogleIcon />
             Continue with Google
@@ -85,7 +85,6 @@ export function AccountStep({
           />
         </div>
 
-        {/* Grammatical Gender Selector inside AccountStep */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-bold tracking-wider text-gray-600 uppercase">
@@ -110,7 +109,7 @@ export function AccountStep({
                   onClick={() => setGender(opt.value)}
                   className={`flex items-center justify-center gap-2 rounded-2xl border-2 px-4 py-3.5 text-sm font-bold transition-all ${
                     selected
-                      ? "border-violet-600 bg-violet-50/70 text-violet-900 shadow-xs ring-2 ring-violet-500/15"
+                      ? "border-blue-600 bg-sky-50/70 text-blue-950 shadow-xs ring-2 ring-sky-500/15"
                       : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                   }`}
                 >
@@ -122,14 +121,13 @@ export function AccountStep({
           </div>
         </div>
 
-        {/* NEW: wrapper div so the error sits right under the field */}
         <div>
           <Field
             label="Username"
             autoComplete="username"
             placeholder="e.g. spoon_learner"
             value={username}
-            maxLength={USERNAME_MAX} // NEW
+            maxLength={USERNAME_MAX}
             onChange={(e) => setUsername(e.target.value)}
             autoCapitalize="none"
             autoCorrect="off"
@@ -140,13 +138,12 @@ export function AccountStep({
                 onClick={onShuffleUsername}
                 aria-label="Suggest another username"
                 title="Suggest another username"
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 transition hover:bg-violet-50 hover:text-violet-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 transition hover:bg-sky-50 hover:text-blue-600"
               >
                 <Dices className="h-5 w-5" />
               </button>
             }
           />
-          {/* NEW: inline validation message */}
           {usernameError && (
             <p className="mt-1.5 text-sm font-medium text-red-600">
               {usernameError}
@@ -203,7 +200,7 @@ function Field({
       <div className="relative">
         <input
           {...props}
-          className={`w-full rounded-2xl border border-gray-100 bg-white px-4 py-3.5 font-medium text-gray-900 shadow-xs outline-none transition placeholder:text-gray-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 read-only:bg-gray-50 read-only:text-gray-500 ${
+          className={`w-full rounded-2xl border border-gray-100 bg-white px-4 py-3.5 font-medium text-gray-900 shadow-xs outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:ring-4 focus:ring-sky-500/10 read-only:bg-gray-50 read-only:text-gray-500 ${
             trailing ? "pr-12" : ""
           }`}
         />

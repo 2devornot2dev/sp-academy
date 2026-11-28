@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,14 +16,12 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
-import { generateUsername } from "@/lib/username"; // NEW
+import { generateUsername } from "@/lib/username";
 import {
   LANGUAGES,
   LEVELS,
   GOALS,
   EMAIL_RE,
-  SPRITES,
-  SPRITE_VOICES,
   SpriteSlug,
   LANGUAGE_LOCALE_MAP,
 } from "./constants";
@@ -36,8 +36,6 @@ import { invokeTrialBuilder } from "@/app/actions/invoke-trial-builder";
 import { setUserGeneration } from "@/app/actions/set-user-generation";
 import { sendOnboardingWelcomeEmail } from "@/lib/actions/send-welcome-email";
 import { getLockedSpriteVoices } from "@/lib/sprites/voices";
-
-
 
 function getLanguageCode(item: any): string {
   if (item?.code && /^[a-z]{2,3}-[A-Z]{2,4}$/.test(item.code)) return item.code;
@@ -64,13 +62,6 @@ export default function OnboardingShell({
   const hasAccount = isOAuth && !!session?.user;
   const [nativeVoiceId, setNativeVoiceId] = useState<string>("");
 
-  // Wipe any existing session when arriving on onboarding unless returning from Google click
-  useEffect(() => {
-    if (!isOAuth) {
-      authClient.signOut();
-    }
-  }, [isOAuth]);
-
   const [step, setStep] = useState(1);
   const totalSteps = 6;
 
@@ -84,7 +75,7 @@ export default function OnboardingShell({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Preference State (Guaranteed to be "en-US", "fr-FR", etc.)
+  // Preference State
   const [nativeLanguage, setNativeLanguage] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("");
   const [level, setLevel] = useState("");
@@ -93,22 +84,18 @@ export default function OnboardingShell({
   const [voiceId, setVoiceId] = useState<string>("");
   const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
-  // NEW: user typing goes through this so it's always lowercase
   const handleUsernameChange = (value: string) => {
     setUsername(normalizeUsername(value));
   };
 
-  // NEW: shuffle button handler
   const shuffleUsername = () => {
     setUsername(generateUsername());
   };
 
-  // NEW: suggest a username once on mount, never overwrite what the user typed
   useEffect(() => {
     setUsername((prev) => prev || generateUsername());
   }, []);
 
-  // Check for URL errors (like account_not_linked) and display them in the UI
   useEffect(() => {
     if (urlErrorCode) {
       if (urlErrorCode === "account_not_linked") {
@@ -119,7 +106,6 @@ export default function OnboardingShell({
         setError(`Google sign in failed (${urlErrorCode}).`);
       }
 
-      // Clean the error from the URL
       const newSearchParams = new URLSearchParams(searchParams.toString());
       newSearchParams.delete("error");
       const newUrl = newSearchParams.toString()
@@ -129,9 +115,9 @@ export default function OnboardingShell({
     }
   }, [urlErrorCode, searchParams, router]);
 
-  // Only sign out stale sessions on initial mount at Step 1 (never after Step 1 signup!)
+  // Only sign out stale sessions on initial mount at Step 1 when not OAuth or Stripe upgrade
   useEffect(() => {
-    if (!isOAuth && step === 1 && !createdUserId) {
+    if (!isOAuth && !sessionId && step === 1 && !createdUserId) {
       authClient.signOut();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,7 +181,7 @@ export default function OnboardingShell({
     }
   };
 
-const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async () => {
     let userId = createdUserId || session?.user?.id;
 
     if (!userId) {
@@ -213,14 +199,11 @@ const handleCompleteOnboarding = async () => {
     setError(null);
 
     try {
-      const fallbackSuffix = sprite === "vivi" ? "girl-01" : "boy-01";
-      const nativeSuffix =
-        nativeVoiceId.split("-").slice(2).join("-") || fallbackSuffix;
-      const targetSuffix =
-        voiceId.split("-").slice(2).join("-") || fallbackSuffix;
-
-      const resolvedNativeVoiceId = `${nativeLanguage}-${nativeSuffix}`;
-      const resolvedTargetVoiceId = `${targetLanguage}-${targetSuffix}`;
+      const {
+        spriteSlug: resolvedSpriteSlug,
+        nativeVoiceId: resolvedNativeVoiceId,
+        targetVoiceId: resolvedTargetVoiceId,
+      } = getLockedSpriteVoices(sprite, nativeLanguage, targetLanguage);
 
       const commonPayload = {
         userId,
@@ -234,7 +217,7 @@ const handleCompleteOnboarding = async () => {
         scriptComfort: "unspecified",
         type: "lang",
         isOnboarding: true,
-        spriteSlug: sprite,
+        spriteSlug: resolvedSpriteSlug,
         nativeVoiceId: resolvedNativeVoiceId,
         targetVoiceId: resolvedTargetVoiceId,
       };
@@ -253,7 +236,7 @@ const handleCompleteOnboarding = async () => {
           targetLanguage,
           level: level.toLowerCase(),
           goal,
-          spriteSlug: sprite,
+          spriteSlug: resolvedSpriteSlug,
           nativeVoiceId: resolvedNativeVoiceId,
           targetVoiceId: resolvedTargetVoiceId,
         }),
@@ -340,34 +323,107 @@ const handleCompleteOnboarding = async () => {
       await handleCompleteOnboarding();
     }
   };
+
   const previousStep = () => {
     if (step > 2) setStep((current) => current - 1);
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F8F9FC] font-sans selection:bg-violet-200">
-      {/* Background Blurs */}
-      <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-violet-400/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -left-40 top-40 -z-10 h-[400px] w-[400px] rounded-full bg-teal-400/10 blur-[100px]" />
-      <div className="pointer-events-none absolute -right-40 top-80 -z-10 h-[500px] w-[500px] rounded-full bg-indigo-400/10 blur-[100px]" />
+    <div className="relative flex min-h-dvh w-full flex-col items-center justify-center overflow-hidden bg-slate-50 px-3.5 py-6 font-sans text-slate-900 selection:bg-sky-200 sm:px-6 sm:py-10">
+      {/* =====================================================================
+          PREMIUM VECTOR & MESH GRADIENT BACKDROP (Outside the Container)
+          ===================================================================== */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(circle_at_15%_20%,rgba(56,189,248,0.18),transparent_36rem),radial-gradient(circle_at_85%_25%,rgba(99,102,241,0.15),transparent_36rem),radial-gradient(circle_at_50%_90%,rgba(20,184,166,0.14),transparent_40rem)]"
+      />
 
-      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-10">
-        {/* Header */}
-        <div className="mb-12 flex items-center justify-between">
-          <span className="text-xl font-extrabold tracking-tight text-gray-900">
-            SPOON ACADEMY
-          </span>
-          <span className="text-sm font-bold text-gray-400">
-            {step} / {totalSteps}
+      {/* Subtle Architectural Vector Grid + Orbit Rings */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-55"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <pattern
+            id="spoon-onboarding-grid"
+            width="48"
+            height="48"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 48 0 L 0 0 0 48"
+              fill="none"
+              stroke="rgba(148, 163, 184, 0.16)"
+              strokeWidth="1"
+            />
+          </pattern>
+          <radialGradient id="spoon-grid-mask" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stopColor="white" stopOpacity="1" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+          <mask id="fade-mask">
+            <rect width="100%" height="100%" fill="url(#spoon-grid-mask)" />
+          </mask>
+        </defs>
+
+        <rect
+          width="100%"
+          height="100%"
+          fill="url(#spoon-onboarding-grid)"
+          mask="url(#fade-mask)"
+        />
+
+        {/* Subtle Decorative Vector Rings */}
+        <circle
+          cx="12%"
+          cy="22%"
+          r="140"
+          fill="none"
+          stroke="rgba(14, 165, 233, 0.14)"
+          strokeWidth="1.5"
+          strokeDasharray="8 8"
+        />
+        <circle
+          cx="88%"
+          cy="76%"
+          r="180"
+          fill="none"
+          stroke="rgba(99, 102, 241, 0.12)"
+          strokeWidth="1.5"
+        />
+      </svg>
+
+      {/* =====================================================================
+          ELEVATED 3D ONBOARDING CONTAINER CARD
+          ===================================================================== */}
+      <div className="relative z-10 flex w-full max-w-2xl flex-col rounded-3xl border-2 border-b-[6px] border-slate-200/90 border-b-slate-300 bg-white/95 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:rounded-[2.25rem] sm:p-10">
+        {/* Header: Spoon Logo + Step Pill */}
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo1-nobg.png"
+              alt="Spoon Academy"
+              width={150}
+              height={42}
+              priority
+              className="h-8 w-auto object-contain sm:h-9"
+            />
+          </Link>
+
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3.5 py-1 text-xs font-black tracking-wider text-blue-700 uppercase">
+            <span>
+              Step {step} of {totalSteps}
+            </span>
           </span>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-12 h-1.5 overflow-hidden rounded-full bg-gray-200">
+        {/* Spoon Primary Gradient Progress Bar */}
+        <div className="mb-8 h-2 overflow-hidden rounded-full bg-slate-100 p-0.5 shadow-inner">
           <motion.div
-            className="h-full rounded-full bg-linear-to-r from-violet-500 to-fuchsia-500"
+            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-600 to-teal-400"
             animate={{ width: `${(step / totalSteps) * 100}%` }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
           />
         </div>
 
@@ -397,11 +453,11 @@ const handleCompleteOnboarding = async () => {
                     setFirstName={setFirstName}
                     lastName={lastName}
                     setLastName={setLastName}
-                    gender={gender} // <-- NEW
-                    setGender={setGender} // <-- NEW
+                    gender={gender}
+                    setGender={setGender}
                     username={username}
-                    setUsername={handleUsernameChange} // CHANGED
-                    onShuffleUsername={shuffleUsername} // NEW
+                    setUsername={handleUsernameChange}
+                    onShuffleUsername={shuffleUsername}
                     email={emailValue}
                     setEmail={setEmailValue}
                     password={password}
@@ -433,7 +489,7 @@ const handleCompleteOnboarding = async () => {
                           onClick={() => setNativeLanguage(langCode)}
                         >
                           <span className="text-2xl">{item.flag}</span>
-                          <span className="flex-1 font-bold text-gray-900">
+                          <span className="flex-1 font-bold text-slate-900">
                             {item.name}
                           </span>
                         </SelectionCard>
@@ -465,7 +521,7 @@ const handleCompleteOnboarding = async () => {
                           onClick={() => setTargetLanguage(langCode)}
                         >
                           <span className="text-2xl">{item.flag}</span>
-                          <span className="flex-1 font-bold text-gray-900">
+                          <span className="flex-1 font-bold text-slate-900">
                             {item.name}
                           </span>
                         </SelectionCard>
@@ -498,10 +554,10 @@ const handleCompleteOnboarding = async () => {
                           onClick={() => setLevel(levelValue)}
                         >
                           <div>
-                            <p className="font-bold text-gray-900">
+                            <p className="font-bold text-slate-900">
                               {item.name}
                             </p>
-                            <p className="mt-1 text-sm font-medium text-gray-500">
+                            <p className="mt-1 text-sm font-medium text-slate-500">
                               {item.description}
                             </p>
                           </div>
@@ -528,7 +584,7 @@ const handleCompleteOnboarding = async () => {
                         selected={goal === item}
                         onClick={() => setGoal(item)}
                       >
-                        <span className="font-bold text-gray-900">{item}</span>
+                        <span className="font-bold text-slate-900">{item}</span>
                       </SelectionCard>
                     ))}
                   </div>
@@ -542,10 +598,9 @@ const handleCompleteOnboarding = async () => {
                   icon={<Volume2 className="h-5 w-5" />}
                   eyebrow="Your AI Companion"
                   title="Choose your guide & voice"
-                  description="Vox or Vivi will brief you before every Spoon and coach you through the curriculum."
+                  description="Vox, Vivi, Dex, or Deva will brief you before every Spoon and coach you through the curriculum."
                 >
-
-                 <SpriteStep
+                  <SpriteStep
                     nativeLanguage={nativeLanguage}
                     targetLanguage={targetLanguage}
                     selectedSprite={sprite}
@@ -555,7 +610,6 @@ const handleCompleteOnboarding = async () => {
                     selectedVoiceId={voiceId}
                     setSelectedVoiceId={setVoiceId}
                   />
-
                 </Question>
               )}
             </AnimatePresence>
@@ -563,12 +617,12 @@ const handleCompleteOnboarding = async () => {
         </div>
 
         {/* Footer Navigation */}
-        <div className="mt-12 flex items-center justify-between">
+        <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-5">
           <button
             type="button"
             onClick={previousStep}
             disabled={step <= 2}
-            className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-gray-500 transition hover:bg-white hover:text-gray-900 disabled:pointer-events-none disabled:opacity-0"
+            className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:pointer-events-none disabled:opacity-0"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -578,7 +632,7 @@ const handleCompleteOnboarding = async () => {
             type="button"
             onClick={nextStep}
             disabled={!canContinue || submitting}
-            className="group flex items-center gap-2 rounded-2xl bg-gray-900 px-7 py-4 text-base font-bold text-white shadow-lg transition-all hover:bg-gray-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-gray-900"
+            className="group flex items-center gap-2 rounded-2xl border-b-4 border-blue-800 bg-gradient-to-b from-sky-400 to-blue-600 px-7 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0.5 active:border-b-0 disabled:cursor-not-allowed disabled:border-slate-300 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none sm:text-base"
           >
             {submitting
               ? "Saving…"
@@ -589,7 +643,7 @@ const handleCompleteOnboarding = async () => {
                   : "Continue"}
 
             {!submitting && (
-              <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
+              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 sm:h-5 sm:w-5" />
             )}
           </button>
         </div>

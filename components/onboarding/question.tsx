@@ -26,11 +26,11 @@ export function Question({
       className="mx-auto max-w-2xl"
     >
       <div className="mb-8 text-center">
-        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-blue-600">
           {icon}
         </div>
 
-        <p className="mb-3 text-sm font-bold uppercase tracking-wider text-violet-600">
+        <p className="mb-3 text-sm font-bold uppercase tracking-wider text-blue-600">
           {eyebrow}
         </p>
 
